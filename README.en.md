@@ -15,3 +15,11 @@ pnpm build
 ```
 
 Update both READMEs after each completed feature with implementation and design, then commit by dependency order on a feature branch. No automatic push or deployment.
+
+## T010 admin session and request boundary · REQ-018 / 019
+
+Implements runtime admin-session validation, separate Bearer requests, login adapter boundary, revocation and 401/403 handling. Tokens stay in Pinia memory; reload requires login. Student Session.me, inactive accounts and unknown roles are rejected. Requests use same-origin admin paths, no-store, omit cookies and reject redirects; DELETE carries an idempotency key. Late responses after session changes are rejected; failed remote revocation is explicitly reported.
+
+Contract 0.1.0 leaves D02 credentials undefined, so real login stays disabled without invented password or SSO fields. Mock defaults off and requires both Vite DEV and VITE_ADMIN_MOCK=true. Synthetic tokens never reach real APIs. Lifecycle and authorization await T008 integration. UI integration follows this module.
+
+Foundation format/check/build passed with 3 template tests. Session/request tests use synthetic transport and do not prove real login or server authorization.
