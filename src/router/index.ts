@@ -1,15 +1,29 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAdminStore } from '@/stores/admin'
+import type { Role } from '@/types/admin'
 
-/** Lazy-loaded route views keep feature code out of the initial entry chunk. */
+export const menu: { path: string; title: string; role?: Role }[] = [
+  { path: '/', title: '工作台' },
+  { path: '/identity', title: '身份审核接入', role: 'review_operator' },
+]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
+    { path: '/login', component: () => import('@/views/LoginView.vue') },
+    { path: '/', component: () => import('@/views/DashboardView.vue') },
     {
-      path: '/:pathMatch(.*)*',
-      name: 'not-found',
-      component: () => import('@/views/NotFoundView.vue'),
+      path: '/identity',
+      component: () => import('@/views/IdentityView.vue'),
+      meta: { role: 'review_operator' },
     },
+    { path: '/403', component: () => import('@/views/ForbiddenView.vue') },
+    { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue') },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+})
+router.beforeEach((to) => {
+  const admin = useAdminStore()
+  if (to.path === '/login') return admin.authenticated ? '/' : true
+  if (!admin.authenticated) return '/login'
+  if (to.meta['role'] === 'review_operator' && !admin.can('review_operator')) return '/403'
+  return true
 })
