@@ -3,6 +3,7 @@ import tseslint from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier'
 import sourceConventions from './scripts/eslint/source-conventions.js'
+import { htmlProcessor, textParser } from './scripts/eslint/text-source.js'
 
 export default tseslint.config(
   { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
@@ -28,10 +29,20 @@ export default tseslint.config(
   },
   { files: ['**/*.js'], ...tseslint.configs.disableTypeChecked },
   {
-    files: ['**/*.{js,mjs,cjs,ts,tsx,jsx,vue}'],
-    ignores: ['**/*.{spec,test}.{js,mjs,cjs,ts,tsx,jsx}', '**/__tests__/**'],
+    files: ['**/*.{js,mjs,cjs,ts,tsx,jsx,vue,css,html}'],
+    ignores: [
+      '**/*.{spec,test}.{js,mjs,cjs,ts,tsx,jsx,vue,css,html}',
+      '**/*.{spec,test}.html/**',
+      '**/__tests__/**',
+    ],
     plugins: { local: { rules: { 'source-conventions': sourceConventions } } },
     rules: { 'local/source-conventions': 'error' },
   },
+  {
+    files: ['**/*.{css,html}'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: { parser: textParser },
+  },
+  { files: ['**/*.html'], processor: htmlProcessor },
   prettier,
 )
