@@ -54,6 +54,8 @@ pnpm preview
 
 `pnpm check` runs formatting, zero-warning ESLint, type checking and tests. Use `pnpm test` for tests alone or `pnpm test:watch` for watch mode.
 
+`pnpm lint` checks non-test JS/TS (including JSX/TSX), Vue and project scripts for task, requirement and milestone IDs. Explanatory comments must contain Chinese. Common logging methods on `console`, `logger` and `log` require a Chinese string or template as their first argument; pass dynamic data in subsequent arguments. Triple-slash type references are preserved. Files named `*.spec.*`, `*.test.*` or under `__tests__/` are exempt from this rule. `pnpm test` runs both business and convention-rule regression tests; `pnpm test:watch` watches business tests only.
+
 ## 4. Development standards and notes
 
 Non-test code must contain no milestone, task or requirement IDs. Keep traceability in stage documents or tests. Write code comments in Chinese to explain functionality, business intent, boundaries and design decisions. Use Chinese for logs and user-facing errors. Preserve language directives, API fields, protocol values and identifiers required by tools.

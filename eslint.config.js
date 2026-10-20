@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier'
+import sourceConventions from './scripts/eslint/source-conventions.js'
 
 export default tseslint.config(
   { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
@@ -26,5 +27,11 @@ export default tseslint.config(
     },
   },
   { files: ['**/*.js'], ...tseslint.configs.disableTypeChecked },
+  {
+    files: ['**/*.{js,mjs,cjs,ts,tsx,jsx,vue}'],
+    ignores: ['**/*.{spec,test}.{js,mjs,cjs,ts,tsx,jsx}', '**/__tests__/**'],
+    plugins: { local: { rules: { 'source-conventions': sourceConventions } } },
+    rules: { 'local/source-conventions': 'error' },
+  },
   prettier,
 )
