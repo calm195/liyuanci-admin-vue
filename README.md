@@ -1,33 +1,69 @@
 # 鲤源池 Web 管理端
 
-T004（Web）/T010，关联 REQ-018、019、020。基于 vue3-template 导入 Vue3、TypeScript、Router、Pinia，保留 pnpm 10.34.6 原始锁文件及质量规则。
+## 1. 项目介绍
+
+鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台及身份审核准备页。
+
+真实登录等待后台身份方案接入，当前没有默认账号或口令。开发环境可使用合成 Mock 演示；真实业务 API 和身份审核尚未接入。
+
+## 2. 项目选项与目录结构
+
+配置示例见 [.env.example](.env.example)。`VITE_ADMIN_MOCK=true` 显式启用本地模拟角色与会话，仅在 Vite DEV 生效，页面持续显示 Mock 标记；生产构建禁用 Mock，模拟请求不会发送到真实 API。`VITE_` 变量为公开配置，不得包含秘密。
+
+```text
+src/
+  assets/       全局样式和静态资源
+  components/   可复用 UI 组件（按需创建）
+  composables/  可复用响应式行为
+  router/       懒加载路由、角色菜单与守卫
+  services/     外部 I/O 与数据校验边界
+  stores/       共享状态与后台内存会话
+  types/        共享领域及契约类型
+  utils/        纯函数与相邻测试
+  views/        路由级页面
+public/         公共静态资源
+docs/
+  milestones/   按阶段分文件的功能、设计与验证记录
+```
+
+阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 接入准备](docs/milestones/T012.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
+
+## 3. 项目启动方式
+
+使用 Node.js `^22.13.0 || >=24.0.0` 和 pnpm 10（项目声明版本为 10.34.6），保留 `pnpm-lock.yaml`。
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
+```
+
+本地合成演示：
+
+```sh
+VITE_ADMIN_MOCK=true pnpm dev
+```
+
+质量检查与构建预览：
+
+```sh
 pnpm format
 pnpm check
 pnpm build
+pnpm preview
 ```
 
-Node 要求见 package.json。默认登录不可用：共享契约 0.1.0 的 D02 后台身份方案尚未冻结，未自行添加密码或 SSO。没有默认口令。仅内存保存后台令牌，刷新重新登录；不接学生会话，不使用浏览器存储保存资料。
+`pnpm check` 包含格式、零警告 ESLint、类型检查与测试。单独执行测试可用 `pnpm test`，监听模式用 `pnpm test:watch`。
 
-本地合成演示：`VITE_ADMIN_MOCK=true pnpm dev`。页面持续显示 Mock 标记，可选择三种模拟角色。只在 Vite DEV 生效，生产构建即使设置此变量也禁止 Mock；模拟请求不会发送至真实 API。真实业务 API 未接入，不提供真实审核数据。
+## 4. 开发规范与须知
 
-src/views 为懒加载页面，src/services 为外部 I/O 边界，src/types 为契约类型，src/stores 仅保存后台内存会话。src/router 配置角色菜单与守卫。隐藏菜单和按钮不替代后端授权。
+使用 `<script setup lang="ts">`，遵循严格类型与现有格式、lint 规则，不使用 `any`、不安全断言或抑制注释绕过检查。外部数据在 services 边界校验；瞬时 UI 状态留在组件，共享状态才进入 store；行为测试与实现相邻存放。
 
-[本批交付与验证](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
+每组修改后依次运行 `pnpm format`、`pnpm check`、`pnpm build`；需要自动 lint 修复时使用 `pnpm lint:fix`。准确记录验证结果与未完成依赖。
 
-生产静态托管需 HTTPS、history fallback 和同源 `/api/v1` 反向代理；禁止静态缓存敏感 API 响应。提交按功能范围在开发分支进行；不自动 push 或部署。
+README 仅维护项目介绍、项目选项与目录结构、启动方式、开发规范与须知，并同步英文版。功能与里程碑记录放在 `docs/milestones/`，按阶段分文件，包含任务 ID / REQ、主要行为、模块边界、设计取舍、接口契约版本、真实/模拟状态、验证结果与未完成依赖，随对应功能提交。
 
-## 已实现功能与设计
+新功能先建开发分支，按功能范围及依赖顺序提交，提交需有用户授权；不自动 push、部署或上线。仅修改本仓库，源模板、共享契约工作台及批准材料保持只读；契约疑问记入本仓库 `docs/`。
 
-| 功能 / 追踪                        | 实现与设计                                                                                                                                                                      | 验证与依赖                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| T004 工程基础 / REQ-001、020       | Vue3 + 严格 TypeScript + Router + Pinia；保持原锁文件与检查规则；源码、构建、CI 配置导入，排除本地资料                                                                          | 独立工程基础提交通过 format/check/build，3 个模板用例通过；后续已移除示例页面                  |
-| T010 后台会话与请求 / REQ-018、019 | 校验 AdminSessionResult，拒绝学生 Session.me、未知角色及停用账号；仅内存令牌，同源 /api/v1/admin 请求，no-store、omit cookie、禁止重定向，DELETE 幂等键；旧会话请求晚到结果作废 | 会话阶段通过 format/check/build，共16个用例（含当时模板用例）；契约0.1.0，真实登录依赖D02/T008 |
-| T010 登录与角色入口 / REQ-018、019 | 登录页默认禁用真实交换；开发Mock显式选择合成角色、持续标记；懒加载工作台、身份审核准备页、403/404；守卫与菜单共用角色判断，危机角色不获身份审核权限，超管可见                   | 最终20个行为用例与format/check/build通过；后端必须逐请求授权                                   |
-| T010 会话失效与退出 / REQ-018、019 | 401清理并回登录、403保留会话并进入拒绝页；退出先清本地再撤销，远端失败显示未确认；刷新重新登录，不虚构续期或TTL                                                                 | 合成HTTP与状态用例通过；真实过期、撤销、角色收回待T008联调                                     |
-| T012 接入准备 / REQ-002、018、019  | 仅受角色守卫的说明页与接入清单；明确脱敏列表、案件授权读卡、审计、版本/幂等与离开清理要求，不读取完整身份资料                                                                   | 等待T011验收及T008真实会话；未实现、未验收真实审核                                             |
+后台令牌仅存内存，刷新需重新登录，不接学生会话，不在浏览器存储身份资料。菜单和按钮隐藏不能替代后端授权。禁止提交凭据、本地 Codex 认证或私有环境值。
 
-每个功能完成修改后必须在本 README 说明实现与设计，同步 README.en.md；功能提交包含文档及必要用例，按依赖顺序在功能分支提交。规则已写入 AGENTS.md。当前开发分支为 feat/admin-foundation-session；没有 push 或部署。
+生产静态托管需 HTTPS、history fallback 和同源 `/api/v1` 反向代理，禁止缓存敏感 API 响应。完整项目约定见 [AGENTS.md](AGENTS.md)。
