@@ -1,4 +1,4 @@
-/** T010 · REQ-018/019 · shared contract 0.1.0. Never accept student Session.me. */
+/** 后台角色独立于学生会话，禁止接受学生身份。 */
 export const roles = ['review_operator', 'crisis_operator', 'super_admin'] as const
 export type Role = (typeof roles)[number]
 export interface AdminAccount {
@@ -17,7 +17,7 @@ export function isRole(value: unknown): value is Role {
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
-/** Copy only the non-sensitive projection; reject student or malformed envelopes. */
+/** 仅提取后台会话所需的非敏感字段，拒绝学生会话及格式异常的响应。 */
 export function parseAdminSession(value: unknown): AdminSession {
   if (
     !record(value) ||

@@ -46,7 +46,7 @@ describe('T010 REQ-018/019 登录入口', () => {
     vi.stubEnv('VITE_ADMIN_MOCK', 'true')
     const { mockEnabled, loginAdmin } = await import('@/services/admin')
     expect(mockEnabled).toBe(false)
-    expect(() => loginAdmin('super_admin')).toThrow('D02')
+    expect(() => loginAdmin('super_admin')).toThrow('后台身份提供方尚未接入，真实登录待联调')
   })
   it('模拟请求禁止向真实后端发送合成令牌', async () => {
     vi.stubEnv('DEV', true)

@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { ApiError, adminRequest, loginAdmin, revokeAdmin } from '@/services/admin'
 import type { AdminSession, Role } from '@/types/admin'
 
-/** T010 · REQ-018/019. Memory only; refresh requires authentication again. */
+/** 后台会话仅保存在内存中，刷新页面后需重新登录。 */
 export const useAdminStore = defineStore('admin-session', () => {
   const session = ref<AdminSession | null>(null)
   const notice = ref('')

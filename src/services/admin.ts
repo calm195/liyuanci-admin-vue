@@ -15,7 +15,7 @@ export class ApiError extends Error {
     )
   }
 }
-/** T010 · REQ-018/019. Only admin paths, same-origin, no cookie/student token. */
+/** 仅向同源后台路径发送请求，不携带浏览器会话凭据或学生令牌。 */
 export async function adminRequest(
   path: `/admin/${string}`,
   token: string,
@@ -29,7 +29,7 @@ export async function adminRequest(
     path.includes('..')
   )
     throw new Error('非法后台路径')
-  // Mock must never transmit its synthetic token to a real endpoint.
+  // 模拟令牌不得发送至真实接口。
   if (mockEnabled) throw new ApiError(503)
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
@@ -44,9 +44,9 @@ export async function adminRequest(
   if (!response.ok) throw new ApiError(response.status)
   return response.status === 204 ? undefined : response.json()
 }
-/** D02 blocks real credential exchange. No invented password/SSO payload. */
+/** 后台身份方案尚未接入，仅提供开发环境的模拟登录。 */
 export function loginAdmin(role: Role): AdminSession {
-  if (!mockEnabled) throw new Error('后台身份提供方尚未接入（D02），真实登录待联调')
+  if (!mockEnabled) throw new Error('后台身份提供方尚未接入，真实登录待联调')
   return parseAdminSession({
     code: 0,
     message: '合成 Mock',

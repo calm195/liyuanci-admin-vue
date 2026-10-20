@@ -21,6 +21,7 @@
 
 ## Code conventions
 
+- 非测试代码不得出现里程碑、任务或需求编号（如 T00x、REQ 编号）；追踪信息仅写入阶段文档或测试。代码注释只使用中文说明功能、业务意图、边界与设计原因；日志及面向用户的错误提示使用中文。保留语言指令、接口字段、协议值和工具要求的标识符原文。
 - Respect strict typing. Avoid `any`, unsafe casts, non-null assertions and suppression comments.
 - Use type-only imports. Handle rejected promises and nullable/indexed values explicitly.
 - Comment public APIs with concise TSDoc when intent is not obvious; explain decisions and edge cases, not syntax.

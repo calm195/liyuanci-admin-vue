@@ -22,7 +22,7 @@ describe('T010 REQ-018/019 请求与会话边界', () => {
       expect(() => parseAdminSession({ ...envelope, data })).toThrow()
   })
   it('默认真实模式阻止尚未冻结的凭据交换', () => {
-    expect(() => loginAdmin('super_admin')).toThrow('D02')
+    expect(() => loginAdmin('super_admin')).toThrow('后台身份提供方尚未接入，真实登录待联调')
   })
   it('仅发送后台 Bearer，禁用缓存/cookie，DELETE 带幂等键', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
