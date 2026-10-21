@@ -1,5 +1,6 @@
 import { onBeforeUnmount, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
+import type { Role } from '@/types/admin'
 import { ApiError } from '@/services/admin'
 
 export function reviewErrorMessage(error: unknown): string {
@@ -12,10 +13,10 @@ export function reviewErrorMessage(error: unknown): string {
   return '操作未完成，请重试；写入结果不明确时请先刷新核对'
 }
 /** 将工作区请求绑定到进入页面时的会话，退出、换页或取消后拒绝旧响应。 */
-export function useAdminWorkspace(clear: () => void) {
+export function useAdminWorkspace(clear: () => void, role: Role = 'review_operator') {
   const admin = useAdminStore()
   const owner = admin.session
-  const allowed = () => admin.session === owner && admin.can('review_operator')
+  const allowed = () => admin.session === owner && admin.can(role)
   let active = true
   let controller = new AbortController()
   function cancel() {
@@ -53,7 +54,7 @@ export function useAdminWorkspace(clear: () => void) {
     }
   }
   watch(
-    () => [admin.session, admin.can('review_operator')],
+    () => [admin.session, admin.can(role)],
     () => {
       if (!allowed()) invalidate()
     },

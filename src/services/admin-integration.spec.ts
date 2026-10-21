@@ -19,6 +19,7 @@ it.each([
   vi.stubEnv('VITE_ADMIN_MOCK', mock)
   const service = await import('./admin')
   expect(service.authIntegrationEnabled).toBe(expected)
+  expect(service.accountsIntegrationEnabled).toBe(expected)
 })
 
 it('INT-003 运行时接线仅发送三项身份操作，拒绝其他业务及合成凭据', async () => {

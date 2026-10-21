@@ -5,6 +5,7 @@ import type { Role } from '@/types/admin'
 export const menu: { path: string; title: string; role?: Role }[] = [
   { path: '/', title: '工作台' },
   { path: '/password', title: '本人改密' },
+  { path: '/accounts', title: '后台账号管理', role: 'super_admin' },
   { path: '/identity', title: '身份审核', role: 'review_operator' },
   { path: '/moderation', title: '内容审核', role: 'review_operator' },
   { path: '/wordlists', title: '词库管理', role: 'review_operator' },
@@ -30,6 +31,11 @@ export const router = createRouter({
       component: () => import('@/views/WordlistsView.vue'),
       meta: { role: 'review_operator' },
     },
+    {
+      path: '/accounts',
+      component: () => import('@/views/AccountsView.vue'),
+      meta: { role: 'super_admin' },
+    },
     { path: '/403', component: () => import('@/views/ForbiddenView.vue') },
     { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue') },
   ],
@@ -39,5 +45,6 @@ router.beforeEach((to) => {
   if (to.path === '/login') return admin.authenticated ? '/' : true
   if (!admin.authenticated) return '/login'
   if (to.meta['role'] === 'review_operator' && !admin.can('review_operator')) return '/403'
+  if (to.meta['role'] === 'super_admin' && !admin.can('super_admin')) return '/403'
   return true
 })

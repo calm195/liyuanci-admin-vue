@@ -15,6 +15,7 @@ export const authIntegrationEnabled =
   import.meta.env.VITE_ADMIN_MOCK !== 'true'
 export const identityIntegrationEnabled =
   authIntegrationEnabled && import.meta.env.VITE_ADMIN_IDENTITY_INTEGRATION === 'true'
+export const accountsIntegrationEnabled = authIntegrationEnabled
 export const loginEnabled = mockEnabled || authIntegrationEnabled
 export class ApiError extends Error {
   constructor(public status: number) {

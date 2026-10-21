@@ -4,7 +4,7 @@
 
 ## 1. 项目介绍
 
-鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台、身份审核及内容审核业务页。
+鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台、后台账号管理、身份审核及内容审核业务页。
 
 后台采用超管预建本地账号，登录后可本人改密；真实登录/改密已有隔离接线，部署及身份验收仍待完成，代码没有内置账号或口令。开发环境可使用合成 Mock 演示；身份审核支持合成案件列表、按需读卡、通过/驳回及回执演示，内容审核支持版本复核、独立业务结果和普通下线/解除限制演示；登录、本人改密及退出已提供隔离 HTTP 接线；身份审核可显式接入注入式后端，尚未完成跨端验收。
 
@@ -28,7 +28,7 @@ docs/
   milestones/   按阶段分文件的功能、设计与验证记录
 ```
 
-阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 身份审核](docs/milestones/T012.md)、[T017 内容审核与词库](docs/milestones/T017.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
+阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 身份审核](docs/milestones/T012.md)、[T017 内容审核与词库](docs/milestones/T017.md)、[后台账号管理](docs/milestones/admin-accounts.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
 
 ## 3. 项目启动方式
 
@@ -45,7 +45,7 @@ pnpm dev
 VITE_ADMIN_MOCK=true pnpm dev
 ```
 
-隔离身份联调仅在显式 DEV 模式启用：`VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`。默认只接同源登录、本人改密和退出；需集成方提供同源测试托管及隔离身份，不新增代理。生产构建始终关闭此入口。后端显式装配人工认证接口后，可额外设置 `VITE_ADMIN_IDENTITY_INTEGRATION=true`，接入身份审核列表、详情、PNG 学生卡与审核决定；内容审核和词库仍仅支持 Mock。
+隔离身份联调仅在显式 DEV 模式启用：`VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`。同源接入登录、本人改密、退出，以及仅超管可用的账号列表、创建和角色完整替换；账号初始口令由服务端策略提供，页面不设置或显示口令；需集成方提供同源测试托管及隔离身份，不新增代理。生产构建始终关闭此入口。后端显式装配人工认证接口后，可额外设置 `VITE_ADMIN_IDENTITY_INTEGRATION=true`，接入身份审核列表、详情、PNG 学生卡与审核决定；内容审核和词库仍仅支持 Mock。
 
 质量检查与构建预览：
 

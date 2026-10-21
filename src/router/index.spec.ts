@@ -4,11 +4,14 @@ import { router, menu } from './index'
 import { useAdminStore } from '@/stores/admin'
 beforeEach(() => setActivePinia(createPinia()))
 describe('T010 REQ-019 路由与菜单', () => {
-  it.each(['/identity', '/moderation', '/wordlists'])('未登录访问%s回登录', async (path) => {
-    await router.push(path)
-    expect(router.currentRoute.value.path).toBe('/login')
-  })
-  it.each(['/identity', '/moderation', '/wordlists'])(
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])(
+    '未登录访问%s回登录',
+    async (path) => {
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe('/login')
+    },
+  )
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])(
     '危机角色不能进入%s且审核菜单不可见',
     async (path) => {
       const admin = useAdminStore()
@@ -29,7 +32,7 @@ describe('T010 REQ-019 路由与菜单', () => {
       ).toEqual(['/', '/password'])
     },
   )
-  it.each(['/identity', '/moderation', '/wordlists'])('超管可进入%s', async (path) => {
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])('超管可进入%s', async (path) => {
     useAdminStore().session = {
       token: 'synthetic',
       account: {
@@ -59,4 +62,24 @@ describe('T010 REQ-019 路由与菜单', () => {
     await router.push('/password')
     expect(router.currentRoute.value.path).toBe('/password')
   })
+})
+
+it('REQ-019 审核运营不能访问超管账号管理', async () => {
+  useAdminStore().session = {
+    token: 'synthetic',
+    account: {
+      id: 'a',
+      login_name: '合成运营',
+      version: 1,
+      active: true,
+      roles: ['review_operator'],
+    },
+  }
+  await router.push('/accounts')
+  expect(router.currentRoute.value.path).toBe('/403')
+  expect(
+    menu
+      .filter((item) => !item.role || useAdminStore().can(item.role))
+      .some((item) => item.path === '/accounts'),
+  ).toBe(false)
 })

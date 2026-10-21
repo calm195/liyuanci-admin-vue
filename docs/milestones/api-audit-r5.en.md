@@ -1,5 +1,6 @@
 # Latest API audit and implemented features
 
+Subsequent update: account management now has a page and three isolated HTTP operations; see [admin account management](admin-accounts.en.md). The table below preserves the audit-time state.
 2026-10-21; T010/T012/T017, REQ-002/015/018/019/020. Read-only inputs: shared OpenAPI 0.2.0, actions revision 5, verification and admin-account integration notes. No inactive moderation extension is consumed.
 
 ## Findings and changes

@@ -4,7 +4,7 @@ Wordlist management previews contract 0.2.0 category heads, complete snapshots, 
 
 ## 1. Project introduction
 
-The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, identity review and content moderation pages.
+The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, admin account management, identity review and content moderation pages.
 
 Administrators use pre-provisioned local accounts and may change their own passwords. Real login/password changes have isolated HTTP wiring; deployment and identity verification remain pending; no account or password is built into the code. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Login, password changes and logout have isolated HTTP wiring. Identity review can explicitly connect to an injected backend; cross-client acceptance remains pending.
 
@@ -28,7 +28,7 @@ docs/
   milestones/   Feature, design and validation records by stage
 ```
 
-Stages: [T004 foundation](docs/milestones/T004.en.md), [T010 sessions and permissions](docs/milestones/T010.en.md), [T012 identity review](docs/milestones/T012.en.md), [T017 moderation and wordlists](docs/milestones/T017.en.md). Supporting material: [initial delivery](docs/delivery-T004-T010.md), [contract questions](docs/contract-questions.md), [T012 checklist](docs/T012-integration.md).
+Stages: [T004 foundation](docs/milestones/T004.en.md), [T010 sessions and permissions](docs/milestones/T010.en.md), [T012 identity review](docs/milestones/T012.en.md), [T017 moderation and wordlists](docs/milestones/T017.en.md), [admin account management](docs/milestones/admin-accounts.en.md). Supporting material: [initial delivery](docs/delivery-T004-T010.md), [contract questions](docs/contract-questions.md), [T012 checklist](docs/T012-integration.md).
 
 ## 3. Getting started
 
@@ -45,7 +45,7 @@ Synthetic local preview: generate temporary fictional credentials on the login p
 VITE_ADMIN_MOCK=true pnpm dev
 ```
 
-Isolated identity integration requires explicit DEV mode: `VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`. By default only same-origin login, self-service password changes and logout are connected. Integration owners must supply same-origin test hosting and isolated identities; no proxy is added. Production builds always close this entry. Once the backend explicitly registers verification routes, additionally set `VITE_ADMIN_IDENTITY_INTEGRATION=true` to connect identity queues, case details, PNG student cards and decisions. Moderation and wordlists remain Mock-only.
+Isolated identity integration requires explicit DEV mode: `VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`. Same-origin login, self-service password changes, logout and super-admin-only account listing, creation and full role replacement are connected. Initial passwords come from server policy and are neither entered nor displayed on the page. Integration owners must supply same-origin test hosting and isolated identities; no proxy is added. Production builds always close this entry. Once the backend explicitly registers verification routes, additionally set `VITE_ADMIN_IDENTITY_INTEGRATION=true` to connect identity queues, case details, PNG student cards and decisions. Moderation and wordlists remain Mock-only.
 
 Quality checks and build preview:
 
