@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
       <p>每次生成会替换本次合成账号；没有内置口令，不代表真实账号创建。</p>
     </section>
     <p v-else-if="authIntegrationEnabled" class="banner">
-      隔离联调环境 · 仅使用指定测试身份，登录、本人改密及退出连接同源后台
+      隔离联调环境 · 仅使用指定测试身份，登录、本人改密及退出连接同源后台；身份审核需额外启用
     </p>
     <p v-else>真实登录关闭；需显式启用隔离联调模式。</p>
     <form @submit.prevent="login">

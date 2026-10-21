@@ -6,7 +6,7 @@ Wordlist management previews contract 0.2.0 category heads, complete snapshots, 
 
 The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, identity review and content moderation pages.
 
-Administrators use pre-provisioned local accounts and may change their own passwords. Real login/password changes await services and isolated identity verification; no account or password is built into the code. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Real business APIs remain pending integration.
+Administrators use pre-provisioned local accounts and may change their own passwords. Real login/password changes have isolated HTTP wiring; deployment and identity verification remain pending; no account or password is built into the code. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Login, password changes and logout have isolated HTTP wiring. Identity review can explicitly connect to an injected backend; cross-client acceptance remains pending.
 
 ## 2. Project options and directory structure
 
@@ -45,7 +45,7 @@ Synthetic local preview: generate temporary fictional credentials on the login p
 VITE_ADMIN_MOCK=true pnpm dev
 ```
 
-Isolated identity integration requires explicit DEV mode: `VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`. Only same-origin login, self-service password changes and logout are connected; other admin requests are closed. Integration owners must supply same-origin test hosting and isolated identities; no proxy is added. Production builds always close this entry.
+Isolated identity integration requires explicit DEV mode: `VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`. By default only same-origin login, self-service password changes and logout are connected. Integration owners must supply same-origin test hosting and isolated identities; no proxy is added. Production builds always close this entry. Once the backend explicitly registers verification routes, additionally set `VITE_ADMIN_IDENTITY_INTEGRATION=true` to connect identity queues, case details, PNG student cards and decisions. Moderation and wordlists remain Mock-only.
 
 Quality checks and build preview:
 

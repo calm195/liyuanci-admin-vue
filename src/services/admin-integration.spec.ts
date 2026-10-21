@@ -66,3 +66,16 @@ it('INT-003 运行时接线仅发送三项身份操作，拒绝其他业务及�
   expect(storage).not.toHaveBeenCalled()
   vi.restoreAllMocks()
 })
+
+it.each([
+  ['true', true],
+  ['false', false],
+  [undefined, false],
+])('T012 人工认证需要额外显式开关 %s', async (enabled, expected) => {
+  vi.stubEnv('DEV', true)
+  vi.stubEnv('MODE', 'integration')
+  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', 'true')
+  vi.stubEnv('VITE_ADMIN_MOCK', 'false')
+  vi.stubEnv('VITE_ADMIN_IDENTITY_INTEGRATION', enabled)
+  expect((await import('./admin')).identityIntegrationEnabled).toBe(expected)
+})

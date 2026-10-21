@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, mockEnabled } from '@/services/admin'
+import { ApiError, mockEnabled, identityIntegrationEnabled } from '@/services/admin'
 import { createIdentityReviewClient } from '@/services/identity'
+import { createIdentityTransport } from '@/services/identity-transport'
 import type {
   IdentityCase,
   IdentityDecision,
@@ -13,7 +14,10 @@ import type {
 const admin = useAdminStore()
 const owner = admin.session
 const allowed = () => admin.session === owner && admin.can('review_operator')
-const client = createIdentityReviewClient(allowed)
+const enabled = mockEnabled || identityIntegrationEnabled
+const client = identityIntegrationEnabled
+  ? createIdentityTransport(owner?.token ?? '', allowed)
+  : createIdentityReviewClient(allowed)
 const items = ref<IdentitySummary[]>([])
 const nextCursor = ref<string | null>(null)
 const currentCursor = ref<string | null>(null)
@@ -252,7 +256,7 @@ watch(
   { flush: 'sync' },
 )
 onMounted(() => {
-  if (mockEnabled) void loadList()
+  if (enabled) void loadList()
 })
 onBeforeUnmount(() => {
   active = false
@@ -265,9 +269,14 @@ onBeforeUnmount(() => {
     <p class="eyebrow">认证管理 / 身份审核</p>
     <h1>身份审核</h1>
     <p>按案件核对身份资料，不设置审核倒计时。</p>
-    <p v-if="!mockEnabled" role="status">真实身份审核待接口验收后开放。</p>
+    <p v-if="!enabled" role="status">真实身份审核待接口验收后开放。</p>
     <template v-else>
-      <p class="banner">合成业务演示 · 学生与卡图均为虚构，决定仅在当前页面内生效</p>
+      <p v-if="mockEnabled" class="banner">
+        合成业务演示 · 学生与卡图均为虚构，决定仅在当前页面内生效
+      </p>
+      <p v-else class="banner">
+        隔离接口联调 · 身份材料由同源后台按案件授权返回，尚未完成真实服务验收
+      </p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <section v-if="receipt" class="receipt" aria-label="审核回执">
         <h2>审核回执</h2>
@@ -335,7 +344,7 @@ onBeforeUnmount(() => {
               v-if="cardUrl"
               class="student-card"
               :src="cardUrl"
-              alt="当前授权案件的合成学生卡"
+              alt="当前授权案件的学生卡"
               @error="cardFailed"
             />
             <form v-if="detail.status === 'pending'" @submit.prevent="confirmDecision">

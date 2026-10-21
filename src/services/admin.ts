@@ -13,6 +13,8 @@ export const authIntegrationEnabled =
   import.meta.env.MODE === 'integration' &&
   import.meta.env.VITE_ADMIN_AUTH_INTEGRATION === 'true' &&
   import.meta.env.VITE_ADMIN_MOCK !== 'true'
+export const identityIntegrationEnabled =
+  authIntegrationEnabled && import.meta.env.VITE_ADMIN_IDENTITY_INTEGRATION === 'true'
 export const loginEnabled = mockEnabled || authIntegrationEnabled
 export class ApiError extends Error {
   constructor(public status: number) {
@@ -47,7 +49,8 @@ export async function adminRequest(
     throw new ApiError(503)
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
-  if (init.method && init.method !== 'GET') headers.set('Idempotency-Key', crypto.randomUUID())
+  if (init.method && init.method !== 'GET' && !headers.has('Idempotency-Key'))
+    headers.set('Idempotency-Key', crypto.randomUUID())
   const response = await transport(`/api/v1${path}`, {
     ...init,
     headers,
@@ -55,7 +58,8 @@ export async function adminRequest(
     credentials: 'omit',
     redirect: 'error',
   })
-  if (!response.ok) throw new ApiError(response.status)
+  if (!response.ok || (path === '/admin/session' && response.status !== 204))
+    throw new ApiError(response.status)
   return response.status === 204 ? undefined : response.json()
 }
 let fixture: { input: AdminLoginInput; account: AdminAccount; tokens: Set<string> } | null = null

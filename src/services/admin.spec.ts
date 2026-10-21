@@ -75,3 +75,18 @@ it('B07 Me/WishResult动作和静态目录不能给后台账号角色提权', ()
     }),
   ).toThrow()
 })
+
+it('REQ-019 请求保留调用方幂等键，退出必须返回204', async () => {
+  const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
+  await adminRequest(
+    '/admin/session',
+    'token',
+    { method: 'DELETE', headers: { 'Idempotency-Key': 'stable' } },
+    transport,
+  )
+  expect(new Headers(transport.mock.calls[0]?.[1]?.headers).get('Idempotency-Key')).toBe('stable')
+  transport.mockResolvedValue(Response.json({ code: 0 }))
+  await expect(
+    adminRequest('/admin/session', 'token', { method: 'DELETE' }, transport),
+  ).rejects.toMatchObject({ status: 200 })
+})
