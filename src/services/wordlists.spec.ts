@@ -94,6 +94,24 @@ describe('T017 REQ-015/019 词库版本服务', () => {
     controller.abort()
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
   })
+  it('合成字面匹配仅使用发布词条，创建不生效、发布后旧词归档', async () => {
+    const client = factory(() => true)
+    const body = '合成涉校词和替代词'
+    const before = await client.demoScan(body, signal())
+    expect(before.find((item) => item.kind === 'school')?.matches).toEqual(['合成涉校词'])
+    const draft = await client.create(
+      { kind: 'school', entries: ['替代词'], expected_version: 1 },
+      'create',
+      signal(),
+    )
+    expect(await client.demoScan(body, signal())).toEqual(before)
+    await client.publish(draft.id, draft.version, 'publish', signal())
+    expect((await client.demoScan(body, signal())).find((item) => item.kind === 'school')).toEqual({
+      kind: 'school',
+      version: 3,
+      matches: ['替代词'],
+    })
+  })
   it('模拟不发送网络请求，生产环境即使设置Mock也不可用', async () => {
     const transport = vi.fn()
     vi.stubGlobal('fetch', transport)

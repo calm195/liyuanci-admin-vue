@@ -34,8 +34,23 @@ export function createWordlistClient(allowed: () => boolean): WordlistClient {
       status: 'published',
     },
   ]
+  const entries = new Map<string, string[]>([
+    ['synthetic-wordlist-school', ['合成涉校词']],
+    ['synthetic-wordlist-ordinary', ['合成违规词']],
+  ])
   let sequence = 0
   return {
+    async demoScan(body, signal) {
+      await boundary.authorize(signal)
+      reviewText(body)
+      return lists
+        .filter((item) => item.status === 'published')
+        .map((item) => ({
+          kind: item.kind,
+          version: item.version,
+          matches: (entries.get(item.id) ?? []).filter((entry) => body.includes(entry)),
+        }))
+    },
     async list(cursor, signal) {
       await boundary.authorize(signal)
       return parseWordlistPage(mockPage(lists, cursor))
@@ -61,6 +76,10 @@ export function createWordlistClient(allowed: () => boolean): WordlistClient {
           version: (latest?.version ?? 0) + 1,
           status: 'draft',
         }
+        entries.set(
+          item.id,
+          input.entries.map((entry) => entry.trim()),
+        )
         lists.push(item)
         return item
       })

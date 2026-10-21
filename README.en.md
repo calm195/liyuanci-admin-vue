@@ -1,5 +1,7 @@
 # Liyuanci Web administration
 
+Wordlist management supports complete synthetic version creation and separate publishing in explicit DEV Mock mode. Baseline, increment and archive rules are synthetic; real integration remains pending.
+
 ## 1. Project introduction
 
 The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, identity review and content moderation pages.

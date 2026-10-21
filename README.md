@@ -1,5 +1,7 @@
 # 鲤源池 Web 管理端
 
+词库管理支持显式 DEV Mock 下的完整合成版本创建与独立发布；基准、递增与归档仅为模拟规则，真实入口待接入。
+
 ## 1. 项目介绍
 
 鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台、身份审核及内容审核业务页。
