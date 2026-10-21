@@ -2,13 +2,13 @@
 
 ## 1. Project introduction
 
-The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard and an identity review business page.
+The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, identity review and content moderation pages.
 
-Real login awaits the backend identity provider. There are no default credentials. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Real business APIs remain pending integration.
+Real login awaits the backend identity provider. There are no default credentials. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Real business APIs remain pending integration.
 
 ## 2. Project options and directory structure
 
-See [.env.example](.env.example). `VITE_ADMIN_MOCK=true` explicitly enables synthetic roles, sessions and identity review in Vite DEV with a persistent Mock banner. Production builds disable Mock, and synthetic requests never reach real APIs. All `VITE_` variables are public and must contain no secrets.
+See [.env.example](.env.example). `VITE_ADMIN_MOCK=true` explicitly enables synthetic roles, sessions identity review and content moderation in Vite DEV with a persistent Mock banner. Production builds disable Mock, and synthetic requests never reach real APIs. All `VITE_` variables are public and must contain no secrets.
 
 ```text
 src/
@@ -26,7 +26,7 @@ docs/
   milestones/   Feature, design and validation records by stage
 ```
 
-Stages: [T004 foundation](docs/milestones/T004.en.md), [T010 sessions and permissions](docs/milestones/T010.en.md), [T012 identity review](docs/milestones/T012.en.md). Supporting material: [initial delivery](docs/delivery-T004-T010.md), [contract questions](docs/contract-questions.md), [T012 checklist](docs/T012-integration.md).
+Stages: [T004 foundation](docs/milestones/T004.en.md), [T010 sessions and permissions](docs/milestones/T010.en.md), [T012 identity review](docs/milestones/T012.en.md), [T017 moderation and wordlists](docs/milestones/T017.en.md). Supporting material: [initial delivery](docs/delivery-T004-T010.md), [contract questions](docs/contract-questions.md), [T012 checklist](docs/T012-integration.md).
 
 ## 3. Getting started
 
