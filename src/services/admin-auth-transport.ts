@@ -2,7 +2,7 @@ import { ApiError } from './admin'
 import { adminLoginInput, adminPasswordInput, parseAdminSession } from '@/types/admin'
 import type { AdminLoginInput, AdminPasswordInput } from '@/types/admin'
 
-/** 显式注入传输用于后台身份协议；运行时仅由隔离模式接线。 */
+/** 显式注入传输用于后台身份协议；运行时默认连接同源后台。 */
 export function createAdminAuthTransport(transport: typeof fetch) {
   return {
     async login(input: AdminLoginInput, signal?: AbortSignal) {

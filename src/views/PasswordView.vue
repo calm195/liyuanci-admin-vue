@@ -30,7 +30,7 @@ watch(
   { flush: 'sync' },
 )
 async function submit() {
-  if (!active || busy.value || !mockEnabled || !valid.value || admin.session !== owner) return
+  if (!active || busy.value || !valid.value || admin.session !== owner) return
   if (attempt?.current !== currentPassword.value || attempt.next !== newPassword.value)
     attempt = {
       current: currentPassword.value,
@@ -70,9 +70,8 @@ onBeforeUnmount(() => {
     <p v-if="mockEnabled" class="banner">
       仅本进程合成演示，不证明真实口令存储、全局撤销或审计生效。
     </p>
-    <p v-else>真实改密待服务与撤销验收后开放。</p>
     <form @submit.prevent="submit">
-      <fieldset :disabled="busy || !mockEnabled">
+      <fieldset :disabled="busy">
         <legend>本人改密</legend>
         <label for="current-password">当前口令</label>
         <input

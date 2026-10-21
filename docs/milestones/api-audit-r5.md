@@ -1,5 +1,7 @@
 # 最新 API 核对与功能清单
 
+最新接线：登录、改密、账号和身份审核的环境限制已移除，见 [默认真实接口](real-admin-api.md)。
+
 后续更新：账号管理三项已补齐页面与隔离 HTTP 接线，见 [后台账号管理](admin-accounts.md)；本文件表格保留本轮核对时的历史状态。
 2026-10-21；T010/T012/T017，REQ-002、015、018、019、020。依据只读共享工作台 `contracts/openapi.v0.2.0.json`、`actions.v0.2.0.md` revision 5、`verification.v0.2.0.md`、`admin-accounts.v0.2.0.md`。契约版本仍为 0.2.0，不消费未激活 moderation 扩展。
 

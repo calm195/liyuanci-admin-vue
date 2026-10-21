@@ -8,15 +8,7 @@ import type {
 } from '@/types/admin'
 
 export const mockEnabled = import.meta.env.DEV && import.meta.env.VITE_ADMIN_MOCK === 'true'
-export const authIntegrationEnabled =
-  import.meta.env.DEV &&
-  import.meta.env.MODE === 'integration' &&
-  import.meta.env.VITE_ADMIN_AUTH_INTEGRATION === 'true' &&
-  import.meta.env.VITE_ADMIN_MOCK !== 'true'
-export const identityIntegrationEnabled =
-  authIntegrationEnabled && import.meta.env.VITE_ADMIN_IDENTITY_INTEGRATION === 'true'
-export const accountsIntegrationEnabled = authIntegrationEnabled
-export const loginEnabled = mockEnabled || authIntegrationEnabled
+export const realApiEnabled = !mockEnabled
 export class ApiError extends Error {
   constructor(public status: number) {
     super(
@@ -46,8 +38,6 @@ export async function adminRequest(
     throw new Error('非法后台路径')
   // 模拟令牌不得发送至真实接口。
   if (mockEnabled) throw new ApiError(503)
-  if (authIntegrationEnabled && (path !== '/admin/session' || init.method !== 'DELETE'))
-    throw new ApiError(503)
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
   if (init.method && init.method !== 'GET' && !headers.has('Idempotency-Key'))
@@ -81,16 +71,15 @@ export function createSyntheticCredentials(role: Role): AdminLoginInput {
   }
   return input
 }
-/** 隔离模式仅接后台身份协议，合成角色仍只由夹具账号返回。 */
+/** 默认通过同源后台身份协议登录，合成角色仅由显式开发夹具返回。 */
 export async function loginAdmin(
   input: AdminLoginInput,
   signal?: AbortSignal,
 ): Promise<AdminSession> {
-  if (authIntegrationEnabled) {
+  if (!mockEnabled) {
     const { createAdminAuthTransport } = await import('./admin-auth-transport')
     return createAdminAuthTransport(fetch).login(input, signal)
   }
-  if (!mockEnabled) throw new ApiError(503)
   const command = adminLoginInput(input)
   await Promise.resolve()
   signal?.throwIfAborted()
@@ -116,11 +105,10 @@ export async function changeAdminPassword(
   key: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (authIntegrationEnabled) {
+  if (!mockEnabled) {
     const { createAdminAuthTransport } = await import('./admin-auth-transport')
     return createAdminAuthTransport(fetch).password(token, input, key, signal)
   }
-  if (!mockEnabled) throw new ApiError(503)
   const command = adminPasswordInput(input)
   if (!key.trim()) throw new ApiError(400)
   await Promise.resolve()
@@ -135,6 +123,5 @@ export async function revokeAdmin(token: string): Promise<void> {
     fixture?.tokens.delete(token)
     return
   }
-  if (!authIntegrationEnabled) throw new ApiError(503)
   await adminRequest('/admin/session', token, { method: 'DELETE' })
 }

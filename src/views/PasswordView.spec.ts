@@ -9,7 +9,7 @@ import { ApiError, changeAdminPassword } from '@/services/admin'
 import type * as service from '@/services/admin'
 vi.mock('@/services/admin', async (original) => ({
   ...(await original<typeof service>()),
-  mockEnabled: true,
+  mockEnabled: false,
   changeAdminPassword: vi.fn(),
 }))
 let router: ReturnType<typeof createRouter>
@@ -61,7 +61,7 @@ afterEach(() => {
   wrapper = undefined
   vi.restoreAllMocks()
 })
-describe('T010 B02/B14 REQ-018/019 本人改密页面', () => {
+describe('T010 B02/B14 REQ-018/019 默认真实本人改密页面', () => {
   it('任意有效后台角色可本人改密，204后清口令与会话并重登', async () => {
     expect(wrapper?.text()).toContain('synthetic-operator')
     expect(wrapper?.get('button').attributes('disabled')).toBeDefined()

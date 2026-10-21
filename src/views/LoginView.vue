@@ -2,13 +2,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import {
-  mockEnabled,
-  loginEnabled,
-  authIntegrationEnabled,
-  createSyntheticCredentials,
-  ApiError,
-} from '@/services/admin'
+import { mockEnabled, createSyntheticCredentials, ApiError } from '@/services/admin'
 import type { Role } from '@/types/admin'
 const admin = useAdminStore()
 const router = useRouter()
@@ -29,7 +23,7 @@ function prepare() {
   error.value = ''
 }
 async function login() {
-  if (busy.value || !loginEnabled || !valid.value) return
+  if (busy.value || !valid.value) return
   busy.value = true
   error.value = ''
   try {
@@ -71,12 +65,9 @@ onBeforeUnmount(() => {
       <button :disabled="busy" @click="prepare">生成并填入临时合成凭据</button>
       <p>每次生成会替换本次合成账号；没有内置口令，不代表真实账号创建。</p>
     </section>
-    <p v-else-if="authIntegrationEnabled" class="banner">
-      隔离联调环境 · 仅使用指定测试身份，登录、本人改密及退出连接同源后台；身份审核需额外启用
-    </p>
-    <p v-else>真实登录关闭；需显式启用隔离联调模式。</p>
+    <p v-else>使用后台账号登录。</p>
     <form @submit.prevent="login">
-      <fieldset :disabled="busy || !loginEnabled">
+      <fieldset :disabled="busy">
         <legend>后台账号登录</legend>
         <label for="login-name">后台账号</label>
         <input id="login-name" v-model="loginName" autocomplete="username" required />

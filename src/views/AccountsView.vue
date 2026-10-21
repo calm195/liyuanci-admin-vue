@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, accountsIntegrationEnabled } from '@/services/admin'
+import { ApiError, realApiEnabled } from '@/services/admin'
 import { createAccountsClient } from '@/services/accounts'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import { roles } from '@/types/admin'
@@ -47,7 +47,7 @@ function clear() {
 }
 const workspace = useAdminWorkspace(clear, 'super_admin')
 const client = createAccountsClient(owner?.token ?? '', workspace.allowed)
-const enabled = accountsIntegrationEnabled
+const enabled = realApiEnabled
 const valid = computed(
   () => (selected.value !== null || !!loginName.value.trim()) && !!reason.value.trim(),
 )
@@ -178,11 +178,9 @@ onMounted(() => {
   <main class="panel workflow">
     <h1>后台账号管理</h1>
     <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
-    <p v-if="!enabled" role="status">
-      账号管理需显式启用隔离联调模式，Mock 环境不连接真实账号接口。
-    </p>
+    <p v-if="!enabled" role="status">Mock 环境不连接真实账号接口。</p>
     <template v-else-if="workspace.allowed()">
-      <p class="banner">隔离接口联调 · 每次请求由服务端核验当前超管权限，尚未完成真实服务验收</p>
+      <p class="banner">每次请求由服务端核验当前超管权限。</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="error" role="alert">{{ error }}</p>
       <section aria-labelledby="accounts-title" :aria-busy="busy">

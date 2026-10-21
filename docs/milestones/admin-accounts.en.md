@@ -1,5 +1,7 @@
 # Admin account management
 
+Subsequent update: real APIs are now enabled by default, with isolated-mode/production restrictions removed; see [default real APIs](real-admin-api.en.md).
+
 2026-10-21; T010/T011, REQ-018/019/020. Contract 0.2.0, actions revision 5. Read-only references: shared OpenAPI, admin-account integration notes and decisions. This stage implements the three account operations missing from the previous frontend inventory without activating moderation extensions.
 
 ## Behavior

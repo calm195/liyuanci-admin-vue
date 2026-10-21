@@ -3,29 +3,28 @@ import { afterEach, expect, it, vi } from 'vitest'
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   vi.resetModules()
 })
 
 it.each([
-  [false, 'integration', 'true', 'false', false],
-  [true, 'development', 'true', 'false', false],
-  [true, 'integration', 'false', 'false', false],
-  [true, 'integration', 'true', 'true', false],
-  [true, 'integration', 'true', 'false', true],
-])('INT-003 显式隔离准入 %s/%s/%s/%s', async (dev, mode, enabled, mock, expected) => {
+  [false, 'production', 'false', true],
+  [false, 'production', 'true', true],
+  [true, 'development', 'false', true],
+  [true, 'integration', 'false', true],
+  [true, 'development', 'true', false],
+])('REQ-018 默认真实接口，不依赖运行模式 %s/%s/%s', async (dev, mode, mock, expected) => {
   vi.stubEnv('DEV', dev)
   vi.stubEnv('MODE', mode)
-  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', enabled)
   vi.stubEnv('VITE_ADMIN_MOCK', mock)
-  const service = await import('./admin')
-  expect(service.authIntegrationEnabled).toBe(expected)
-  expect(service.accountsIntegrationEnabled).toBe(expected)
+  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', 'false')
+  vi.stubEnv('VITE_ADMIN_IDENTITY_INTEGRATION', 'false')
+  expect((await import('./admin')).realApiEnabled).toBe(expected)
 })
 
-it('INT-003 运行时接线仅发送三项身份操作，拒绝其他业务及合成凭据', async () => {
-  vi.stubEnv('DEV', true)
-  vi.stubEnv('MODE', 'integration')
-  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', 'true')
+it.each([true, false])('REQ-018 DEV=%s 默认登录、改密、退出和后台请求均可调用', async (dev) => {
+  vi.stubEnv('DEV', dev)
+  vi.stubEnv('MODE', dev ? 'development' : 'production')
   vi.stubEnv('VITE_ADMIN_MOCK', 'false')
   const transport = vi.fn<typeof fetch>().mockResolvedValue(
     Response.json({
@@ -34,13 +33,7 @@ it('INT-003 运行时接线仅发送三项身份操作，拒绝其他业务及�
       request_id: 'synthetic',
       data: {
         token: 'synthetic',
-        account: {
-          id: 'synthetic',
-          login_name: 'synthetic',
-          active: true,
-          version: 1,
-          roles: [],
-        },
+        account: { id: 'synthetic', login_name: 'synthetic', active: true, version: 1, roles: [] },
       },
     }),
   )
@@ -56,27 +49,20 @@ it('INT-003 运行时接线仅发送三项身份操作，拒绝其他业务及�
     'stable-key',
   )
   await service.revokeAdmin('synthetic')
-  await expect(service.adminRequest('/admin/accounts', 'synthetic')).rejects.toMatchObject({
-    status: 503,
-  })
+  transport.mockResolvedValue(
+    Response.json({
+      code: 0,
+      message: '合成',
+      request_id: 'synthetic',
+      data: { items: [], next_cursor: null },
+    }),
+  )
+  await service.adminRequest('/admin/accounts', 'synthetic')
   expect(transport.mock.calls.map(([url]) => url)).toEqual([
     '/api/v1/admin/sessions',
     '/api/v1/admin/password',
     '/api/v1/admin/session',
+    '/api/v1/admin/accounts',
   ])
   expect(storage).not.toHaveBeenCalled()
-  vi.restoreAllMocks()
-})
-
-it.each([
-  ['true', true],
-  ['false', false],
-  [undefined, false],
-])('T012 人工认证需要额外显式开关 %s', async (enabled, expected) => {
-  vi.stubEnv('DEV', true)
-  vi.stubEnv('MODE', 'integration')
-  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', 'true')
-  vi.stubEnv('VITE_ADMIN_MOCK', 'false')
-  vi.stubEnv('VITE_ADMIN_IDENTITY_INTEGRATION', enabled)
-  expect((await import('./admin')).identityIntegrationEnabled).toBe(expected)
 })

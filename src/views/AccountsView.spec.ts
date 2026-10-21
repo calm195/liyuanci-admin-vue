@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/accounts', () => ({ createAccountsClient: () => mocks }))
 vi.mock('@/services/admin', async (original) => ({
   ...(await original<typeof service>()),
-  get accountsIntegrationEnabled() {
+  get realApiEnabled() {
     return mocks.enabled
   },
 }))
@@ -85,10 +85,10 @@ afterEach(() => {
   wrapper = undefined
 })
 describe('T010 REQ-018/019 后台账号管理页面', () => {
-  it('未启用联调及非超管不读取账号列表', async () => {
+  it('Mock及非超管不读取账号列表', async () => {
     mocks.enabled = false
     await start()
-    expect(wrapper?.text()).toContain('需显式启用')
+    expect(wrapper?.text()).toContain('Mock 环境不连接真实账号接口')
     expect(mocks.list).not.toHaveBeenCalled()
     wrapper?.unmount()
     mocks.enabled = true

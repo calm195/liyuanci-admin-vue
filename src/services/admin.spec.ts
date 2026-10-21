@@ -29,7 +29,11 @@ describe('T010 REQ-018/019 请求与会话边界', () => {
     ])
       expect(() => parseAdminSession({ ...envelope, data })).toThrow()
   })
-  it('真实服务未就绪，协议已明确也不启用登录', async () => {
+  it('默认调用真实登录接口并保留服务端错误状态', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 503 })),
+    )
     await expect(
       loginAdmin({ login_name: 'synthetic', password: crypto.randomUUID() }),
     ).rejects.toMatchObject({ status: 503 })

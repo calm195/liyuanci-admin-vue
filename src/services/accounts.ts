@@ -42,7 +42,7 @@ function commandRoles(roles: Role[], reason: string, key: string) {
   return [...new Set(roles)]
 }
 
-/** 仅供显式隔离接线使用，令牌由进入页面时的后台会话注入，禁止从列表选择操作者身份。 */
+/** 令牌由进入页面时的后台会话注入，禁止从列表选择操作者身份。 */
 export function createAccountsClient(
   token: string,
   allowed: () => boolean,

@@ -132,7 +132,7 @@ describe('T010 B02/B14 REQ-018/019 账号与本人改密协议', () => {
       input.login_name,
     )
   })
-  it('合成账号与改密不落盘、不联网，生产失败关闭', async () => {
+  it('合成账号与改密不落盘、不联网，生产使用真实接口', async () => {
     vi.stubEnv('DEV', true)
     vi.stubEnv('VITE_ADMIN_MOCK', 'true')
     vi.resetModules()
@@ -155,12 +155,14 @@ describe('T010 B02/B14 REQ-018/019 账号与本人改密协议', () => {
     vi.resetModules()
     const service = await import('./admin')
     expect(() => service.createSyntheticCredentials('super_admin')).toThrow()
+    fetch.mockResolvedValue(new Response(null, { status: 204 }))
     await expect(
       service.changeAdminPassword(
         'token',
         { current_password: '合成旧', new_password: '合成新' },
         'key',
       ),
-    ).rejects.toMatchObject({ status: 503 })
+    ).resolves.toBeUndefined()
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 })
