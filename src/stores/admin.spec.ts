@@ -181,3 +181,29 @@ describe('T010 0.2.0 本人改密会话代次', () => {
     expect(admin.authenticated).toBe(false)
   })
 })
+
+describe('B07 revision 1 后台角色快照消费', () => {
+  it('403停止且不推导角色，只有显式重登替换菜单角色，401清除角色快照', async () => {
+    const admin = useAdminStore()
+    vi.mocked(service.loginAdmin).mockResolvedValue(session)
+    await admin.login({ login_name: 'synthetic', password: '合成' })
+    vi.mocked(service.adminRequest).mockRejectedValueOnce(new ApiError(403))
+    await expect(admin.request('/admin/accounts')).rejects.toMatchObject({ status: 403 })
+    expect(service.adminRequest).toHaveBeenCalledTimes(1)
+    expect(admin.session?.account.roles).toEqual(['review_operator'])
+    expect(admin.can('super_admin')).toBe(false)
+    expect(admin.authenticated).toBe(true)
+    vi.mocked(service.loginAdmin).mockResolvedValue({
+      ...session,
+      token: 'new-synthetic',
+      account: { ...session.account, roles: ['crisis_operator'] },
+    })
+    await admin.login({ login_name: 'synthetic', password: '合成' })
+    expect(admin.can('review_operator')).toBe(false)
+    expect(admin.can('crisis_operator')).toBe(true)
+    vi.mocked(service.adminRequest).mockRejectedValueOnce(new ApiError(401))
+    await expect(admin.request('/admin/accounts')).rejects.toMatchObject({ status: 401 })
+    expect(admin.session).toBeNull()
+    expect(admin.can('crisis_operator')).toBe(false)
+  })
+})

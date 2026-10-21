@@ -51,3 +51,27 @@ describe('T010 REQ-018/019 请求与会话边界', () => {
     )
   })
 })
+
+it('B07 Me/WishResult动作和静态目录不能给后台账号角色提权', () => {
+  const result = parseAdminSession({
+    ...envelope,
+    data: {
+      ...envelope.data,
+      allowed_actions: ['postWishes', 'postAdminAccounts'],
+      account: {
+        ...envelope.data.account,
+        roles: [],
+        allowed_actions: ['postAdminAccounts', 'content.scan'],
+      },
+    },
+  })
+  expect(result.account.roles).toEqual([])
+  expect(result.account).not.toHaveProperty('allowed_actions')
+  expect(result).not.toHaveProperty('allowed_actions')
+  expect(() =>
+    parseAdminSession({
+      ...envelope,
+      data: { token: 'synthetic', me: { allowed_actions: ['postWishes'] } },
+    }),
+  ).toThrow()
+})
