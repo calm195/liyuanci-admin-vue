@@ -1,6 +1,6 @@
 # Liyuanci Web administration
 
-Wordlist management supports complete synthetic version creation and separate publishing in explicit DEV Mock mode. Baseline, increment and archive rules are synthetic; real integration remains pending.
+Wordlist management previews contract 0.2.0 category heads, complete snapshots, dual-version publication and read-only archive details in explicit DEV Mock mode. Real integration remains pending.
 
 ## 1. Project introduction
 

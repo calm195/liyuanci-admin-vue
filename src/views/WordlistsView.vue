@@ -4,9 +4,19 @@ import { mockEnabled, ApiError } from '@/services/admin'
 import { createWordlistClient } from '@/services/wordlists'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import { wordlistKinds } from '@/types/wordlists'
-import type { Wordlist, WordlistInput, WordlistKind } from '@/types/wordlists'
+import type {
+  Wordlist,
+  WordlistInput,
+  WordlistKind,
+  WordlistHead,
+  WordlistDetail,
+  WordlistPublish,
+} from '@/types/wordlists'
 
 const items = ref<Wordlist[]>([])
+const heads = ref<WordlistHead[]>([])
+const detail = ref<WordlistDetail | null>(null)
+const detailBusy = ref(false)
 const busy = ref(false)
 const writing = ref(false)
 const loaded = ref(false)
@@ -14,7 +24,7 @@ const error = ref('')
 const notice = ref('')
 const kind = ref<WordlistKind>('school')
 const text = ref('')
-const confirmation = ref<WordlistInput | Wordlist | null>(null)
+const confirmation = ref<WordlistInput | { item: Wordlist; input: WordlistPublish } | null>(null)
 let generation = 0
 let attempt: { fingerprint: string; key: string } | null = null
 const workspace = useAdminWorkspace(clear)
@@ -24,11 +34,7 @@ const labels: Record<WordlistKind, string> = {
   school: '涉校',
   ordinary_violation: '普通违规',
 }
-const base = computed(() =>
-  items.value
-    .filter((item) => item.kind === kind.value)
-    .reduce<number | undefined>((latest, item) => Math.max(latest ?? 0, item.version), undefined),
-)
+const base = computed(() => heads.value.find((head) => head.kind === kind.value))
 function status(value: string) {
   return (
     ({ draft: '草稿', published: '已发布', archived: '已归档' } as Record<string, string>)[value] ??
@@ -38,6 +44,9 @@ function status(value: string) {
 function clear() {
   generation++
   items.value = []
+  heads.value = []
+  detail.value = null
+  detailBusy.value = false
   busy.value = false
   writing.value = false
   loaded.value = false
@@ -55,9 +64,19 @@ async function load() {
     async (signal) => {
       const all: Wordlist[] = []
       const cursors = new Set<string>()
+      let snapshot: WordlistHead[] | null = null
       let cursor: string | null = null
       do {
         const page = await client.list(cursor, signal)
+        const ordered = wordlistKinds.map((kind) => page.heads.find((head) => head.kind === kind))
+        if (snapshot && JSON.stringify(snapshot) !== JSON.stringify(ordered))
+          throw new Error('词库分页基准已变化，请刷新')
+        if (ordered.some((head) => !head)) throw new Error('词库基准缺失')
+        snapshot = page.heads
+          .slice()
+          .sort(
+            (left, right) => wordlistKinds.indexOf(left.kind) - wordlistKinds.indexOf(right.kind),
+          )
         all.push(...page.items)
         cursor = page.next_cursor
         if (cursor) {
@@ -65,10 +84,11 @@ async function load() {
           cursors.add(cursor)
         }
       } while (cursor)
-      return all
+      return { items: all, heads: snapshot ?? [] }
     },
     (value) => {
-      items.value = value
+      items.value = value.items
+      heads.value = value.heads
       loaded.value = true
     },
     (cause) => {
@@ -80,7 +100,7 @@ async function load() {
   )
 }
 function prepare() {
-  if (!loaded.value || busy.value || writing.value) return
+  if (!loaded.value || busy.value || writing.value || !base.value) return
   const entries = text.value
     .split('\n')
     .map((entry) => entry.trim())
@@ -88,12 +108,17 @@ function prepare() {
   confirmation.value = {
     kind: kind.value,
     entries,
-    ...(base.value === undefined ? {} : { expected_version: base.value }),
+    expected_version: base.value.version,
   }
 }
 function publish(item: Wordlist) {
   if (writing.value || busy.value || !loaded.value || item.status !== 'draft') return
-  confirmation.value = { ...item }
+  const head = heads.value.find((head) => head.kind === item.kind)
+  if (!head || item.base_effective_id !== head.effective_id) return
+  confirmation.value = {
+    item: { ...item },
+    input: { expected_version: item.version, expected_head_version: head.version },
+  }
 }
 async function submit() {
   const current = confirmation.value
@@ -108,12 +133,12 @@ async function submit() {
     (signal) =>
       'entries' in current
         ? client.create(current, key, signal)
-        : client.publish(current.id, current.version, key, signal),
+        : client.publish(current.item.id, current.input, key, signal),
     async (value) => {
       const expected = generation + 1
       await load()
       if (generation === expected && workspace.allowed())
-        notice.value = `${'entries' in current ? '合成草稿已创建，尚未发布' : '合成版本已发布，旧发布项按模拟规则归档'}：${value.id} · 资源版本 ${value.version}；不代表真实扫描生效`
+        notice.value = `${'entries' in current ? '合成草稿已创建，尚未发布' : '合成版本已发布，旧生效版已归档'}：${value.id} · 资源版本 ${value.version}；不代表真实扫描生效`
     },
     async (cause) => {
       if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) {
@@ -130,6 +155,40 @@ async function submit() {
     },
   )
 }
+async function openDetail(id: string) {
+  if (busy.value || writing.value) return
+  workspace.cancel()
+  detail.value = null
+  detailBusy.value = true
+  error.value = ''
+  await workspace.run(
+    (signal) => client.detail(id, signal),
+    (value) => {
+      if (value.id !== id) throw new Error('词库详情响应不匹配')
+      detail.value = value
+    },
+    (cause) => {
+      error.value = reviewErrorMessage(cause)
+    },
+    () => {
+      detailBusy.value = false
+    },
+  )
+}
+function closeDetail() {
+  if (writing.value) return
+  workspace.cancel()
+  detail.value = null
+  detailBusy.value = false
+}
+function canPublish(item: Wordlist) {
+  return (
+    item.status === 'draft' &&
+    heads.value.some(
+      (head) => head.kind === item.kind && head.effective_id === item.base_effective_id,
+    )
+  )
+}
 onMounted(() => {
   if (mockEnabled) void load()
 })
@@ -142,21 +201,34 @@ onMounted(() => {
     <template v-else>
       <p class="banner">合成业务演示 · 离开页面后重置；不代表真实审核、审计或扫描生效。</p>
       <p>
-        模拟规则：同分类最高资源版本作为创建基准；完整新版本词条由本次输入提供，未读取原词条。创建仅生成草稿，发布使资源版本递增并归档同分类旧发布项。这些规则尚非真实契约。
+        创建使用分类基准，首次也须读取；词条为完整不可变快照。发布核对草稿资源版本、分类基准和创建时生效版，替代版本授权只读，不可直接重发。仅用于后续新扫描及正常重提，不自动全量重扫历史。此处仅演示契约流程，不代表真实服务生效。
       </p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <button :disabled="busy || writing" @click="load">刷新词库</button>
       <p v-if="busy" role="status">正在读取全部合成版本…</p>
       <template v-if="loaded">
+        <h2>分类基准与当前生效版</h2>
+        <ul aria-label="词库基准">
+          <li v-for="head in heads" :key="head.kind">
+            {{ labels[head.kind] }} · 分类基准 {{ head.version }} · 生效版
+            {{ head.effective_id ?? '无' }}
+          </li>
+        </ul>
         <h2>版本列表</h2>
         <p v-if="!items.length">暂无词库版本</p>
         <ul class="workflow-list">
           <li v-for="item in items" :key="item.id">
             {{ labels[item.kind] }} · {{ item.id }} · 资源版本 {{ item.version }} ·
-            {{ status(item.status) }}
+            {{ status(item.status) }} · 创建时生效版 {{ item.base_effective_id ?? '无' }}
+            <button :disabled="writing || !!confirmation" @click="openDetail(item.id)">
+              查看 {{ item.id }}
+            </button>
+            <p v-if="item.status === 'draft' && !canPublish(item)">
+              创建基准已被替代，请基于当前生效版创建新快照。
+            </p>
             <button
-              v-if="item.status === 'draft'"
+              v-if="canPublish(item)"
               :disabled="writing || !!confirmation"
               @click="publish(item)"
             >
@@ -173,7 +245,10 @@ onMounted(() => {
                 {{ labels[value] }}
               </option>
             </select>
-            <p>模拟创建基准：{{ base ?? '新分类，无前置版本' }}</p>
+            <p>
+              分类创建基准：{{ base?.version ?? '未读取' }} · 当前生效版
+              {{ base?.effective_id ?? '无' }}
+            </p>
             <label for="wordlist-entries">完整词条，每行一条；空输入表示空版本</label>
             <textarea id="wordlist-entries" v-model="text" rows="5"></textarea>
             <button type="submit">核对草稿</button>
@@ -181,10 +256,12 @@ onMounted(() => {
         </form>
         <section v-if="confirmation" class="workflow-box" aria-label="词库操作确认">
           <h2>{{ 'entries' in confirmation ? '确认创建草稿' : '确认发布版本' }}</h2>
-          <p>{{ labels[confirmation.kind] }}</p>
+          <p>
+            {{ labels['entries' in confirmation ? confirmation.kind : confirmation.item.kind] }}
+          </p>
           <template v-if="'entries' in confirmation">
             <p>
-              模拟基准：{{ confirmation.expected_version ?? '无' }}；完整词条
+              分类基准：{{ confirmation.expected_version }}；完整词条
               {{ confirmation.entries.length }} 条
             </p>
             <ul>
@@ -193,13 +270,29 @@ onMounted(() => {
             <p>创建后尚未发布，不改变合成当前发布项。</p>
           </template>
           <p v-else>
-            {{ confirmation.id }} · 资源版本
-            {{ confirmation.version }}；确认后按模拟规则归档旧发布项，不证明真实扫描生效。
+            {{ confirmation.item.id }} · 草稿资源版本 {{ confirmation.input.expected_version }} ·
+            分类基准 {{ confirmation.input.expected_head_version }} · 创建时生效版
+            {{
+              confirmation.item.base_effective_id ?? '无'
+            }}；发布后归档旧生效版，不自动全量重扫历史，不证明真实扫描生效。
           </p>
           <button :disabled="writing" @click="submit">
             {{ writing ? '正在提交…' : '确认提交' }}
           </button>
           <button :disabled="writing" @click="confirmation = null">返回修改</button>
+        </section>
+        <p v-if="detailBusy" role="status">正在读取完整词条…</p>
+        <section v-if="detail" class="workflow-box" aria-label="词库只读详情">
+          <h2>完整快照（只读）</h2>
+          <p>{{ detail.id }} · 资源版本 {{ detail.version }} · {{ status(detail.status) }}</p>
+          <p>
+            创建时生效版 {{ detail.base_effective_id ?? '无' }}；归档不等于物理删除或无限期保留。
+          </p>
+          <ul>
+            <li v-for="(entry, index) in detail.entries" :key="index">{{ entry }}</li>
+          </ul>
+          <p v-if="!detail.entries.length">空词条快照</p>
+          <button :disabled="writing" @click="closeDetail">关闭详情</button>
         </section>
       </template>
     </template>
