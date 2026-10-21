@@ -18,10 +18,9 @@ export const useAdminStore = defineStore('admin-session', () => {
   async function login(role: Role) {
     const current = ++generation
     const result = await Promise.resolve(loginAdmin(role))
-    if (current === generation) {
-      session.value = result
-      notice.value = ''
-    }
+    if (current !== generation) throw new Error('登录操作已失效，请重新登录')
+    session.value = result
+    notice.value = ''
   }
   function can(role: Role) {
     return (
@@ -32,18 +31,30 @@ export const useAdminStore = defineStore('admin-session', () => {
   }
   async function request(path: `/admin/${string}`, init?: RequestInit) {
     const current = session.value
+    const currentGeneration = generation
     if (!current) {
       clear('请先登录后台')
       throw new ApiError(401)
     }
     try {
       const result = await adminRequest(path, current.token, init)
-      if (session.value !== current) throw new Error('会话已变更，请重新操作')
+      if (session.value !== current || generation !== currentGeneration)
+        throw new Error('会话已变更，请重新操作')
       return result
     } catch (error) {
-      if (session.value === current && error instanceof ApiError && error.status === 401)
+      if (
+        session.value === current &&
+        generation === currentGeneration &&
+        error instanceof ApiError &&
+        error.status === 401
+      )
         clear(error.message)
-      if (session.value === current && error instanceof ApiError && error.status === 403)
+      if (
+        session.value === current &&
+        generation === currentGeneration &&
+        error instanceof ApiError &&
+        error.status === 403
+      )
         forbidden.value++
       throw error
     }
@@ -51,11 +62,14 @@ export const useAdminStore = defineStore('admin-session', () => {
   async function logout() {
     const token = session.value?.token
     clear()
+    const current = generation
     if (token) {
       try {
         await revokeAdmin(token)
       } catch {
-        notice.value = '本地会话已清除；服务端撤销未确认，请联系管理员核验。'
+        // 旧退出请求的结果不得覆盖后续登录的提示。
+        if (current === generation)
+          notice.value = '本地会话已清除；服务端撤销未确认，请联系管理员核验。'
       }
     }
   }
