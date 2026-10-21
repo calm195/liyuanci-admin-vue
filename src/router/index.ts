@@ -4,6 +4,7 @@ import type { Role } from '@/types/admin'
 
 export const menu: { path: string; title: string; role?: Role }[] = [
   { path: '/', title: '工作台' },
+  { path: '/password', title: '本人改密' },
   { path: '/identity', title: '身份审核', role: 'review_operator' },
   { path: '/moderation', title: '内容审核', role: 'review_operator' },
   { path: '/wordlists', title: '词库管理', role: 'review_operator' },
@@ -13,6 +14,7 @@ export const router = createRouter({
   routes: [
     { path: '/login', component: () => import('@/views/LoginView.vue') },
     { path: '/', component: () => import('@/views/DashboardView.vue') },
+    { path: '/password', component: () => import('@/views/PasswordView.vue') },
     {
       path: '/identity',
       component: () => import('@/views/IdentityView.vue'),

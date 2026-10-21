@@ -1,5 +1,11 @@
-import { parseAdminSession } from '@/types/admin'
-import type { AdminSession, Role } from '@/types/admin'
+import { parseAdminSession, adminLoginInput, adminPasswordInput } from '@/types/admin'
+import type {
+  AdminSession,
+  AdminLoginInput,
+  AdminPasswordInput,
+  AdminAccount,
+  Role,
+} from '@/types/admin'
 
 export const mockEnabled = import.meta.env.DEV && import.meta.env.VITE_ADMIN_MOCK === 'true'
 export class ApiError extends Error {
@@ -44,20 +50,69 @@ export async function adminRequest(
   if (!response.ok) throw new ApiError(response.status)
   return response.status === 204 ? undefined : response.json()
 }
-/** 后台身份方案尚未接入，仅提供开发环境的模拟登录。 */
-export function loginAdmin(role: Role): AdminSession {
-  if (!mockEnabled) throw new Error('后台身份提供方尚未接入，真实登录待联调')
+let fixture: { input: AdminLoginInput; account: AdminAccount; tokens: Set<string> } | null = null
+/** 仅为本次开发演示生成临时虚构凭据，不是账号创建接口或真实授权来源。 */
+export function createSyntheticCredentials(role: Role): AdminLoginInput {
+  if (!mockEnabled) throw new ApiError(503)
+  const input = { login_name: `synthetic-${crypto.randomUUID()}`, password: crypto.randomUUID() }
+  fixture = {
+    input: { ...input },
+    account: {
+      id: 'synthetic-account',
+      login_name: input.login_name,
+      version: 1,
+      roles: [role],
+      active: true,
+    },
+    tokens: new Set(),
+  }
+  return input
+}
+/** 真实登录尚未接线；合成分支验证临时凭据，角色仅由夹具账号返回。 */
+export async function loginAdmin(
+  input: AdminLoginInput,
+  signal?: AbortSignal,
+): Promise<AdminSession> {
+  if (!mockEnabled) throw new ApiError(503)
+  const command = adminLoginInput(input)
+  await Promise.resolve()
+  signal?.throwIfAborted()
+  if (
+    !fixture ||
+    fixture.input.login_name !== command.login_name ||
+    fixture.input.password !== command.password
+  )
+    throw new ApiError(401)
+  const token = `synthetic-${crypto.randomUUID()}`
+  fixture.tokens.add(token)
   return parseAdminSession({
     code: 0,
-    message: '合成 Mock',
+    message: '合成会话',
     request_id: 'synthetic',
-    data: {
-      token: 'synthetic-admin-session',
-      account: { id: 'synthetic-account', version: 1, roles: [role], active: true },
-    },
+    data: { token, account: fixture.account },
   })
 }
+/** 合成撤销仅验证本进程场景，不代表后端密码摘要、跨进程撤销或审计已经生效。 */
+export async function changeAdminPassword(
+  token: string,
+  input: AdminPasswordInput,
+  key: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!mockEnabled) throw new ApiError(503)
+  const command = adminPasswordInput(input)
+  if (!key.trim()) throw new ApiError(400)
+  await Promise.resolve()
+  signal?.throwIfAborted()
+  if (!fixture || !fixture.tokens.has(token)) throw new ApiError(401)
+  if (fixture.input.password !== command.current_password) throw new ApiError(403)
+  fixture.input.password = command.new_password
+  fixture.tokens.clear()
+}
 export async function revokeAdmin(token: string): Promise<void> {
-  if (mockEnabled) return
+  if (mockEnabled) {
+    fixture?.tokens.delete(token)
+    return
+  }
   await adminRequest('/admin/session', token, { method: 'DELETE' })
 }

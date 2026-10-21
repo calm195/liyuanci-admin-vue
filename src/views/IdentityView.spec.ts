@@ -71,7 +71,13 @@ beforeEach(() => {
   setActivePinia(pinia)
   useAdminStore().session = {
     token: 'synthetic',
-    account: { id: 'operator', active: true, version: 1, roles: ['review_operator'] },
+    account: {
+      login_name: 'synthetic-operator',
+      id: 'operator',
+      active: true,
+      version: 1,
+      roles: ['review_operator'],
+    },
   }
   mocks.list.mockResolvedValue({
     items: [first, second].map(({ id, version, status }) => ({ id, version, status })),

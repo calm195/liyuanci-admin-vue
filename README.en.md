@@ -6,11 +6,11 @@ Wordlist management previews contract 0.2.0 category heads, complete snapshots, 
 
 The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, identity review and content moderation pages.
 
-Real login awaits the backend identity provider. There are no default credentials. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Real business APIs remain pending integration.
+Administrators use pre-provisioned local accounts and may change their own passwords. Real login/password changes await services and isolated identity verification; no account or password is built into the code. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Real business APIs remain pending integration.
 
 ## 2. Project options and directory structure
 
-See [.env.example](.env.example). `VITE_ADMIN_MOCK=true` explicitly enables synthetic roles, sessions identity review and content moderation in Vite DEV with a persistent Mock banner. Production builds disable Mock, and synthetic requests never reach real APIs. All `VITE_` variables are public and must contain no secrets.
+See [.env.example](.env.example). `VITE_ADMIN_MOCK=true` explicitly enables synthetic accounts, sessions, self-service password changes, identity review and content moderation in Vite DEV with a persistent Mock banner. Production builds disable Mock, and synthetic requests never reach real APIs. All `VITE_` variables are public and must contain no secrets.
 
 ```text
 src/
@@ -39,7 +39,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Synthetic local preview:
+Synthetic local preview: generate temporary fictional credentials on the login page. Roles only configure the fixture account. You may reveal and record the fictional password before login for the self-service password-change preview, then log in again after success. Generating a new fixture replaces the previous synthetic account; it is not a real account creation/reset API.
 
 ```sh
 VITE_ADMIN_MOCK=true pnpm dev

@@ -1,7 +1,13 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiError, adminRequest, loginAdmin, revokeAdmin } from '@/services/admin'
-import type { AdminSession, Role } from '@/types/admin'
+import {
+  ApiError,
+  adminRequest,
+  loginAdmin,
+  revokeAdmin,
+  changeAdminPassword,
+} from '@/services/admin'
+import type { AdminSession, Role, AdminLoginInput, AdminPasswordInput } from '@/types/admin'
 
 /** 后台会话仅保存在内存中，刷新页面后需重新登录。 */
 export const useAdminStore = defineStore('admin-session', () => {
@@ -15,12 +21,34 @@ export const useAdminStore = defineStore('admin-session', () => {
     session.value = null
     notice.value = message
   }
-  async function login(role: Role) {
+  async function login(input: AdminLoginInput, signal?: AbortSignal) {
     const current = ++generation
-    const result = await Promise.resolve(loginAdmin(role))
+    const result = await loginAdmin(input, signal)
+    signal?.throwIfAborted()
     if (current !== generation) throw new Error('登录操作已失效，请重新登录')
     session.value = result
     notice.value = ''
+  }
+  let passwordBusy = false
+  async function changePassword(input: AdminPasswordInput, key: string, signal?: AbortSignal) {
+    if (passwordBusy) throw new Error('改密正在提交，请勿重复操作')
+    const owner = session.value
+    const currentGeneration = generation
+    if (!owner) throw new ApiError(401)
+    const current = () => session.value === owner && generation === currentGeneration
+    passwordBusy = true
+    try {
+      await changeAdminPassword(owner.token, input, key, signal)
+      signal?.throwIfAborted()
+      if (!current()) throw new Error('会话已变更，请重新操作')
+      clear('口令已修改，请重新登录')
+    } catch (cause) {
+      if (current() && cause instanceof ApiError && cause.status === 401) clear(cause.message)
+      // 本人旧口令错误不属于角色越权，不触发全局拒绝页。
+      throw cause
+    } finally {
+      passwordBusy = false
+    }
   }
   function can(role: Role) {
     return (
@@ -73,5 +101,16 @@ export const useAdminStore = defineStore('admin-session', () => {
       }
     }
   }
-  return { session, notice, forbidden, authenticated, can, login, clear, request, logout }
+  return {
+    session,
+    notice,
+    forbidden,
+    authenticated,
+    can,
+    login,
+    changePassword,
+    clear,
+    request,
+    logout,
+  }
 })

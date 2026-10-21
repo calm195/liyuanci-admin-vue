@@ -21,8 +21,8 @@ describe('T010 REQ-018/019 登录入口', () => {
     vi.stubEnv('VITE_ADMIN_MOCK', 'false')
     const wrapper = await mountLogin()
     expect(wrapper.find('select').exists()).toBe(false)
-    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('身份提供方接入准备中')
+    expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('真实登录待服务及隔离身份验收后开放')
     wrapper.unmount()
   })
   it('显式开发Mock可登录，角色选择只在本地生效且不请求真实API', async () => {
@@ -33,6 +33,7 @@ describe('T010 REQ-018/019 登录入口', () => {
     const wrapper = await mountLogin()
     expect(wrapper.text()).toContain('合成 Mock')
     await wrapper.get('select').setValue('crisis_operator')
+    await wrapper.get('button').trigger('click')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     const { useAdminStore } = await import('@/stores/admin')
@@ -46,7 +47,9 @@ describe('T010 REQ-018/019 登录入口', () => {
     vi.stubEnv('VITE_ADMIN_MOCK', 'true')
     const { mockEnabled, loginAdmin } = await import('@/services/admin')
     expect(mockEnabled).toBe(false)
-    expect(() => loginAdmin('super_admin')).toThrow('后台身份提供方尚未接入，真实登录待联调')
+    await expect(
+      loginAdmin({ login_name: 'synthetic', password: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ status: 503 })
   })
   it('模拟请求禁止向真实后端发送合成令牌', async () => {
     vi.stubEnv('DEV', true)

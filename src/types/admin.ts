@@ -3,9 +3,18 @@ export const roles = ['review_operator', 'crisis_operator', 'super_admin'] as co
 export type Role = (typeof roles)[number]
 export interface AdminAccount {
   id: string
+  login_name: string
   version: number
   roles: Role[]
   active: boolean
+}
+export interface AdminLoginInput {
+  login_name: string
+  password: string
+}
+export interface AdminPasswordInput {
+  current_password: string
+  new_password: string
 }
 export interface AdminSession {
   token: string
@@ -34,6 +43,8 @@ export function parseAdminSession(value: unknown): AdminSession {
     !record(account) ||
     typeof account['id'] !== 'string' ||
     !account['id'] ||
+    typeof account['login_name'] !== 'string' ||
+    !account['login_name'].trim() ||
     typeof account['version'] !== 'number' ||
     !Number.isInteger(account['version']) ||
     account['version'] < 1 ||
@@ -47,9 +58,21 @@ export function parseAdminSession(value: unknown): AdminSession {
     token,
     account: {
       id: account['id'],
+      login_name: account['login_name'],
       version: account['version'],
       active: account['active'],
       roles: [...account['roles']],
     },
   }
+}
+
+/** 仅保留登录协议字段，不接受角色选择作为授权参数，也不改写口令空白。 */
+export function adminLoginInput(input: AdminLoginInput): AdminLoginInput {
+  if (!input.login_name.trim() || !input.password.length) throw new Error('请填写后台账号和口令')
+  return { login_name: input.login_name, password: input.password }
+}
+export function adminPasswordInput(input: AdminPasswordInput): AdminPasswordInput {
+  if (!input.current_password.length || !input.new_password.length)
+    throw new Error('请填写当前口令和新口令')
+  return { current_password: input.current_password, new_password: input.new_password }
 }
