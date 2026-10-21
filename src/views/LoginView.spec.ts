@@ -22,7 +22,7 @@ describe('T010 REQ-018/019 登录入口', () => {
     const wrapper = await mountLogin()
     expect(wrapper.find('select').exists()).toBe(false)
     expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('真实登录待服务及隔离身份验收后开放')
+    expect(wrapper.text()).toContain('真实登录关闭；需显式启用隔离联调模式')
     wrapper.unmount()
   })
   it('显式开发Mock可登录，角色选择只在本地生效且不请求真实API', async () => {

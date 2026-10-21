@@ -45,6 +45,8 @@ Synthetic local preview: generate temporary fictional credentials on the login p
 VITE_ADMIN_MOCK=true pnpm dev
 ```
 
+Isolated identity integration requires explicit DEV mode: `VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`. Only same-origin login, self-service password changes and logout are connected; other admin requests are closed. Integration owners must supply same-origin test hosting and isolated identities; no proxy is added. Production builds always close this entry.
+
 Quality checks and build preview:
 
 ```sh

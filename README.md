@@ -45,6 +45,8 @@ pnpm dev
 VITE_ADMIN_MOCK=true pnpm dev
 ```
 
+隔离身份联调仅在显式 DEV 模式启用：`VITE_ADMIN_MOCK=false VITE_ADMIN_AUTH_INTEGRATION=true pnpm dev --mode integration`。只接同源登录、本人改密和退出，其余后台请求关闭；需集成方提供同源测试托管及隔离身份，不新增代理。生产构建始终关闭此入口。
+
 质量检查与构建预览：
 
 ```sh
