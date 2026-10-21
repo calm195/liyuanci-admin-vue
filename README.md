@@ -2,13 +2,13 @@
 
 ## 1. 项目介绍
 
-鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台及身份审核准备页。
+鲤源池后台管理 Web 应用，采用 Vue 3 Composition API、Vite、严格 TypeScript、Vue Router 和 Pinia。提供后台登录入口、角色菜单、工作台及身份审核业务页。
 
-真实登录等待后台身份方案接入，当前没有默认账号或口令。开发环境可使用合成 Mock 演示；真实业务 API 和身份审核尚未接入。
+真实登录等待后台身份方案接入，当前没有默认账号或口令。开发环境可使用合成 Mock 演示；身份审核支持合成案件列表、按需读卡、通过/驳回及回执演示，真实业务 API 尚未接入。
 
 ## 2. 项目选项与目录结构
 
-配置示例见 [.env.example](.env.example)。`VITE_ADMIN_MOCK=true` 显式启用本地模拟角色与会话，仅在 Vite DEV 生效，页面持续显示 Mock 标记；生产构建禁用 Mock，模拟请求不会发送到真实 API。`VITE_` 变量为公开配置，不得包含秘密。
+配置示例见 [.env.example](.env.example)。`VITE_ADMIN_MOCK=true` 显式启用本地模拟角色、会话与身份审核业务，仅在 Vite DEV 生效，页面持续显示 Mock 标记；生产构建禁用 Mock，模拟请求不会发送到真实 API。`VITE_` 变量为公开配置，不得包含秘密。
 
 ```text
 src/
@@ -26,7 +26,7 @@ docs/
   milestones/   按阶段分文件的功能、设计与验证记录
 ```
 
-阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 接入准备](docs/milestones/T012.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
+阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 身份审核](docs/milestones/T012.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
 
 ## 3. 项目启动方式
 

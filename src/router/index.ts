@@ -4,7 +4,7 @@ import type { Role } from '@/types/admin'
 
 export const menu: { path: string; title: string; role?: Role }[] = [
   { path: '/', title: '工作台' },
-  { path: '/identity', title: '身份审核接入', role: 'review_operator' },
+  { path: '/identity', title: '身份审核', role: 'review_operator' },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
