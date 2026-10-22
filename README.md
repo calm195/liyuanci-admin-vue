@@ -24,11 +24,9 @@ src/
   utils/        纯函数与相邻测试
   views/        路由级页面
 public/         公共静态资源
-docs/
-  milestones/   按阶段分文件的功能、设计与验证记录
 ```
 
-阶段记录：[T004 工程基础](docs/milestones/T004.md)、[T010 后台会话与权限](docs/milestones/T010.md)、[T012 身份审核](docs/milestones/T012.md)、[T017 内容审核与词库](docs/milestones/T017.md)、[后台账号管理](docs/milestones/admin-accounts.md)。配套材料：[首批交付记录](docs/delivery-T004-T010.md)、[契约疑问](docs/contract-questions.md)、[T012 接入清单](docs/T012-integration.md)。
+开发过程、阶段记录及验证证据统一见 [管理端文档索引](../docs/development/admin/README.md)。
 
 ## 3. 项目启动方式
 
@@ -68,9 +66,9 @@ pnpm preview
 
 每组修改后依次运行 `pnpm format`、`pnpm check`、`pnpm build`；需要自动 lint 修复时使用 `pnpm lint:fix`。准确记录验证结果与未完成依赖。
 
-README 仅维护项目介绍、项目选项与目录结构、启动方式、开发规范与须知，并同步英文版。功能与里程碑记录放在 `docs/milestones/`，按阶段分文件，包含任务 ID / REQ、主要行为、模块边界、设计取舍、接口契约版本、真实/模拟状态、验证结果与未完成依赖，随对应功能提交。
+README 仅维护项目介绍、项目选项与目录结构、启动方式、开发规范与须知，并同步英文版。过程产物由 docs 工程集中管理；本工程不保留阶段文档。
 
-新功能先建开发分支，按功能范围及依赖顺序提交，提交需有用户授权；不自动 push、部署或上线。仅修改本仓库，源模板、共享契约工作台及批准材料保持只读；契约疑问记入本仓库 `docs/`。
+任何工程变动前同步准备本工程与 docs 的同名 `codex/<主题>` 分支。固定阶段记录不再修改，后续交付、勘误和补证据在 docs 对应端新增文件，并引用完整源码提交；详见 [文档管理规范](../docs/governance/README.md)。按功能提交且须有用户授权，不自动 push、部署或上线；需求、审批及固定设计只读。
 
 后台令牌仅存内存，刷新需重新登录，不接学生会话，不在浏览器存储身份资料。菜单和按钮隐藏不能替代后端授权。禁止提交凭据、本地 Codex 认证或私有环境值。
 

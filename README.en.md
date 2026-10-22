@@ -24,11 +24,9 @@ src/
   utils/        Pure helpers and adjacent tests
   views/        Route-level views
 public/         Public static assets
-docs/
-  milestones/   Feature, design and validation records by stage
 ```
 
-Stages: [T004 foundation](docs/milestones/T004.en.md), [T010 sessions and permissions](docs/milestones/T010.en.md), [T012 identity review](docs/milestones/T012.en.md), [T017 moderation and wordlists](docs/milestones/T017.en.md), [admin account management](docs/milestones/admin-accounts.en.md). Supporting material: [initial delivery](docs/delivery-T004-T010.md), [contract questions](docs/contract-questions.md), [T012 checklist](docs/T012-integration.md).
+Development records, milestones and validation evidence are managed in the [admin documentation index](../docs/development/admin/README.md).
 
 ## 3. Getting started
 
@@ -68,9 +66,9 @@ Use `<script setup lang="ts">` and respect strict typing and existing formatting
 
 After each set of changes, run `pnpm format`, `pnpm check` and `pnpm build` in order. Use `pnpm lint:fix` when automated lint fixes are needed. Report validation and unfinished dependencies accurately.
 
-Keep README limited to project introduction, options and directory structure, startup instructions, and development standards and notes. Keep both languages aligned. Store feature and milestone records in separate stage files under `docs/milestones/`, covering task IDs / REQs, behavior, module boundaries, design tradeoffs, contract version, real/Mock status, validation and unfinished dependencies. Include these records in the corresponding feature commits.
+Keep README limited to introduction, options and structure, startup, and development notes; keep both root README languages aligned. All process artifacts belong to the docs repository; this project retains no stage documents.
 
-Create a development branch before new features and commit by feature scope and dependency order with user authorization. Do not automatically push, deploy or release. Modify only this repository; source templates, shared contract workspaces and approval materials remain read-only. Record contract questions in this repository's `docs/`.
+Before any project change, prepare matching `codex/<topic>` branches in this project and docs. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
 
 Admin tokens stay in memory and refresh requires login again. Exclude student sessions and never persist identity data in browser storage. Menu and button visibility does not replace backend authorization. Never commit credentials, local Codex authentication or private environment values.
 

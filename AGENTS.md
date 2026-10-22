@@ -1,40 +1,27 @@
-# Project guidance for Codex
+# 管理端协作规则
 
-## Stack and commands
+## 工程与代码规范
 
-- Vue 3 Composition API with `<script setup lang="ts">`, Vite, strict TypeScript, Vue Router, Pinia.
-- Use pnpm 10 only. Install with `pnpm install`; preserve `pnpm-lock.yaml`.
-- Develop: `pnpm dev`.
-- After every set of modifications, run `pnpm format`, then `pnpm check` (formatting, lint, type checking, and tests), and `pnpm build` before completing the task. If fixes require further modifications, repeat formatting and checks on the final changes.
-- Use `pnpm lint:fix` when automated lint fixes are needed. Resolve failures without weakening checks; report any checks that cannot run and why.
+- 使用 Vue 3 Composition API、`<script setup lang="ts">`、Vite、严格 TypeScript、Vue Router 和 Pinia。仅用 pnpm 10，安装用 `pnpm install`，保留 pnpm-lock.yaml；开发用 `pnpm dev`。
+- 路由级页面放 src/views 并由 src/router 懒加载；复用组件放 src/components，props/emits 类型明确并使用可访问 HTML；响应式复用逻辑放 src/composables，命名 useX；store 只存共享状态，临时状态放组件。
+- 外部 I/O 放 src/services，边界校验 unknown；共享类型放 src/types，本地类型靠近使用方；纯函数放 src/utils，行为测试与实现相邻 `*.spec.ts`。无具体需要不增加抽象或依赖。
+- 严格类型，避免 any、不安全断言、非空断言和抑制注释；类型导入用 type，明确处理 Promise 拒绝、空值及索引值。公共 API 意图不明显时写简短中文 TSDoc，说明取舍与边界，不复述语法。
+- 非测试代码不得出现任务/里程碑/REQ 编号；追踪仅在测试和 docs 工程。说明注释、日志及面向用户错误提示使用中文；语言指令、接口字段、协议值和工具标识保留原文。
+- pnpm lint 使用本地 ESLint 规则检查非测试 JS/TS、Vue、独立 CSS/HTML 与工程脚本，包含 Vue 样式块及 HTML 内联脚本/样式。日志首参为含中文的字符串或模板，动态数据作后续参数；按作用域追踪赋值、解构、链式/命名导入别名和 bind/call/apply，重赋值保守保留来源。禁止用动态属性、别名、跨模块转发或抑制绕过规则；新增日志封装同步扩展规则和回归用例。自动中文检测只是最低门槛，评审仍需确认语义。
+- 遵循现有 Prettier/ESLint，不削弱检查；新增逻辑与回归修复补行为测试，以用户可见结果验证。README.md 与 README.en.md 的用法、架构和规范保持一致；阶段产物仅维护中文，不复制英文译本。
+- 不提交凭据、本地 Codex 认证或私有环境值；VITE_ 变量公开。后台令牌只存内存，菜单/按钮不可替代服务端授权。
 
-## Architecture
+## 验证
 
-- `src/views`: route-level views, lazy-loaded through `src/router`.
-- `src/components`: reusable UI; typed props/emits and accessible HTML.
-- `src/composables`: reusable reactive behavior, named `useX`.
-- `src/stores`: shared state only; keep transient UI state inside components.
-- `src/services`: external I/O; validate unknown data at the boundary.
-- `src/types`: shared domain types. Keep local types beside their consumer.
-- `src/utils`: pure helpers. Tests live beside implementations as `*.spec.ts`.
-- Do not create abstractions or dependencies without a concrete need.
+每组修改后运行 `pnpm format`、`pnpm check`、`pnpm build`；必要时用 `pnpm lint:fix` 后完整复跑。不得关闭规则或删除测试绕过失败；无法执行时报告命令与原因，不沿用旧快照结果或声称未执行的检查通过。另在 docs 工程运行文档检查与固定指纹检查。
 
-## Code conventions
+## 跨仓库文档与分支规则
 
-- 非测试代码不得出现里程碑、任务或需求编号（如 T00x、REQ 编号）；追踪信息仅写入阶段文档或测试。代码注释只使用中文说明功能、业务意图、边界与设计原因；日志及面向用户的错误提示使用中文。保留语言指令、接口字段、协议值和工具要求的标识符原文。
-- `pnpm lint` 通过本地 ESLint 规则检查非测试 JS/TS、Vue、独立 CSS/HTML 与工程脚本中的编号、中文说明注释和日志，包含 Vue 样式块、HTML 内联样式块及脚本。日志首参使用包含中文的字符串或模板，动态数据作为后续参数。检查按作用域追踪日志对象和方法的赋值、解构、链式别名、命名导入别名以及 bind/call/apply；重赋值保守保留日志来源。不要用别名、动态属性、跨模块转发或规则抑制绕过检查。新增日志封装须同步扩展检查与回归用例。自动语言检查以包含中文为最低门槛，代码评审仍须确认说明完整、准确。
-- Respect strict typing. Avoid `any`, unsafe casts, non-null assertions and suppression comments.
-- Use type-only imports. Handle rejected promises and nullable/indexed values explicitly.
-- Comment public APIs with concise TSDoc when intent is not obvious; explain decisions and edge cases, not syntax.
-- Follow existing Prettier/ESLint configuration. Do not weaken checks to make a task pass.
-- Add behavioral tests for new logic and regressions; prefer user-visible outcomes.
-- Keep README.md and README.en.md aligned when commands or architecture change.
-- Never commit credentials, local Codex auth, or private environment values. VITE_ variables are public.
-- Report changes and validation accurately. Do not claim checks ran when they did not.
-
-## 功能文档与提交
-
-- README.md 仅包含项目介绍、项目选项与目录结构、项目启动方式、开发规范与须知；同步更新 README.en.md。每个功能完整修改完成后，在 docs/milestones/ 按阶段分文件记录实现功能与设计，包括任务 ID / REQ、主要行为、模块边界、关键设计取舍、接口契约版本、真实/模拟状态、验证结果与未完成依赖；同步维护英文阶段文件。阶段文档随对应功能一起提交，不能只以对话代替。
-- 新功能开发前新建功能分支；按功能范围拆分提交，并按依赖顺序提交工程基础、业务能力及后续接入材料。每个功能提交包含对应阶段文档与必要用例；涉及项目介绍、选项、目录、命令或规范变化时同步更新中英文 README，不混入无关改动。
-- 仅修改本仓库；源模板、共享契约工作台与批准材料保持只读，契约疑问记录在本仓库 docs/，由后端协调维护共享契约。
-- 提交须有用户授权；本次用户已授权新建开发分支并按功能提交，不自动 push、部署或上线。
+- 统一遵循 [docs 文档规范](../docs/governance/README.md)；本端文档入口为 [端内索引](../docs/development/admin/README.md)。
+- 开发工程不保留 docs/、里程碑、设计、评审、联调或验证报告；所有过程产物写入 docs 工程 `development/admin/`。源码旁必要用法说明和根 README/AGENTS 可保留；README 只维护项目介绍、选项/目录、启动及开发须知。
+- 任何工程变动前先核对两仓库分支、完整 HEAD、工作区，并同步准备同名 `codex/<主题>` 分支。保护已有修改；docs 分支无法安全准备时停止受影响交付。并行不同任务用独立工作树，不切换他人工作区。
+- 已固定阶段文件不修改、不追加、不格式化、不删除；每次完整交付新增 `development/admin/milestones/YYYY-MM-DD-<主题>-rN.md`，证据放同端 `validation/`。注明任务/REQ、源码分支/完整提交、docs 基点、契约版本、实现与未完成范围、取舍、真实/模拟边界、实际检查及依赖，交付时追加 docs 固定清单。
+- 勘误或补证据另建文件引用原记录与指纹，更新端内索引；不重写历史完成状态。共享进度/阻塞/联调台账由 docs 协调者维护。契约疑问写 docs 对应端新记录；后端仅在既有授权范围协调共享 contracts/，改变批准语义先评审。
+- requirements/original.md 只读；既有需求、审批及设计不覆盖，变更新版本按影响重新评审并由用户确认。AI 不签发 G1/G2/G3；受阻前置只停止依赖它的工作。
+- 按功能范围提交；需有用户授权。先提交开发工程，再将精确源码提交写入本次尚未固定的 docs 记录并提交 docs；检查暂存范围，不混入无关改动。已明确授权的动作不重复索取确认；不因本规则自动获得推送、合并、部署或上线权限。
+- 修改前说明计划，完成后列出变更文件、风险与实际验证结果；文档用中文，代码标识符保留英文。事实、假设、建议和待确认问题分开。业务需求使用 REQ-001 格式和可测试验收标准，设计/任务引用原 REQ；协作治理不编造业务 REQ。
