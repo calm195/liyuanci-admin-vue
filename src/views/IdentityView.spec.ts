@@ -1,6 +1,6 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import IdentityView from './IdentityView.vue'
@@ -29,13 +29,13 @@ let wrapper: VueWrapper | undefined
 const createUrl = vi.fn(() => 'blob:synthetic-card')
 const revokeUrl = vi.fn()
 function deferred<T>() {
-  let finish: ((value: T) => void) | undefined
+  let finish: ((value: T | PromiseLike<T>) => void) | undefined
   const promise = new Promise<T>((resolve) => {
     finish = resolve
   })
   return {
     promise,
-    resolve(value: T) {
+    resolve(value: T | PromiseLike<T>) {
       if (!finish) throw new Error('尚未准备')
       finish(value)
     },
@@ -52,7 +52,14 @@ async function open(id = 'case-a') {
   await found.trigger('click')
   await flushPromises()
 }
+async function processing() {
+  if (!wrapper?.find('form').exists()) {
+    await button('处理身份审核').trigger('click')
+    await flushPromises()
+  }
+}
 async function confirm() {
+  await processing()
   await wrapper?.get('form').trigger('submit')
   await flushPromises()
   await button('确认提交').trigger('click')
@@ -107,8 +114,15 @@ describe('T012 身份审核页面业务', () => {
     await open()
     const pending = deferred<Awaited<ReturnType<IdentityReviewClient['decide']>>>()
     mocks.decide.mockReturnValueOnce(pending.promise)
+    await processing()
     await wrapper?.get('form').trigger('submit')
     await button('确认提交').trigger('click')
+    expect(button('刷新列表').attributes('disabled')).toBeDefined()
+    wrapper?.unmount()
+    const pinia = getActivePinia()
+    if (!pinia) throw new Error('缺少会话')
+    wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
+    await flushPromises()
     await open('case-b')
     pending.resolve({ request_id: first.id, status: 'approved', version: 2 })
     await flushPromises()
@@ -148,6 +162,7 @@ describe('T012 身份审核页面业务', () => {
   it('驳回必须填写原因和建议，二次确认后按版本提交并展示回执', async () => {
     await flushPromises()
     await open()
+    await processing()
     await wrapper?.get('input[value="rejected"]').setValue()
     await wrapper?.get('#reject-reason').setValue('  图像不清晰  ')
     expect(button('核对决定').attributes('disabled')).toBeDefined()
@@ -192,6 +207,7 @@ describe('T012 身份审核页面业务', () => {
     await open()
     const pending = deferred<Awaited<ReturnType<IdentityReviewClient['decide']>>>()
     mocks.decide.mockReturnValueOnce(pending.promise)
+    await processing()
     await wrapper?.get('form').trigger('submit')
     await button('确认提交').trigger('click')
     await button('正在提交…').trigger('click')
@@ -300,10 +316,16 @@ it('T012 读卡冲突时清除旧图片和决定，重读新版本后人工复�
   await open()
   await button('查看学生卡').trigger('click')
   await flushPromises()
+  const pending = deferred<Blob>()
+  mocks.card.mockReturnValueOnce(pending.promise)
+  const reading = button('查看学生卡').trigger('click')
+  await reading
+  await processing()
   await wrapper?.get('form').trigger('submit')
-  mocks.card.mockRejectedValueOnce(new ApiError(409))
   mocks.detail.mockResolvedValueOnce({ ...first, version: 2, name: '合成新版' })
-  await button('查看学生卡').trigger('click')
+  // 在读取完成前打开处理，迟到的冲突仍需清除旧决定。
+  const failed = Promise.reject(new ApiError(409))
+  pending.resolve(failed)
   await flushPromises()
   expect(wrapper?.text()).not.toContain('合成甲')
   expect(wrapper?.text()).toContain('合成新版')
@@ -330,6 +352,7 @@ it('T012 刷新回到待审队列首页，避免沿用旧游标遗漏新增案�
 it('T012 超长中文意见不能进入二次确认，修正后可继续', async () => {
   await flushPromises()
   await open()
+  await processing()
   await wrapper?.get('input[value="rejected"]').setValue()
   await wrapper?.get('#reject-reason').setValue('中'.repeat(667))
   await wrapper?.get('#revision-suggestion').setValue('请重新上传')
@@ -339,4 +362,42 @@ it('T012 超长中文意见不能进入二次确认，修正后可继续', async
   await wrapper?.get('#reject-reason').setValue('中'.repeat(666) + 'ab')
   expect(button('核对决定').attributes('disabled')).toBeUndefined()
   expect(mocks.decide).not.toHaveBeenCalled()
+})
+
+it('查询与详情只读，显式处理后取消清空表单但保留当前案件与分页', async () => {
+  await flushPromises()
+  await open()
+  expect(wrapper?.find('form').exists()).toBe(false)
+  await processing()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#reject-reason').setValue('旧原因')
+  await wrapper?.get('#revision-suggestion').setValue('旧建议')
+  await wrapper?.get('form').trigger('submit')
+  await button('取消处理').trigger('click')
+  await flushPromises()
+  expect(wrapper?.text()).toContain('合成甲')
+  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(mocks.list).toHaveBeenCalledTimes(1)
+  expect(mocks.decide).not.toHaveBeenCalled()
+  await processing()
+  expect(wrapper?.get('input[value="approved"]').element).toHaveProperty('checked', true)
+  expect(wrapper?.find('[aria-label="提交确认"]').exists()).toBe(false)
+})
+it('提交期间不能关闭处理或切换案件，404后关闭失效案件', async () => {
+  await flushPromises()
+  await open()
+  await processing()
+  const pending = deferred<Awaited<ReturnType<IdentityReviewClient['decide']>>>()
+  mocks.decide.mockReturnValueOnce(pending.promise)
+  await wrapper?.get('form').trigger('submit')
+  await button('确认提交').trigger('click')
+  await button('取消处理').trigger('click')
+  await open('case-b')
+  expect(wrapper?.text()).toContain('合成甲')
+  expect(wrapper?.text()).not.toContain('合成乙')
+  expect(wrapper?.find('form').exists()).toBe(true)
+  pending.resolve(Promise.reject(new ApiError(404)))
+  await flushPromises()
+  expect(wrapper?.text()).not.toContain('合成甲')
+  expect(wrapper?.find('form').exists()).toBe(false)
 })
