@@ -3,6 +3,7 @@ import { useAdminStore } from '@/stores/admin'
 import { isRole } from '@/types/admin'
 import type { Role } from '@/types/admin'
 import { safetyRoles } from '@/types/safety'
+import { crisisRoles } from '@/types/crisis'
 
 export interface MenuItem {
   path: string
@@ -25,6 +26,7 @@ export const menu: MenuItem[] = [
   { path: '/moderation', title: '内容审核', role: 'review_operator' },
   { path: '/wordlists', title: '词库管理', role: 'review_operator' },
   { path: '/safety', title: '举报、处罚与申诉', roles: safetyRoles },
+  { path: '/crisis', title: '危机工作台', roles: crisisRoles },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -56,6 +58,11 @@ export const router = createRouter({
       path: '/safety',
       component: () => import('@/views/SafetyView.vue'),
       meta: { roles: safetyRoles },
+    },
+    {
+      path: '/crisis',
+      component: () => import('@/views/CrisisView.vue'),
+      meta: { roles: crisisRoles },
     },
     { path: '/403', component: () => import('@/views/ForbiddenView.vue') },
     { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue') },

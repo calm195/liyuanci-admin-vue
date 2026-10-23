@@ -4,9 +4,9 @@ Content moderation and wordlist management use the contract 0.2.0 backend APIs. 
 
 ## 1. Project introduction
 
-The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, admin account management, identity review, content moderation, and report/penalty/appeal management pages.
+The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, admin account management, identity review, content moderation, and report/penalty/appeal management and a crisis workspace.
 
-Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation, wordlists and safety case management connect directly to same-origin HTTP APIs in development and production. Identity review supports on-demand card viewing and decisions; content moderation submits the case version and displays the business outcome separately. No local demonstration accounts, cases or wordlists are provided.
+Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation, wordlists, safety case management and the crisis workspace connect directly to same-origin HTTP APIs in development and production. Identity review supports on-demand card viewing and decisions; content moderation submits the case version and displays the business outcome separately. No local demonstration accounts, cases or wordlists are provided.
 
 ## 2. Project options and directory structure
 
@@ -37,7 +37,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Both `pnpm dev` and production builds connect to same-origin `/api/v1` by default, without integration mode or extra flags. Account management requires super_admin. Initial passwords come from server policy and are neither entered nor displayed on the page. Hosting must supply same-origin backend routes; identity review requires registered verification routes. Moderation and wordlists use real APIs. Safety case management supports report decisions, warnings, fixed 7-day muting, permanent bans, appeal decisions, and ordinary content restrictions. All three admin roles may access ordinary safety cases; account role management still requires super_admin. Current account and content-resource versions must come from an authorized handoff; case and body versions are never substituted.
+Both `pnpm dev` and production builds connect to same-origin `/api/v1` by default, without integration mode or extra flags. Account management requires super_admin. Initial passwords come from server policy and are neither entered nor displayed on the page. Hosting must supply same-origin backend routes; identity review requires registered verification routes. Moderation and wordlists use real APIs. Safety case management supports report decisions, warnings, fixed 7-day muting, permanent bans, appeal decisions, and ordinary content restrictions. All three admin roles may access ordinary safety cases; account role management still requires super_admin. Current account and content-resource versions must come from an authorized handoff; case and body versions are never substituted. The crisis workspace is restricted to crisis operators and super administrators. It provides case evidence, timelines, care/operator delivery work, case actions and false-positive review; authorized report/moderation details can escalate a case. The backend requires an explicit independent `CrisisDSN` to register crisis routes; missing routes display a retriable error. The workspace shows care delivery status, excludes student-only care-card contents and contains no built-in assistance resources.
 
 Quality checks and build preview:
 

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import CrisisEscalation from '@/components/CrisisEscalation.vue'
+import { useRouter } from 'vue-router'
+import type { CrisisSummary } from '@/types/crisis'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createModerationTransport, validModerationFeedback } from '@/services/content-transport'
@@ -31,6 +34,15 @@ const outcome = ref<ModerationOutcome | null>(null)
 const notice = ref('')
 let editorGeneration = 0
 let attempt: { fingerprint: string; key: string } | null = null
+const router = useRouter()
+async function crisisEscalated(value: CrisisSummary) {
+  close()
+  try {
+    await router.push({ path: '/crisis', query: { case: value.id } })
+  } catch {
+    error.value = '危机升级已确认，但页面跳转未完成，请进入危机工作台查看'
+  }
+}
 const workspace = useAdminWorkspace(clearAll)
 const client = createModerationTransport(useAdminStore().session?.token ?? '', workspace.allowed)
 const valid = computed(
@@ -166,7 +178,8 @@ async function submit() {
           revision_suggestion: suggestion.value.trim(),
         }
   const fingerprint = JSON.stringify([current.id, input])
-  if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, key: crypto.randomUUID() }
+  if (attempt?.fingerprint !== fingerprint)
+    attempt = { fingerprint, key: globalThis.crypto.randomUUID() }
   const key = attempt.key
   writing.value = true
   error.value = ''
@@ -263,6 +276,14 @@ onMounted(() => {
             </p>
             <blockquote class="workflow-body">{{ detail.body }}</blockquote>
             <p>{{ stateLabel(detail.status) }}</p>
+            <CrisisEscalation
+              :key="`${detail.id}:${detail.version}`"
+              source="task"
+              :source-id="detail.id"
+              :version="detail.version"
+              @escalated="crisisEscalated"
+              @conflict="openCase(detail.id)"
+            />
             <form v-if="detail.status === 'human_required'" @submit.prevent="check">
               <fieldset :disabled="writing || confirming">
                 <legend>审核决定</legend>

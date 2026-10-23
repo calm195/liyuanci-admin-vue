@@ -6,6 +6,8 @@ import SafetyView from './SafetyView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { ReportDetail, SafetySummary } from '@/types/safety'
+vi.mock('@/components/CrisisEscalation.vue', () => ({ default: { template: '<span />' } }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const mocks = vi.hoisted(() => ({
   reports: vi.fn(),
   report: vi.fn(),
@@ -169,7 +171,7 @@ describe('T028 举报、处罚与申诉页面', () => {
     await open()
     await button('申诉管理').trigger('click')
     await flushPromises()
-    expect(wrapper?.text()).not.toContain('举报说明')
+    expect(wrapper?.get('[aria-label="案件详情"]').text()).not.toContain('举报说明')
     await open()
     expect(wrapper?.text()).toContain('原处罚理由')
     await wrapper?.get('#safety-operation').setValue('revoke')

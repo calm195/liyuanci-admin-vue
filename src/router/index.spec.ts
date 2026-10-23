@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { router, menu, canAccessMenu } from './index'
 import { useAdminStore } from '@/stores/admin'
-beforeEach(() => setActivePinia(createPinia()))
+beforeEach(async () => {
+  setActivePinia(createPinia())
+  await router.replace('/login')
+})
 describe('T010 REQ-019 路由与菜单', () => {
   it.each(['/identity', '/moderation', '/wordlists', '/accounts'])(
     '未登录访问%s回登录',
@@ -31,6 +34,7 @@ describe('T010 REQ-019 路由与菜单', () => {
         '/',
         '/password',
         '/safety',
+        '/crisis',
       ])
     },
   )
@@ -104,4 +108,27 @@ it('T028 空角色和未登录拒绝安全治理入口', async () => {
   await router.push('/safety')
   expect(router.currentRoute.value.path).toBe('/403')
   expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety')).toBe(false)
+})
+
+it.each(['crisis_operator', 'super_admin'] as const)('T030 %s可进入危机工作台', async (role) => {
+  useAdminStore().session = {
+    token: 'test',
+    account: { id: 'admin', login_name: '测试账号', version: 1, active: true, roles: [role] },
+  }
+  await router.push('/crisis')
+  expect(router.currentRoute.value.path).toBe('/crisis')
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/crisis')).toBe(true)
+})
+it('T030 普通审核与空角色不能进入危机工作台，未登录回登录', async () => {
+  await router.push('/crisis')
+  expect(router.currentRoute.value.path).toBe('/login')
+  for (const roles of [['review_operator' as const], []]) {
+    useAdminStore().session = {
+      token: 'test',
+      account: { id: 'admin', login_name: '测试账号', version: 1, active: true, roles },
+    }
+    await router.push('/crisis')
+    expect(router.currentRoute.value.path).toBe('/403')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === '/crisis')).toBe(false)
+  }
 })

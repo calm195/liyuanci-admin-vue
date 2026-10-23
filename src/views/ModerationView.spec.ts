@@ -7,6 +7,8 @@ import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type * as contentService from '@/services/content-transport'
 import type { ModerationCase, ModerationOutcome } from '@/types/moderation'
+vi.mock('@/components/CrisisEscalation.vue', () => ({ default: { template: '<span />' } }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   detail: vi.fn(),

@@ -58,6 +58,7 @@ it.each([200, 401])('REQ-018 默认登录表单调用真实传输，HTTP %s 后�
   await wrapper.get('#login-name').setValue('合成账号')
   await wrapper.get('#login-password').setValue('合成口令')
   await wrapper.get('form').trigger('submit')
+  await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1))
   await flushPromises()
   expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/sessions')
   expect(wrapper.get('#login-password').element).toHaveProperty('value', '')

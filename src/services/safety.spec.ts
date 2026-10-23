@@ -33,23 +33,21 @@ const penalty: PenaltyInput = {
 }
 describe('T028 REQ-014/016/018/019 安全治理协议', () => {
   it('列表仅保留技术投影，不回显举报人、说明或申诉正文', async () => {
-    const transport = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        envelope({
-          items: [
-            {
-              id: 'report',
-              version: 7,
-              status: 'resolved',
-              kind: 'wish',
-              body: '私密正文',
-              reporter_id: '私密主体',
-            },
-          ],
-          next_cursor: null,
-        }),
-      )
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      envelope({
+        items: [
+          {
+            id: 'report',
+            version: 7,
+            status: 'resolved',
+            kind: 'wish',
+            body: '私密正文',
+            reporter_id: '私密主体',
+          },
+        ],
+        next_cursor: null,
+      }),
+    )
     const result = await createSafetyClient('token', () => true, transport).reports(
       'opaque+/=',
       signal(),
@@ -113,17 +111,22 @@ describe('T028 REQ-014/016/018/019 安全治理协议', () => {
     expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('same')
   })
   it('举报与申诉决定使用各自案件版本，重试保留幂等键', async () => {
-    const transport = vi
-      .fn<typeof fetch>()
-      .mockImplementation((url) =>
-        Promise.resolve(
-          envelope({
-            id: String(url).includes('/reports/') ? 'report' : 'appeal',
-            status: 'resolved',
-            version: 8,
-          }),
-        ),
-      )
+    const transport = vi.fn<typeof fetch>().mockImplementation((url) =>
+      Promise.resolve(
+        envelope({
+          id: (typeof url === 'string'
+            ? url
+            : url instanceof URL
+              ? url.pathname
+              : url.url
+          ).includes('/reports/')
+            ? 'report'
+            : 'appeal',
+          status: 'resolved',
+          version: 8,
+        }),
+      ),
+    )
     const client = createSafetyClient('token', () => true, transport)
     const input = { decision: 'confirmed' as const, reason: '核对属实', expected_version: 7 }
     await client.decideReport('report', input, 'same', signal())
@@ -141,17 +144,15 @@ describe('T028 REQ-014/016/018/019 安全治理协议', () => {
   it.each(['offline', 'release-restriction'] as const)(
     '真实内容%s绑定实体ID和独立资源版本',
     async (action) => {
-      const transport = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          envelope({
-            id: 'wish',
-            kind: 'wish',
-            content_version: 3,
-            version: 12,
-            status: 'restricted',
-          }),
-        )
+      const transport = vi.fn<typeof fetch>().mockResolvedValue(
+        envelope({
+          id: 'wish',
+          kind: 'wish',
+          content_version: 3,
+          version: 12,
+          status: 'restricted',
+        }),
+      )
       const client = createSafetyClient('token', () => true, transport)
       await client.restrict(
         'wish',

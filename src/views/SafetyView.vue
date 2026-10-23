@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import CrisisEscalation from '@/components/CrisisEscalation.vue'
+import { useRouter } from 'vue-router'
+import type { CrisisSummary } from '@/types/crisis'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createSafetyClient } from '@/services/safety'
@@ -55,6 +58,15 @@ const resourceVersion = ref('')
 const confirmation = ref<Confirmation | null>(null)
 let attempt: { fingerprint: string; key: string } | null = null
 let generation = 0
+const router = useRouter()
+async function crisisEscalated(value: CrisisSummary) {
+  close()
+  try {
+    await router.push({ path: '/crisis', query: { case: value.id } })
+  } catch {
+    error.value = '危机升级已确认，但页面跳转未完成，请进入危机工作台查看'
+  }
+}
 const workspace = useAdminWorkspace(clearAll, safetyRoles)
 const client = createSafetyClient(useAdminStore().session?.token ?? '', workspace.allowed)
 const detail = computed(() => report.value ?? appeal.value)
@@ -271,7 +283,8 @@ async function submit() {
   const current = confirmation.value
   if (!current || writing.value || !workspace.allowed()) return
   const fingerprint = JSON.stringify(current)
-  if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, key: crypto.randomUUID() }
+  if (attempt?.fingerprint !== fingerprint)
+    attempt = { fingerprint, key: globalThis.crypto.randomUUID() }
   const key = attempt.key
   const caseId = selected.value
   writing.value = true
@@ -420,6 +433,15 @@ onMounted(() => {
               <p class="case-text">{{ appeal.penalty_reason || '未提供理由' }}</p>
             </template>
             <p v-if="detail.reason" class="case-text">已有处理理由：{{ detail.reason }}</p>
+            <CrisisEscalation
+              v-if="report"
+              :key="`${report.id}:${report.version}`"
+              source="report"
+              :source-id="report.id"
+              :version="report.version"
+              @escalated="crisisEscalated"
+              @conflict="open(report.id)"
+            />
             <form v-if="options.length" @submit.prevent="prepare">
               <fieldset :disabled="writing || !!confirmation">
                 <legend>案件处理</legend>
