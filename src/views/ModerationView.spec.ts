@@ -1,15 +1,24 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ModerationView from './ModerationView.vue'
+import { ElDrawer } from 'element-plus'
+import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type * as contentService from '@/services/content-transport'
 import type { ModerationCase, ModerationOutcome } from '@/types/moderation'
-vi.mock('@/components/CrisisEscalation.vue', () => ({ default: { template: '<span />' } }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/CrisisEscalation.vue', () => ({
+  default: {
+    name: 'CrisisEscalation',
+    emits: ['busyChange', 'conflict', 'escalated'],
+    template: '<span />',
+  },
+}))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
   list: vi.fn(),
   detail: vi.fn(),
   decide: vi.fn(),
@@ -39,13 +48,13 @@ function button(text: string) {
   return found
 }
 function deferred<T>() {
-  let finish: ((value: T) => void) | undefined
+  let finish: ((value: T | PromiseLike<T>) => void) | undefined
   const promise = new Promise<T>((resolve) => {
     finish = resolve
   })
   return {
     promise,
-    resolve(value: T) {
+    resolve(value: T | PromiseLike<T>) {
       if (!finish) throw new Error('尚未准备')
       finish(value)
     },
@@ -57,7 +66,14 @@ async function open(id = 'case-a') {
   await found.trigger('click')
   await flushPromises()
 }
+async function processing() {
+  if (!wrapper?.find('form').exists()) {
+    await button('处理内容审核').trigger('click')
+    await flushPromises()
+  }
+}
 async function confirm() {
+  await processing()
   await wrapper?.get('form').trigger('submit')
   await button('确认提交').trigger('click')
   await flushPromises()
@@ -129,11 +145,13 @@ describe('T017 真实内容审核页面交互', () => {
   it('驳回必填去空白原因和建议，提交前可返回修改', async () => {
     await flushPromises()
     await open()
+    await processing()
     await wrapper?.get('input[value="rejected"]').setValue()
     await wrapper?.get('#moderation-reason').setValue(' ')
     await wrapper?.get('#moderation-suggestion').setValue('请改写')
     expect(button('核对操作').attributes('disabled')).toBeDefined()
     await wrapper?.get('#moderation-reason').setValue(' 合成违规 ')
+    await processing()
     await wrapper?.get('form').trigger('submit')
     expect(mocks.decide).not.toHaveBeenCalled()
     await button('返回修改').trigger('click')
@@ -192,8 +210,15 @@ describe('T017 真实内容审核页面交互', () => {
     expect(wrapper?.text()).toContain('另一合成正文')
     const write = deferred<ModerationOutcome>()
     mocks.decide.mockReturnValueOnce(write.promise)
+    await processing()
     await wrapper?.get('form').trigger('submit')
     await button('确认提交').trigger('click')
+    expect(button('刷新列表').attributes('disabled')).toBeDefined()
+    wrapper?.unmount()
+    const pinia = getActivePinia()
+    if (!pinia) throw new Error('缺少会话')
+    wrapper = mount(ModerationView, { global: { plugins: [pinia] } })
+    await flushPromises()
     await open()
     write.resolve({ content_decision: 'approved', business_outcome: 'published', version: 2 })
     await flushPromises()
@@ -205,6 +230,7 @@ describe('T017 真实内容审核页面交互', () => {
     await open()
     const pending = deferred<ModerationOutcome>()
     mocks.decide.mockReturnValueOnce(pending.promise)
+    await processing()
     await wrapper?.get('form').trigger('submit')
     await button('确认提交').trigger('click')
     await button('正在提交…').trigger('click')
@@ -279,4 +305,96 @@ describe('T017 真实内容审核页面交互', () => {
     expect(wrapper?.text()).toContain('当前状态只读')
     expect(wrapper?.find('form').exists()).toBe(false)
   })
+})
+
+it('列表与案件详情只读，取消处理清空意见但保留正文和当前查询', async () => {
+  await flushPromises()
+  await open()
+  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.get('[aria-label="案件详情"]').find('textarea').exists()).toBe(false)
+  await processing()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#moderation-reason').setValue('旧原因')
+  await wrapper?.get('#moderation-suggestion').setValue('旧建议')
+  await wrapper?.get('form').trigger('submit')
+  await button('取消处理').trigger('click')
+  await flushPromises()
+  expect(wrapper?.text()).toContain('合成涉校命中正文')
+  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(mocks.list).toHaveBeenCalledTimes(1)
+  expect(mocks.decide).not.toHaveBeenCalled()
+  await processing()
+  expect(wrapper?.get('input[value="approved"]').element).toHaveProperty('checked', true)
+  expect(wrapper?.find('[aria-label="操作确认"]').exists()).toBe(false)
+})
+it('处理期间禁用切案和查询，提交期间不能取消，404后关闭失效正文', async () => {
+  await flushPromises()
+  await open()
+  await processing()
+  const pending = deferred<ModerationOutcome>()
+  mocks.decide.mockReturnValueOnce(pending.promise)
+  await wrapper?.get('form').trigger('submit')
+  await button('确认提交').trigger('click')
+  const done = vi.fn()
+  const beforeClose = wrapper?.findComponent(ElDrawer).props('beforeClose')
+  if (typeof beforeClose !== 'function') throw new Error('缺少关闭拦截')
+  beforeClose(done)
+  expect(done).not.toHaveBeenCalled()
+  await button('取消处理').trigger('click')
+  await open('case-b')
+  expect(wrapper?.text()).toContain('合成涉校命中正文')
+  expect(wrapper?.text()).not.toContain('另一合成正文')
+  expect(wrapper?.find('form').exists()).toBe(true)
+  pending.resolve(Promise.reject(new ApiError(404)))
+  await flushPromises()
+  expect(wrapper?.find('blockquote').exists()).toBe(false)
+  expect(wrapper?.find('form').exists()).toBe(false)
+})
+it('危机升级从详情显式打开独立抽屉，忙碌时禁止关闭，冲突后重读且清空抽屉', async () => {
+  const session = useAdminStore().session
+  if (!session) throw new Error('缺少会话')
+  session.account.roles = ['review_operator', 'crisis_operator']
+  await flushPromises()
+  await open()
+  expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(false)
+  await button('升级危机').trigger('click')
+  await flushPromises()
+  const escalation = wrapper?.findComponent(CrisisEscalation)
+  if (!escalation) throw new Error('缺少升级组件')
+  expect(wrapper?.find('form').exists()).toBe(false)
+  escalation.vm.$emit('busyChange', true)
+  await flushPromises()
+  await button('取消处理').trigger('click')
+  expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(true)
+  escalation.vm.$emit('busyChange', false)
+  mocks.detail.mockResolvedValueOnce({ ...first, version: 4, content_version: 5 })
+  escalation.vm.$emit('conflict')
+  await flushPromises()
+  expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(false)
+  expect(wrapper?.text()).toContain('案件版本 4')
+  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(mocks.decide).not.toHaveBeenCalled()
+})
+it('普通审核角色不展示危机升级入口', async () => {
+  await flushPromises()
+  await open()
+  expect(wrapper?.findAll('button').some((item) => item.text() === '升级危机')).toBe(false)
+})
+
+it('危机升级确认后清除原正文与操作，并跳转危机工作台', async () => {
+  const session = useAdminStore().session
+  if (!session) throw new Error('缺少会话')
+  session.account.roles = ['review_operator', 'crisis_operator']
+  await flushPromises()
+  await open()
+  await button('升级危机').trigger('click')
+  await flushPromises()
+  wrapper
+    ?.findComponent(CrisisEscalation)
+    .vm.$emit('escalated', { id: 'crisis-new', version: 1, status: 'open' })
+  await flushPromises()
+  expect(mocks.push).toHaveBeenCalledWith({ path: '/crisis', query: { case: 'crisis-new' } })
+  expect(wrapper?.find('blockquote').exists()).toBe(false)
+  expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(false)
+  expect(mocks.decide).not.toHaveBeenCalled()
 })
