@@ -1,9 +1,11 @@
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as privacyService from '@/services/privacy'
 import EvidenceDeletionView from './EvidenceDeletionView.vue'
+import DeletionReceiptsView from './DeletionReceiptsView.vue'
+import { ElDrawer } from 'element-plus'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 const mocks = vi.hoisted(() => ({
@@ -18,7 +20,14 @@ vi.mock('@/services/privacy', async (original) => ({
 }))
 const evidenceId = '11111111-1111-4111-8111-111111111111'
 const jobId = '22222222-2222-4222-8222-222222222222'
+let pinia: ReturnType<typeof createPinia>
 let wrapper: VueWrapper
+function showReceipts() {
+  wrapper.unmount()
+  wrapper = mount(DeletionReceiptsView, {
+    global: { plugins: [pinia], stubs: { RouterLink: RouterLinkStub } },
+  })
+}
 function button(label: string) {
   const found = wrapper.findAll('button').find((item) => item.text() === label)
   if (!found) throw new Error(`未找到按钮：${label}`)
@@ -31,13 +40,15 @@ async function load() {
 }
 async function prepare() {
   await load()
+  await button('处理证据删除').trigger('click')
+  await flushPromises()
   await wrapper.get('#delete-reason').setValue('核对删除理由')
   await wrapper.findAll('form')[1]?.trigger('submit')
   await flushPromises()
 }
 beforeEach(() => {
   vi.resetAllMocks()
-  const pinia = createPinia()
+  pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
     token: 'test',
@@ -58,7 +69,9 @@ beforeEach(() => {
   mocks.remove.mockResolvedValue({ id: jobId, version: 1, status: 'pending' })
   mocks.job.mockResolvedValue({ status: 'processing' })
   mocks.receipt.mockResolvedValue({ status: 'completed' })
-  wrapper = mount(EvidenceDeletionView, { global: { plugins: [pinia] } })
+  wrapper = mount(EvidenceDeletionView, {
+    global: { plugins: [pinia], stubs: { RouterLink: RouterLinkStub } },
+  })
 })
 afterEach(() => wrapper.unmount())
 describe('T032 REQ-018/019 后台证据删除与回执', () => {
@@ -79,13 +92,18 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
     expect(wrapper.text()).toContain('已受理，尚未确认清理完成')
     expect(wrapper.find('#delete-reason').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('核对删除理由')
-    expect(wrapper.get<HTMLInputElement>('#delete-job-id').element.value).toBe(jobId)
+    expect(wrapper.text()).toContain(jobId)
+    expect(wrapper.find('#delete-job-id').exists()).toBe(false)
+    showReceipts()
+    await wrapper.get('#delete-job-id').setValue(jobId)
     await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
     await flushPromises()
     expect(wrapper.get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
   })
   it('超出中文UTF-8字节限制不能准备删除', async () => {
     await load()
+    await button('处理证据删除').trigger('click')
+    await flushPromises()
     await wrapper.get('#delete-reason').setValue('中'.repeat(667))
     expect(button('核对删除范围').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('2001 / 2000 字节')
@@ -115,12 +133,15 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
   it('切换目标清除旧范围与确认，返回修改不直接执行', async () => {
     await prepare()
     await button('返回修改').trigger('click')
+    await button('取消处理').trigger('click')
+    await flushPromises()
     await wrapper.get('#delete-evidence-id').setValue(jobId)
     expect(wrapper.find('#delete-reason').exists()).toBe(false)
     expect(wrapper.find('[aria-label="最终删除确认"]').exists()).toBe(false)
     expect(mocks.remove).not.toHaveBeenCalled()
   })
   it('回执完成与安全错误提示，编辑查询立即撤下旧结果，404不声称完成', async () => {
+    showReceipts()
     mocks.job
       .mockResolvedValueOnce({
         status: 'processing',
@@ -174,7 +195,73 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
   })
 })
 
+describe('证据删除与查询隔离', () => {
+  it('读取仅展示元信息，显式处理可取消并保留目标，重开没有旧理由', async () => {
+    await load()
+    expect(wrapper.find('#delete-reason').exists()).toBe(false)
+    expect(wrapper.find('#delete-job-id').exists()).toBe(false)
+    expect(wrapper.find('#delete-receipt').exists()).toBe(false)
+    await button('处理证据删除').trigger('click')
+    await wrapper.get('#delete-reason').setValue('未提交理由')
+    await button('取消处理').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('证据范围版本：9')
+    expect(wrapper.find('#delete-reason').exists()).toBe(false)
+    expect(mocks.evidence).toHaveBeenCalledTimes(1)
+    expect(mocks.remove).not.toHaveBeenCalled()
+    await button('处理证据删除').trigger('click')
+    expect(wrapper.get<HTMLTextAreaElement>('#delete-reason').element.value).toBe('')
+  })
+  it('写入中不能关闭抽屉或刷新，离页丢弃晚到受理结果', async () => {
+    let finish: ((value: unknown) => void) | undefined
+    mocks.remove.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    await prepare()
+    await button('确认删除证据范围').trigger('click')
+    expect(button('取消处理').attributes('disabled')).toBeDefined()
+    expect(button('清空页面').attributes('disabled')).toBeDefined()
+    const done = vi.fn()
+    wrapper.findComponent(ElDrawer).props('beforeClose')?.(done)
+    expect(done).not.toHaveBeenCalled()
+    const signal: unknown = mocks.remove.mock.calls[0]?.[3]
+    showReceipts()
+    if (!finish || !(signal instanceof AbortSignal)) throw new Error('请求未准备')
+    expect(signal.aborted).toBe(true)
+    finish({ id: jobId, status: 'pending', version: 1 })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('已受理')
+    expect(mocks.job).not.toHaveBeenCalled()
+  })
+  it('离开回执页清空凭据并取消读取，不能恢复旧结果', async () => {
+    showReceipts()
+    let finish: ((value: unknown) => void) | undefined
+    mocks.receipt.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const handle = `${jobId}.${'a'.repeat(43)}`
+    await wrapper.get('#delete-receipt').setValue(handle)
+    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[1]?.trigger('submit')
+    const signal: unknown = mocks.receipt.mock.calls[0]?.[1]
+    showReceipts()
+    if (!finish || !(signal instanceof AbortSignal)) throw new Error('请求未准备')
+    expect(signal.aborted).toBe(true)
+    finish({ status: 'completed' })
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('#delete-receipt').element.value).toBe('')
+    expect(wrapper.find('[aria-label="清理结果"]').exists()).toBe(false)
+    expect(mocks.remove).not.toHaveBeenCalled()
+  })
+})
+
 describe('T032 REQ-018 只读查询反馈回归', () => {
+  beforeEach(() => showReceipts())
   it('格式错误的回执禁止查询，表单提交也不能绕过，格式修正后才查询', async () => {
     await wrapper.get('#delete-receipt').setValue('not-a-receipt')
     expect(button('查询匿名删除回执').attributes('disabled')).toBeDefined()

@@ -30,7 +30,8 @@ export const menu: MenuItem[] = [
   { path: '/safety/penalties', group: '安全治理', title: '处罚管理', roles: safetyRoles },
   { path: '/safety/appeals', group: '安全治理', title: '申诉管理', roles: safetyRoles },
   { path: '/crisis', group: '安全治理', title: '危机工作台', roles: crisisRoles },
-  { path: '/evidence-deletion', group: '隐私管理', title: '证据删除与回执', role: 'super_admin' },
+  { path: '/evidence-deletion', group: '隐私管理', title: '证据删除', role: 'super_admin' },
+  { path: '/deletion-receipts', group: '隐私管理', title: '回执查询', role: 'super_admin' },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -109,6 +110,11 @@ export const router = createRouter({
     {
       path: '/evidence-deletion',
       component: () => import('@/views/EvidenceDeletionView.vue'),
+      meta: { role: 'super_admin' },
+    },
+    {
+      path: '/deletion-receipts',
+      component: () => import('@/views/DeletionReceiptsView.vue'),
       meta: { role: 'super_admin' },
     },
     {

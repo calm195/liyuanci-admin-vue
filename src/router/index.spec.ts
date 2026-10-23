@@ -7,56 +7,68 @@ beforeEach(async () => {
   await router.replace('/login')
 })
 describe('T010 REQ-019 路由与菜单', () => {
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
-    '未登录访问%s回登录',
-    async (path) => {
-      await router.push(path)
-      expect(router.currentRoute.value.path).toBe('/login')
-    },
-  )
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
-    '危机角色不能进入%s且审核菜单不可见',
-    async (path) => {
-      const admin = useAdminStore()
-      admin.session = {
-        token: 'synthetic',
-        account: {
-          login_name: 'synthetic-operator',
-          id: 'a',
-          version: 1,
-          active: true,
-          roles: ['crisis_operator'],
-        },
-      }
-      await router.push(path)
-      expect(router.currentRoute.value.path).toBe('/403')
-      expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
-        '/',
-        '/password',
-        '/safety/reports',
-        '/safety/penalties',
-        '/safety/appeals',
-        '/crisis',
-      ])
-    },
-  )
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
-    '超管可进入%s',
-    async (path) => {
-      useAdminStore().session = {
-        token: 'synthetic',
-        account: {
-          login_name: 'synthetic-operator',
-          id: 'a',
-          version: 1,
-          active: true,
-          roles: ['super_admin'],
-        },
-      }
-      await router.push(path)
-      expect(router.currentRoute.value.path).toBe(path)
-    },
-  )
+  it.each([
+    '/identity',
+    '/moderation',
+    '/wordlists',
+    '/accounts',
+    '/evidence-deletion',
+    '/deletion-receipts',
+  ])('未登录访问%s回登录', async (path) => {
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/login')
+  })
+  it.each([
+    '/identity',
+    '/moderation',
+    '/wordlists',
+    '/accounts',
+    '/evidence-deletion',
+    '/deletion-receipts',
+  ])('危机角色不能进入%s且审核菜单不可见', async (path) => {
+    const admin = useAdminStore()
+    admin.session = {
+      token: 'synthetic',
+      account: {
+        login_name: 'synthetic-operator',
+        id: 'a',
+        version: 1,
+        active: true,
+        roles: ['crisis_operator'],
+      },
+    }
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/403')
+    expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
+      '/',
+      '/password',
+      '/safety/reports',
+      '/safety/penalties',
+      '/safety/appeals',
+      '/crisis',
+    ])
+  })
+  it.each([
+    '/identity',
+    '/moderation',
+    '/wordlists',
+    '/accounts',
+    '/evidence-deletion',
+    '/deletion-receipts',
+  ])('超管可进入%s', async (path) => {
+    useAdminStore().session = {
+      token: 'synthetic',
+      account: {
+        login_name: 'synthetic-operator',
+        id: 'a',
+        version: 1,
+        active: true,
+        roles: ['super_admin'],
+      },
+    }
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe(path)
+  })
   it('本人改密要求登录，但不要求审核运营或超管角色', async () => {
     await router.push('/password')
     expect(router.currentRoute.value.path).toBe('/login')
@@ -154,3 +166,24 @@ it.each(['/safety/reports', '/safety/penalties', '/safety/appeals'])(
     }
   },
 )
+
+it('回执查询面包屑与菜单独立，普通审核角色不可见', async () => {
+  useAdminStore().session = {
+    token: 'synthetic',
+    account: {
+      id: 'a',
+      login_name: '合成审核',
+      version: 1,
+      active: true,
+      roles: ['review_operator'],
+    },
+  }
+  await router.push('/deletion-receipts')
+  expect(router.currentRoute.value.path).toBe('/403')
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/deletion-receipts')).toBe(false)
+  expect(router.resolve('/deletion-receipts').meta).toMatchObject({
+    title: '回执查询',
+    group: '隐私管理',
+    role: 'super_admin',
+  })
+})
