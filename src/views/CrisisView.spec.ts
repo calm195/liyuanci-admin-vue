@@ -4,6 +4,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CrisisView from './CrisisView.vue'
+import { ElDrawer } from 'element-plus'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { CrisisDetail, CrisisEvidence, CrisisSummary } from '@/types/crisis'
@@ -60,7 +61,14 @@ async function open(id = 'case-a') {
   await found.trigger('click')
   await flushPromises()
 }
+async function process() {
+  if (!wrapper?.find('#crisis-reason').exists()) {
+    await button('处理危机案件').trigger('click')
+    await flushPromises()
+  }
+}
 async function confirm() {
+  await process()
   await wrapper?.get('#crisis-reason').setValue('  测试核对理由  ')
   await wrapper?.get('form').trigger('submit')
   await button('确认提交').trigger('click')
@@ -165,6 +173,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
   it('接手理由必填且按当前案件版本二次确认，提交后清敏感材料', async () => {
     await flushPromises()
     await open()
+    await process()
     expect(button('核对处置').attributes('disabled')).toBeDefined()
     await confirm()
     expect(mocks.act).toHaveBeenCalledWith(
@@ -179,6 +188,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
   it('误报走专用接口并提示转普通复核，不直接上架或送达', async () => {
     await flushPromises()
     await open()
+    await process()
     await wrapper?.get('#crisis-action').setValue('false_positive')
     expect(wrapper?.text()).toContain('不会直接公开或送达')
     await confirm()
@@ -201,6 +211,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
   it('通知重试回执不代表已送达，409清旧决定重读并禁止自动提交', async () => {
     await flushPromises()
     await open()
+    await process()
     await wrapper?.get('#crisis-action').setValue('retry_notification')
     await confirm()
     expect(wrapper?.text()).toContain('不代表通知已送达')
@@ -212,6 +223,8 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     expect(wrapper?.text()).toContain('案件版本或状态已变化')
     expect(wrapper?.text()).toContain('案件版本 9')
     expect(wrapper?.find('[aria-label="危机处置确认"]').exists()).toBe(false)
+    expect(wrapper?.find('#crisis-reason').exists()).toBe(false)
+    await process()
     expect(wrapper?.get('#crisis-reason').element).toHaveProperty('value', '')
   })
   it('网络失败同输入重试复用键，确认后修改理由须重新核对', async () => {
@@ -224,6 +237,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await flushPromises()
     expect(mocks.act.mock.calls[1]?.[2]).toBe(key)
     await open()
+    await process()
     await wrapper?.get('#crisis-reason').setValue('准备理由')
     await wrapper?.get('form').trigger('submit')
     await button('返回修改').trigger('click')
@@ -289,6 +303,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await open()
     const pending = deferred<CrisisSummary>()
     mocks.act.mockReturnValueOnce(pending.promise)
+    await process()
     await wrapper?.get('#crisis-reason').setValue('测试理由')
     await wrapper?.get('form').trigger('submit')
     await button('确认提交').trigger('click')
@@ -300,5 +315,47 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     expect(wrapper?.text()).not.toContain(first.body)
     if (!(requestSignal instanceof AbortSignal)) throw new Error('请求缺取消信号')
     expect(requestSignal.aborted).toBe(true)
+  })
+  it('只读详情无表单，显式处理隐藏学号与证据；取消保留案件并清空意见', async () => {
+    await flushPromises()
+    await open()
+    expect(wrapper?.find('form').exists()).toBe(false)
+    await button('显示完整学号').trigger('click')
+    await button('查看证据 evidence-a').trigger('click')
+    await flushPromises()
+    await process()
+    expect(wrapper?.text()).not.toContain(first.student_number)
+    await wrapper?.get('#crisis-reason').setValue('未提交理由')
+    await wrapper?.get('form').trigger('submit')
+    await button('取消处理').trigger('click')
+    await flushPromises()
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.text()).toContain(first.body)
+    expect(mocks.detail).toHaveBeenCalledTimes(1)
+    expect(mocks.act).not.toHaveBeenCalled()
+    await process()
+    expect(wrapper?.get('#crisis-reason').element).toHaveProperty('value', '')
+    expect(wrapper?.find('[aria-label="危机处置确认"]').exists()).toBe(false)
+  })
+  it('提交中锁定列表、取消与抽屉关闭，404清除失效材料', async () => {
+    await flushPromises()
+    await open()
+    const pending = deferred<CrisisSummary>()
+    mocks.act.mockReturnValueOnce(pending.promise)
+    await confirm()
+    expect(button('从首页刷新').attributes('disabled')).toBeDefined()
+    expect(button('取消处理').attributes('disabled')).toBeDefined()
+    expect(button('关闭案件并清除材料').attributes('disabled')).toBeDefined()
+    const done = vi.fn()
+    const beforeClose = wrapper?.findComponent(ElDrawer).props('beforeClose')
+    beforeClose?.(done)
+    expect(done).not.toHaveBeenCalled()
+    pending.resolve({ id: first.id, version: 8, status: 'handling' })
+    await flushPromises()
+    await open()
+    mocks.act.mockRejectedValueOnce(new ApiError(404))
+    await confirm()
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.text()).not.toContain(first.body)
   })
 })
