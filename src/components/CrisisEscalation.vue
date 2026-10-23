@@ -6,10 +6,15 @@ import { ApiError } from '@/services/admin'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import type { CrisisSource, CrisisSummary } from '@/types/crisis'
 const props = defineProps<{ source: CrisisSource; sourceId: string; version: number }>()
-const emit = defineEmits<{ escalated: [result: CrisisSummary]; conflict: [] }>()
+const emit = defineEmits<{
+  escalated: [result: CrisisSummary]
+  conflict: []
+  busyChange: [busy: boolean]
+}>()
 const reason = ref('')
 const confirming = ref(false)
 const busy = ref(false)
+watch(busy, (value) => emit('busyChange', value), { flush: 'sync' })
 const error = ref('')
 const result = ref<CrisisSummary | null>(null)
 const stale = ref(false)
@@ -73,6 +78,7 @@ async function submit() {
         stale.value = true
         attempt = null
         error.value = '来源案件版本或状态已变化，请重新读取来源案件后核对，不会自动升级'
+        busy.value = false
         emit('conflict')
       } else error.value = reviewErrorMessage(cause)
     },

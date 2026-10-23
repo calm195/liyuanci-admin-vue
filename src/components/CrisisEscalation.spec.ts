@@ -76,6 +76,35 @@ describe('T030 按来源案件升级危机', () => {
     expect(mocks.escalate).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
+  it.each([404, 409])('%s升级请求期间通知宿主锁定关闭，冲突前先解除锁定', async (status) => {
+    const events: string[] = []
+    let reject: ((reason: unknown) => void) | undefined
+    mocks.escalate.mockReturnValueOnce(
+      new Promise((_, fail) => {
+        reject = fail
+      }),
+    )
+    const wrapper = mount(CrisisEscalation, {
+      props: {
+        source: 'report',
+        sourceId: 'source',
+        version: 19,
+        onBusyChange: (busy: boolean) => events.push(busy ? '开始请求' : '结束请求'),
+        onConflict: () => events.push('请求重读'),
+      },
+      global,
+    })
+    await wrapper.get('textarea').setValue('人工核对风险')
+    await wrapper.get('form').trigger('submit')
+    await wrapper.get('[aria-label="危机升级确认"] button').trigger('click')
+    expect(events).toEqual(['开始请求'])
+    if (!reject) throw new Error('未发出请求')
+    reject(new ApiError(status))
+    await flushPromises()
+    expect(events).toEqual(['开始请求', '结束请求', '请求重读'])
+    expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
   it('网络失败原键重试，来源版本变化清空理由和旧确认', async () => {
     const wrapper = mount(CrisisEscalation, {
       props: { source: 'report', sourceId: 'source', version: 19 },
