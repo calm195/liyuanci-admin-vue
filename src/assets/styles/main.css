@@ -96,19 +96,19 @@ h1 {
   color: var(--warning-text);
   padding: 0.8rem 1.2rem;
 }
-button:not(.el-button, .el-radio-button__original),
+button:not(.el-button, .el-drawer__close-btn, .el-radio-button__original),
 select {
   font: inherit;
   padding: 0.65rem 1rem;
   border-radius: 8px;
   border: 1px solid var(--control-border);
 }
-button:not(.el-button) {
+button:not(.el-button, .el-drawer__close-btn) {
   cursor: pointer;
   background: var(--accent-color);
   color: var(--on-accent);
 }
-button:not(.el-button):disabled {
+button:not(.el-button, .el-drawer__close-btn):disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
