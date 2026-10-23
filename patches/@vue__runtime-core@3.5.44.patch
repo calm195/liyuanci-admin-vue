@@ -1,0 +1,13 @@
+diff --git a/dist/runtime-core.d.ts b/dist/runtime-core.d.ts
+index 1713b7d0341ef20b4a47444da3bc628a90100724..2c6bd0c77c81561a4f0fa2d86ee5fd882b49b49d 100644
+--- a/dist/runtime-core.d.ts
++++ b/dist/runtime-core.d.ts
+@@ -73,7 +73,7 @@ interface PropOptions<T = any, D = T> {
+     type?: PropType<T> | true | null;
+     required?: boolean;
+     default?: D | DefaultFactory<D> | null | undefined | object;
+-    validator?(value: unknown, props: Data): boolean;
++    validator?: ((value: unknown, props: Data) => boolean) | undefined;
+ }
+ export type PropType<T> = PropConstructor<T> | (PropConstructor<T> | null)[];
+ type PropConstructor<T = any> = {

@@ -274,7 +274,7 @@ th,
 td {
   text-align: left;
   padding: 0.5rem;
-  border-bottom: 1px solid #ccd9d6;
+  border-bottom: 1px solid var(--border-color);
 }
 textarea {
   display: block;

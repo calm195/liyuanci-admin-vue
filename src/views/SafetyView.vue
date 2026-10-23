@@ -548,7 +548,7 @@ input {
   width: 100%;
   padding: 0.65rem;
   font: inherit;
-  border: 1px solid #75978c;
+  border: 1px solid var(--control-border);
   border-radius: 8px;
 }
 </style>

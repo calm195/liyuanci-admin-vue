@@ -435,12 +435,12 @@ onBeforeUnmount(() => {
   gap: 0.4rem;
   margin-bottom: 0.75rem;
   overflow-wrap: anywhere;
-  background: #f3f7f6;
-  color: #183c3a;
+  background: var(--surface-muted);
+  color: var(--text-primary);
 }
 .case-list button[aria-pressed='true'] {
-  border: 2px solid #176957;
-  background: #e3f2ed;
+  border: 2px solid var(--accent-color);
+  background: var(--selected-surface);
 }
 .identity-fields {
   display: grid;
@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 .muted {
-  color: #4d7369;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 .student-card {
@@ -462,7 +462,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
 }
 fieldset {
-  border: 1px solid #d3dfdb;
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   margin-top: 1rem;
   padding: 1rem;
@@ -473,14 +473,14 @@ fieldset label {
 textarea {
   width: 100%;
   font: inherit;
-  border: 1px solid #75978c;
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 0.75rem;
   margin-bottom: 1rem;
 }
 .receipt {
-  background: #f3f7f6;
-  border: 1px solid #d3dfdb;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1rem;
   margin: 1rem 0;

@@ -6,6 +6,36 @@
     <meta name="theme-color" content="#f6f8f4" />
     <meta name="description" content="鲤源池 Web 管理工作台" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // 在样式与应用加载前应用偏好，避免深色主题首次绘制为浅色。
+      ;(() => {
+        let preference = 'system'
+        try {
+          preference = globalThis.localStorage.getItem('liyuanci-theme') || 'system'
+        } catch {
+          // 存储不可用时跟随系统。
+        }
+        const dark =
+          preference === 'dark' ||
+          (preference !== 'light' &&
+            preference !== 'dark' &&
+            typeof globalThis.matchMedia === 'function' &&
+            globalThis.matchMedia('(prefers-color-scheme: dark)').matches)
+        globalThis.document.documentElement.classList.toggle('dark', dark)
+        globalThis.document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        globalThis.document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute('content', dark ? '#111827' : '#f4f6f9')
+      })()
+    </script>
+    <style>
+      html {
+        background: #f4f6f9;
+      }
+      html.dark {
+        background: #111827;
+      }
+    </style>
     <title>鲤源池管理端</title>
   </head>
   <body>
