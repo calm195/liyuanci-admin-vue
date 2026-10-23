@@ -27,6 +27,7 @@ export const menu: MenuItem[] = [
   { path: '/wordlists', title: '词库管理', role: 'review_operator' },
   { path: '/safety', title: '举报、处罚与申诉', roles: safetyRoles },
   { path: '/crisis', title: '危机工作台', roles: crisisRoles },
+  { path: '/evidence-deletion', title: '证据删除与回执', role: 'super_admin' },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -63,6 +64,11 @@ export const router = createRouter({
       path: '/crisis',
       component: () => import('@/views/CrisisView.vue'),
       meta: { roles: crisisRoles },
+    },
+    {
+      path: '/evidence-deletion',
+      component: () => import('@/views/EvidenceDeletionView.vue'),
+      meta: { role: 'super_admin' },
     },
     { path: '/403', component: () => import('@/views/ForbiddenView.vue') },
     { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue') },

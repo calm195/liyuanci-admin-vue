@@ -7,14 +7,14 @@ beforeEach(async () => {
   await router.replace('/login')
 })
 describe('T010 REQ-019 路由与菜单', () => {
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])(
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
     '未登录访问%s回登录',
     async (path) => {
       await router.push(path)
       expect(router.currentRoute.value.path).toBe('/login')
     },
   )
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])(
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
     '危机角色不能进入%s且审核菜单不可见',
     async (path) => {
       const admin = useAdminStore()
@@ -38,20 +38,23 @@ describe('T010 REQ-019 路由与菜单', () => {
       ])
     },
   )
-  it.each(['/identity', '/moderation', '/wordlists', '/accounts'])('超管可进入%s', async (path) => {
-    useAdminStore().session = {
-      token: 'synthetic',
-      account: {
-        login_name: 'synthetic-operator',
-        id: 'a',
-        version: 1,
-        active: true,
-        roles: ['super_admin'],
-      },
-    }
-    await router.push(path)
-    expect(router.currentRoute.value.path).toBe(path)
-  })
+  it.each(['/identity', '/moderation', '/wordlists', '/accounts', '/evidence-deletion'])(
+    '超管可进入%s',
+    async (path) => {
+      useAdminStore().session = {
+        token: 'synthetic',
+        account: {
+          login_name: 'synthetic-operator',
+          id: 'a',
+          version: 1,
+          active: true,
+          roles: ['super_admin'],
+        },
+      }
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe(path)
+    },
+  )
   it('本人改密要求登录，但不要求审核运营或超管角色', async () => {
     await router.push('/password')
     expect(router.currentRoute.value.path).toBe('/login')

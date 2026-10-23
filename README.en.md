@@ -8,6 +8,8 @@ The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScr
 
 Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation, wordlists, safety case management and the crisis workspace connect directly to same-origin HTTP APIs in development and production. Identity review supports on-demand card viewing and decisions; content moderation submits the case version and displays the business outcome separately. No local demonstration accounts, cases or wordlists are provided.
 
+Super administrators can read metadata for a known evidence item, confirm deletion of its entire retained scope using the scope version and a reason, and query evidence deletion jobs or anonymous deletion receipts. Acceptance does not mean physical cleanup is complete. Bodies, student numbers and receipts are never persisted to browser storage.
+
 ## 2. Project options and directory structure
 
 The app accesses same-origin `/api/v1` without public environment flags. Vite forwards development requests to the local backend on port `18080`; production hosting must supply a same-origin reverse proxy. All `VITE_` variables are public and must contain no secrets.
