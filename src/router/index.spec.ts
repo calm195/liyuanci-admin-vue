@@ -33,7 +33,9 @@ describe('T010 REQ-019 路由与菜单', () => {
       expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
         '/',
         '/password',
-        '/safety',
+        '/safety/reports',
+        '/safety/penalties',
+        '/safety/appeals',
         '/crisis',
       ])
     },
@@ -97,8 +99,8 @@ it.each(['review_operator', 'crisis_operator', 'super_admin'] as const)(
       account: { id: 'admin', login_name: '测试账号', version: 1, active: true, roles: [role] },
     }
     await router.push('/safety')
-    expect(router.currentRoute.value.path).toBe('/safety')
-    expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety')).toBe(true)
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety/reports')).toBe(true)
   },
 )
 it('T028 空角色和未登录拒绝安全治理入口', async () => {
@@ -110,7 +112,7 @@ it('T028 空角色和未登录拒绝安全治理入口', async () => {
   }
   await router.push('/safety')
   expect(router.currentRoute.value.path).toBe('/403')
-  expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety')).toBe(false)
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety/reports')).toBe(false)
 })
 
 it.each(['crisis_operator', 'super_admin'] as const)('T030 %s可进入危机工作台', async (role) => {
@@ -135,3 +137,20 @@ it('T030 普通审核与空角色不能进入危机工作台，未登录回登�
     expect(menu.filter(canAccessMenu).some((item) => item.path === '/crisis')).toBe(false)
   }
 })
+
+it.each(['/safety/reports', '/safety/penalties', '/safety/appeals'])(
+  'REQ-019 %s独立路由要求登录与案件角色，三类案件角色均可访问',
+  async (path) => {
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/login')
+    for (const roles of [[], ['review_operator'], ['crisis_operator'], ['super_admin']] as const) {
+      useAdminStore().session = {
+        token: 'synthetic',
+        account: { id: 'a', login_name: '合成角色', version: 1, active: true, roles: [...roles] },
+      }
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe(roles.length ? path : '/403')
+      expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(roles.length > 0)
+    }
+  },
+)

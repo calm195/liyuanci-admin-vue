@@ -105,3 +105,24 @@ it('REQ-019 词库子路由继承权限，详情保留菜单高亮与列表面�
   await router.push('/wordlists/example')
   expect(router.currentRoute.value.path).toBe('/403')
 })
+
+it('REQ-019 安全治理三个入口各自高亮，面包屑和页面标题随路由更新', async () => {
+  login()
+  await router.push('/safety')
+  const view = render()
+  expect(router.currentRoute.value.path).toBe('/safety/reports')
+  for (const [path, title] of [
+    ['reports', '举报管理'],
+    ['penalties', '处罚管理'],
+    ['appeals', '申诉管理'],
+  ]) {
+    await router.push(`/safety/${path}`)
+    await flushPromises()
+    expect(document.title).toBe(`${title} · 鲤源池`)
+    const current = view.get('[aria-label="面包屑导航"] [aria-current="page"]')
+    expect(current.text()).toContain(title)
+    const menu = view.get('nav[aria-label="管理菜单"]')
+    expect(menu.findAll('a.router-link-exact-active').map((item) => item.text())).toEqual([title])
+    expect(menu.get(`a[href="/safety/${path}"]`).attributes('aria-current')).toBe('page')
+  }
+})

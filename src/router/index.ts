@@ -26,7 +26,9 @@ export const menu: MenuItem[] = [
   { path: '/identity', group: '认证管理', title: '身份审核', role: 'review_operator' },
   { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
   { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
-  { path: '/safety', group: '安全治理', title: '举报、处罚与申诉', roles: safetyRoles },
+  { path: '/safety/reports', group: '安全治理', title: '举报管理', roles: safetyRoles },
+  { path: '/safety/penalties', group: '安全治理', title: '处罚管理', roles: safetyRoles },
+  { path: '/safety/appeals', group: '安全治理', title: '申诉管理', roles: safetyRoles },
   { path: '/crisis', group: '安全治理', title: '危机工作台', roles: crisisRoles },
   { path: '/evidence-deletion', group: '隐私管理', title: '证据删除与回执', role: 'super_admin' },
 ]
@@ -79,7 +81,25 @@ export const router = createRouter({
     {
       path: '/safety',
       component: () => import('@/views/SafetyView.vue'),
-      meta: { roles: safetyRoles },
+      redirect: '/safety/reports',
+      meta: { roles: safetyRoles, group: '安全治理' },
+      children: [
+        {
+          path: 'reports',
+          component: () => import('@/views/ReportsView.vue'),
+          meta: { title: '举报管理' },
+        },
+        {
+          path: 'penalties',
+          component: () => import('@/views/PenaltiesView.vue'),
+          meta: { title: '处罚管理' },
+        },
+        {
+          path: 'appeals',
+          component: () => import('@/views/AppealsView.vue'),
+          meta: { title: '申诉管理' },
+        },
+      ],
     },
     {
       path: '/crisis',
