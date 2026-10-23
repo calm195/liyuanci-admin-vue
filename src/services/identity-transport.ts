@@ -1,5 +1,10 @@
 import { ApiError } from './admin'
-import { parseIdentityCase, parseIdentityPage, parseIdentityReceipt } from './identity'
+import {
+  parseIdentityCase,
+  parseIdentityPage,
+  parseIdentityReceipt,
+  validIdentityFeedback,
+} from './identity'
 import { record } from '@/types/admin'
 import type { IdentityReviewClient } from '@/types/identity'
 
@@ -82,9 +87,9 @@ export function createIdentityTransport(
         throw new Error('缺少有效版本或操作标识')
       if (
         input.decision === 'rejected' &&
-        (!input.reason.trim() || !input.revision_suggestion.trim())
+        (!validIdentityFeedback(input.reason) || !validIdentityFeedback(input.revision_suggestion))
       )
-        throw new Error('驳回原因和修改建议均不能为空')
+        throw new Error('驳回原因和修改建议均不能为空，且每项不得超过 2000 字节')
       const body =
         input.decision === 'approved'
           ? { decision: input.decision, expected_version: input.expected_version }

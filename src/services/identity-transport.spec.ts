@@ -102,3 +102,26 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
     expect(transport).not.toHaveBeenCalled()
   })
 })
+
+it.each(['reason', 'revision_suggestion'] as const)(
+  'T012 超长 %s 在真实传输前阻止提交',
+  async (field) => {
+    const transport = vi.fn<typeof fetch>()
+    const client = createIdentityTransport('token', () => true, transport)
+    await expect(
+      client.decide(
+        id,
+        {
+          decision: 'rejected',
+          expected_version: 1,
+          reason: '原因',
+          revision_suggestion: '建议',
+          [field]: '中'.repeat(667),
+        },
+        'key',
+        signal,
+      ),
+    ).rejects.toThrow('2000 字节')
+    expect(transport).not.toHaveBeenCalled()
+  },
+)

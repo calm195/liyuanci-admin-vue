@@ -6,15 +6,10 @@ import { nextTick } from 'vue'
 import IdentityView from './IdentityView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
-import type * as adminService from '@/services/admin'
 import type { IdentityCase, IdentityReviewClient } from '@/types/identity'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), card: vi.fn(), decide: vi.fn() }))
-vi.mock('@/services/identity', () => ({ createIdentityReviewClient: () => mocks }))
-vi.mock('@/services/admin', async (original) => ({
-  ...(await original<typeof adminService>()),
-  mockEnabled: true,
-}))
+vi.mock('@/services/identity-transport', () => ({ createIdentityTransport: () => mocks }))
 const first: IdentityCase = {
   id: 'case-a',
   version: 1,
@@ -298,4 +293,50 @@ describe('T012 身份审核页面业务', () => {
     expect(revokeUrl).toHaveBeenCalled()
     await nextTick()
   })
+})
+
+it('T012 读卡冲突时清除旧图片和决定，重读新版本后人工复核', async () => {
+  await flushPromises()
+  await open()
+  await button('查看学生卡').trigger('click')
+  await flushPromises()
+  await wrapper?.get('form').trigger('submit')
+  mocks.card.mockRejectedValueOnce(new ApiError(409))
+  mocks.detail.mockResolvedValueOnce({ ...first, version: 2, name: '合成新版' })
+  await button('查看学生卡').trigger('click')
+  await flushPromises()
+  expect(wrapper?.text()).not.toContain('合成甲')
+  expect(wrapper?.text()).toContain('合成新版')
+  expect(wrapper?.text()).toContain('旧决定不会自动重试')
+  expect(wrapper?.find('img').exists()).toBe(false)
+  expect(wrapper?.find('[aria-label="提交确认"]').exists()).toBe(false)
+  expect(revokeUrl).toHaveBeenCalledWith('blob:synthetic-card')
+  expect(mocks.decide).not.toHaveBeenCalled()
+})
+it('T012 刷新回到待审队列首页，避免沿用旧游标遗漏新增案件', async () => {
+  await flushPromises()
+  mocks.list.mockResolvedValueOnce({ items: [], next_cursor: 'next' })
+  await button('刷新列表').trigger('click')
+  await flushPromises()
+  mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null })
+  await button('下一页').trigger('click')
+  await flushPromises()
+  expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal))
+  await button('刷新列表').trigger('click')
+  await flushPromises()
+  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal))
+  expect(button('上一页').attributes('disabled')).toBeDefined()
+})
+it('T012 超长中文意见不能进入二次确认，修正后可继续', async () => {
+  await flushPromises()
+  await open()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#reject-reason').setValue('中'.repeat(667))
+  await wrapper?.get('#revision-suggestion').setValue('请重新上传')
+  expect(button('核对决定').attributes('disabled')).toBeDefined()
+  await wrapper?.get('form').trigger('submit')
+  expect(wrapper?.find('[aria-label="提交确认"]').exists()).toBe(false)
+  await wrapper?.get('#reject-reason').setValue('中'.repeat(666) + 'ab')
+  expect(button('核对决定').attributes('disabled')).toBeUndefined()
+  expect(mocks.decide).not.toHaveBeenCalled()
 })

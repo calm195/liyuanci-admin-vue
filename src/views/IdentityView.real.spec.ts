@@ -3,11 +3,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, expect, it, vi } from 'vitest'
 import IdentityView from './IdentityView.vue'
 import { useAdminStore } from '@/stores/admin'
-import type * as service from '@/services/admin'
-vi.mock('@/services/admin', async (original) => ({
-  ...(await original<typeof service>()),
-  mockEnabled: false,
-}))
 afterEach(() => {
   vi.unstubAllGlobals()
 })

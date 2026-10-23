@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, mockEnabled } from '@/services/admin'
-import { createIdentityReviewClient } from '@/services/identity'
+import { ApiError } from '@/services/admin'
+import { validIdentityFeedback } from '@/services/identity'
 import { createIdentityTransport } from '@/services/identity-transport'
 import type {
   IdentityCase,
@@ -14,9 +14,7 @@ import type {
 const admin = useAdminStore()
 const owner = admin.session
 const allowed = () => admin.session === owner && admin.can('review_operator')
-const client = !mockEnabled
-  ? createIdentityTransport(owner?.token ?? '', allowed)
-  : createIdentityReviewClient(allowed)
+const client = createIdentityTransport(owner?.token ?? '', allowed)
 const items = ref<IdentitySummary[]>([])
 const nextCursor = ref<string | null>(null)
 const currentCursor = ref<string | null>(null)
@@ -37,7 +35,9 @@ const reason = ref('')
 const suggestion = ref('')
 const confirming = ref(false)
 const valid = computed(
-  () => decision.value === 'approved' || (!!reason.value.trim() && !!suggestion.value.trim()),
+  () =>
+    decision.value === 'approved' ||
+    (validIdentityFeedback(reason.value.trim()) && validIdentityFeedback(suggestion.value.trim())),
 )
 let listController: AbortController | null = null
 let caseController: AbortController | null = null
@@ -129,7 +129,9 @@ async function loadList(cursor: string | null = currentCursor.value) {
 }
 async function refreshList() {
   clearCase()
-  await loadList()
+  cursors.value = []
+  currentCursor.value = null
+  await loadList(null)
 }
 async function nextPage() {
   if (!nextCursor.value || listBusy.value) return
@@ -179,11 +181,21 @@ async function showCard() {
     cardUrl.value = URL.createObjectURL(image)
   } catch (error) {
     if (!active || controller.signal.aborted || generation !== caseGeneration) return
-    if (error instanceof ApiError && error.status === 404) clearCase()
-    caseError.value = message(error)
+    if (error instanceof ApiError && error.status === 409) {
+      await reloadConflictedCase(current.id)
+    } else {
+      if (error instanceof ApiError && error.status === 404) clearCase()
+      caseError.value = message(error)
+    }
   } finally {
     if (generation === caseGeneration) cardBusy.value = false
   }
+}
+async function reloadConflictedCase(id: string) {
+  const reloadedGeneration = caseGeneration + 1
+  await openCase(id)
+  if (active && caseGeneration === reloadedGeneration && selected.value === id && allowed())
+    caseError.value = '案件版本或状态已变化，已重新读取；请重新核对，旧决定不会自动重试'
 }
 function cardFailed() {
   hideCard()
@@ -231,15 +243,7 @@ async function submit() {
   } catch (error) {
     if (!active || controller.signal.aborted || generation !== caseGeneration) return
     if (error instanceof ApiError && error.status === 409) {
-      const reloadedGeneration = caseGeneration + 1
-      await openCase(current.id)
-      if (
-        active &&
-        caseGeneration === reloadedGeneration &&
-        selected.value === current.id &&
-        allowed()
-      )
-        caseError.value = '案件版本或状态已变化，已重新读取；请重新核对，旧决定不会自动重试'
+      await reloadConflictedCase(current.id)
     } else {
       caseError.value = message(error)
     }
@@ -269,10 +273,7 @@ onBeforeUnmount(() => {
     <h1>身份审核</h1>
     <p>按案件核对身份资料，不设置审核倒计时。</p>
     <template v-if="allowed()">
-      <p v-if="mockEnabled" class="banner">
-        合成业务演示 · 学生与卡图均为虚构，决定仅在当前页面内生效
-      </p>
-      <p v-else class="banner">身份材料由同源后台按案件授权返回。</p>
+      <p class="banner">身份材料由同源后台按案件授权返回。</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <section v-if="receipt" class="receipt" aria-label="审核回执">
         <h2>审核回执</h2>
@@ -363,6 +364,7 @@ onBeforeUnmount(() => {
                   />驳回并建议修改</label
                 >
                 <template v-if="decision === 'rejected'">
+                  <p class="muted">原因和建议各不得超过 2000 字节，中文通常每字占 3 字节。</p>
                   <label for="reject-reason">驳回原因（必填）</label>
                   <textarea id="reject-reason" v-model="reason" required rows="3"></textarea>
                   <label for="revision-suggestion">修改建议（必填）</label>
