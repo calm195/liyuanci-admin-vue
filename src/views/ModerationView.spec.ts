@@ -5,19 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ModerationView from './ModerationView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
-import type * as adminService from '@/services/admin'
+import type * as contentService from '@/services/content-transport'
 import type { ModerationCase, ModerationOutcome } from '@/types/moderation'
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   detail: vi.fn(),
   decide: vi.fn(),
-  demoContents: vi.fn(),
-  restrict: vi.fn(),
 }))
-vi.mock('@/services/moderation', () => ({ createModerationClient: () => mocks }))
-vi.mock('@/services/admin', async (original) => ({
-  ...(await original<typeof adminService>()),
-  mockEnabled: true,
+vi.mock('@/services/content-transport', async (original) => ({
+  ...(await original<typeof contentService>()),
+  createModerationTransport: () => mocks,
 }))
 const first: ModerationCase = {
   id: 'case-a',
@@ -25,7 +22,7 @@ const first: ModerationCase = {
   content_version: 2,
   body: '合成涉校命中正文',
   school_related: true,
-  status: 'pending',
+  status: 'human_required',
 }
 const second: ModerationCase = {
   ...first,
@@ -94,17 +91,13 @@ beforeEach(() => {
     business_outcome: 'cancelled',
     version: 2,
   })
-  mocks.demoContents.mockResolvedValue([
-    { id: 'content-a', kind: 'wish', version: 3, status: 'published', ordinary_restricted: false },
-  ])
-  mocks.restrict.mockResolvedValue({ id: 'content-a', version: 4, status: 'offline' })
   wrapper = mount(ModerationView, { global: { plugins: [pinia] } })
 })
 afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
 })
-describe('T017 内容审核与普通处置交互', () => {
+describe('T017 真实内容审核页面交互', () => {
   it('列表不加载正文，案件详情展示精确正文版本及涉校未经证实提示', async () => {
     await flushPromises()
     expect(wrapper?.text()).not.toContain('合成涉校命中正文')
@@ -224,32 +217,11 @@ describe('T017 内容审核与普通处置交互', () => {
     await flushPromises()
     expect(mocks.decide.mock.calls[2]?.[2]).toBe(key)
   })
-  it('下线使用独立内容目标与资源版本，原因必填且解除不自动上架', async () => {
+  it('只提供正式审核决定，不显示未交付的下线或解除入口', async () => {
     await flushPromises()
-    await open('content-a')
-    await wrapper?.get('#moderation-reason').setValue(' 合成违规 ')
-    await confirm()
-    expect(mocks.restrict).toHaveBeenCalledWith(
-      'wish',
-      'content-a',
-      'offline',
-      { expected_version: 3, reason: '合成违规' },
-      expect.any(String),
-      expect.any(AbortSignal),
-    )
-    expect(wrapper?.text()).toContain('普通违规下线已确认')
-    mocks.demoContents.mockResolvedValue([
-      { id: 'content-a', kind: 'wish', version: 4, status: 'offline', ordinary_restricted: true },
-    ])
-    await button('刷新列表').trigger('click')
-    await flushPromises()
-    await open('content-a')
-    expect(button('核对操作').attributes('disabled')).toBeDefined()
-    await wrapper?.get('#moderation-reason').setValue('复核解除')
-    mocks.restrict.mockResolvedValue({ id: 'content-a', version: 5, status: 'withdrawn' })
-    await confirm()
-    expect(wrapper?.text()).toContain('未自动上架，也未解除危机隔离')
-    expect(mocks.restrict.mock.calls[1]?.[2]).toBe('release-restriction')
+    expect(wrapper?.text()).not.toContain('合成内容处置样例')
+    expect(wrapper?.text()).not.toContain('解除普通限制')
+    expect(wrapper?.text()).not.toContain('普通违规下线')
   })
   it.each([401, 403])('%s 清空正文，401清会话而403进入拒绝流程', async (status) => {
     await flushPromises()
@@ -288,7 +260,7 @@ describe('T017 内容审核与普通处置交互', () => {
     await flushPromises()
     expect(wrapper?.text()).toContain('暂无审核案件')
     mocks.list.mockResolvedValue({
-      items: [{ id: first.id, version: 1, status: 'pending' }],
+      items: [{ id: first.id, version: 1, status: 'human_required' }],
       next_cursor: 'next',
     })
     await button('刷新列表').trigger('click')

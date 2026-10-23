@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { mockEnabled, ApiError } from '@/services/admin'
-import { createWordlistClient } from '@/services/wordlists'
+import { ApiError } from '@/services/admin'
+import { createWordlistTransport } from '@/services/content-transport'
+import { useAdminStore } from '@/stores/admin'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import { wordlistKinds } from '@/types/wordlists'
 import type {
@@ -28,7 +29,7 @@ const confirmation = ref<WordlistInput | { item: Wordlist; input: WordlistPublis
 let generation = 0
 let attempt: { fingerprint: string; key: string } | null = null
 const workspace = useAdminWorkspace(clear)
-const client = createWordlistClient(workspace.allowed)
+const client = createWordlistTransport(useAdminStore().session?.token ?? '', workspace.allowed)
 const labels: Record<WordlistKind, string> = {
   crisis: '危机',
   school: '涉校',
@@ -138,7 +139,7 @@ async function submit() {
       const expected = generation + 1
       await load()
       if (generation === expected && workspace.allowed())
-        notice.value = `${'entries' in current ? '合成草稿已创建，尚未发布' : '合成版本已发布，旧生效版已归档'}：${value.id} · 资源版本 ${value.version}；不代表真实扫描生效`
+        notice.value = `${'entries' in current ? '草稿已创建，尚未发布' : '版本已发布，旧生效版已归档'}：${value.id} · 资源版本 ${value.version}；已有审核任务继续使用原词库快照`
     },
     async (cause) => {
       if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) {
@@ -190,23 +191,22 @@ function canPublish(item: Wordlist) {
   )
 }
 onMounted(() => {
-  if (mockEnabled) void load()
+  void load()
 })
 </script>
 <template>
   <main class="panel workflow">
     <p class="eyebrow">内容治理 / 版本管理</p>
     <h1>词库管理</h1>
-    <p v-if="!mockEnabled" role="status">真实词库入口待契约及接口验收后开放。</p>
-    <template v-else>
-      <p class="banner">合成业务演示 · 离开页面后重置；不代表真实审核、审计或扫描生效。</p>
+    <template v-if="workspace.allowed()">
+      <p class="banner">发布将切换当前生效词库，提交前请核对分类和完整词条。</p>
       <p>
-        创建使用分类基准，首次也须读取；词条为完整不可变快照。发布核对草稿资源版本、分类基准和创建时生效版，替代版本授权只读，不可直接重发。仅用于后续新扫描及正常重提，不自动全量重扫历史。此处仅演示契约流程，不代表真实服务生效。
+        创建使用分类基准，首次也须读取；词条为完整不可变快照。发布核对草稿资源版本、分类基准和创建时生效版，替代版本授权只读，不可直接重发。仅用于后续新扫描及正常重提，不自动全量重扫历史。
       </p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <button :disabled="busy || writing" @click="load">刷新词库</button>
-      <p v-if="busy" role="status">正在读取全部合成版本…</p>
+      <p v-if="busy" role="status">正在读取词库版本…</p>
       <template v-if="loaded">
         <h2>分类基准与当前生效版</h2>
         <ul aria-label="词库基准">
@@ -238,7 +238,7 @@ onMounted(() => {
         </ul>
         <form @submit.prevent="prepare">
           <fieldset :disabled="writing || !!confirmation">
-            <legend>创建合成完整版本</legend>
+            <legend>创建完整版本</legend>
             <label for="wordlist-kind">分类</label>
             <select id="wordlist-kind" v-model="kind">
               <option v-for="value in wordlistKinds" :key="value" :value="value">
@@ -267,14 +267,14 @@ onMounted(() => {
             <ul>
               <li v-for="(entry, index) in confirmation.entries" :key="index">{{ entry }}</li>
             </ul>
-            <p>创建后尚未发布，不改变合成当前发布项。</p>
+            <p>创建后尚未发布，不改变当前生效版本。</p>
           </template>
           <p v-else>
             {{ confirmation.item.id }} · 草稿资源版本 {{ confirmation.input.expected_version }} ·
             分类基准 {{ confirmation.input.expected_head_version }} · 创建时生效版
             {{
               confirmation.item.base_effective_id ?? '无'
-            }}；发布后归档旧生效版，不自动全量重扫历史，不证明真实扫描生效。
+            }}；发布后归档旧生效版，不自动全量重扫历史。
           </p>
           <button :disabled="writing" @click="submit">
             {{ writing ? '正在提交…' : '确认提交' }}

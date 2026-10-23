@@ -36,15 +36,6 @@ export interface ModerationOutcome {
   business_outcome: BusinessOutcome
   version: number
 }
-export interface ReasonCommand {
-  expected_version: number
-  reason: string
-}
-/** 合成内容目录仅服务本地演示，不属于真实案件响应或接口扩展。 */
-export interface DemoContent extends ModerationSummary {
-  kind: 'wish' | 'story'
-  ordinary_restricted: boolean
-}
 export interface ModerationClient {
   list(cursor: string | null, signal: AbortSignal): Promise<CursorPage<ModerationSummary>>
   detail(id: string, signal: AbortSignal): Promise<ModerationCase>
@@ -54,13 +45,4 @@ export interface ModerationClient {
     key: string,
     signal: AbortSignal,
   ): Promise<ModerationOutcome>
-  demoContents(signal: AbortSignal): Promise<DemoContent[]>
-  restrict(
-    kind: string,
-    id: string,
-    action: 'offline' | 'release-restriction',
-    input: ReasonCommand,
-    key: string,
-    signal: AbortSignal,
-  ): Promise<ModerationSummary>
 }

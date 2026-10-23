@@ -5,7 +5,6 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import WordlistsView from './WordlistsView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
-import type * as adminService from '@/services/admin'
 import type { Wordlist, WordlistHead, WordlistPage, WordlistDetail } from '@/types/wordlists'
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -13,11 +12,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   publish: vi.fn(),
 }))
-vi.mock('@/services/wordlists', () => ({ createWordlistClient: () => mocks }))
-vi.mock('@/services/admin', async (original) => ({
-  ...(await original<typeof adminService>()),
-  mockEnabled: true,
-}))
+vi.mock('@/services/content-transport', () => ({ createWordlistTransport: () => mocks }))
 const published: Wordlist = {
   id: 'school-old',
   kind: 'school',
@@ -89,7 +84,7 @@ afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
 })
-describe('T017 REQ-015/018/019 合成词库页面', () => {
+describe('T017 REQ-015/018/019 词库页面', () => {
   it('明确契约边界，创建使用heads而非列表资源最高版本', async () => {
     await flushPromises()
     expect(wrapper?.text()).toContain('不自动全量重扫历史')
@@ -131,7 +126,7 @@ describe('T017 REQ-015/018/019 合成词库页面', () => {
       expect.any(String),
       expect.any(AbortSignal),
     )
-    expect(wrapper?.text()).toContain('不代表真实扫描生效')
+    expect(wrapper?.text()).toContain('已有审核任务继续使用原词库快照')
     mocks.list.mockResolvedValue({
       items: [{ ...draft, status: 'archived' }],
       next_cursor: null,
@@ -293,7 +288,7 @@ describe('T017 REQ-015/018/019 合成词库页面', () => {
     pending.finish(draft)
     await flushPromises()
     expect(wrapper?.find('form').exists()).toBe(false)
-    expect(wrapper?.text()).not.toContain('合成草稿已创建')
+    expect(wrapper?.text()).not.toContain('草稿已创建')
   })
   it('离开取消请求，旧列表晚到不恢复；列表失败后可刷新为空', async () => {
     await flushPromises()

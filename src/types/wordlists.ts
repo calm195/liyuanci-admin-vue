@@ -29,15 +29,7 @@ export interface WordlistPublish {
   expected_version: number
   expected_head_version: number
 }
-/** 仅验证合成词库的本地字面匹配，不代表真实扫描结果。 */
-export interface DemoWordlistMatch {
-  kind: WordlistKind
-  id: string
-  version: number
-  matches: string[]
-}
 export interface WordlistClient {
-  demoScan(body: string, signal: AbortSignal): Promise<DemoWordlistMatch[]>
   list(cursor: string | null, signal: AbortSignal): Promise<WordlistPage>
   detail(id: string, signal: AbortSignal): Promise<WordlistDetail>
   create(input: WordlistInput, key: string, signal: AbortSignal): Promise<Wordlist>
