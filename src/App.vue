@@ -21,6 +21,7 @@ watch(
   () => admin.authenticated,
   (active) => {
     if (!active) navigate('/login')
+    else if (route.path === '/login') navigate('/')
   },
 )
 watch(

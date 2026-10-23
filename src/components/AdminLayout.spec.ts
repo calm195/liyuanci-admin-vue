@@ -17,6 +17,7 @@ afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
   disposePinia(pinia)
+  vi.restoreAllMocks()
 })
 function login() {
   useAdminStore().session = {
@@ -125,4 +126,21 @@ it('REQ-019 安全治理三个入口各自高亮，面包屑和页面标题随�
     expect(menu.findAll('a.router-link-exact-active').map((item) => item.text())).toEqual([title])
     expect(menu.get(`a[href="/safety/${path}"]`).attributes('aria-current')).toBe('page')
   }
+})
+
+it('登录建立会话并切换布局后仍自动进入工作台', async () => {
+  vi.spyOn(useAdminStore(), 'login').mockImplementation(() => {
+    login()
+    return Promise.resolve()
+  })
+  wrapper = mount(App, { global: { plugins: [pinia, router] } })
+  await flushPromises()
+  await wrapper.get('#login-name').setValue('登录回归')
+  await wrapper.get('#login-password').setValue('临时输入')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(useAdminStore().authenticated).toBe(true)
+  expect(router.currentRoute.value.path).toBe('/')
+  expect(wrapper.find('#login-password').exists()).toBe(false)
+  expect(wrapper.get('h1').text()).toBe('欢迎使用鲤源池')
 })
