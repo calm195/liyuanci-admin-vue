@@ -14,6 +14,17 @@ export function validDeletionId(value: string): boolean {
     value !== '00000000-0000-0000-0000-000000000000'
   )
 }
+/** 匿名回执是带校验串的访问凭据，不能以待办 ID 或网址代替。 */
+export function validDeletionReceipt(value: string): boolean {
+  const [receiptId, tag] = value.split('.')
+  return (
+    !!receiptId &&
+    validDeletionId(receiptId) &&
+    !!tag &&
+    /^[A-Za-z0-9_-]{43}$/u.test(tag) &&
+    value === `${receiptId}.${tag}`
+  )
+}
 /** 删除理由按后端 UTF-8 字节上限校验，保留原文用于幂等重试。 */
 export function validDeletionReason(value: string): boolean {
   return !!value.trim() && new TextEncoder().encode(value).length <= 2000
@@ -125,15 +136,7 @@ export function createPrivacyClient(
       )
     },
     async receipt(handle: string, signal: AbortSignal): Promise<DeletionProgress> {
-      const [receiptId, tag] = handle.split('.')
-      if (
-        !receiptId ||
-        !validDeletionId(receiptId) ||
-        !tag ||
-        !/^[A-Za-z0-9_-]{43}$/u.test(tag) ||
-        handle !== `${receiptId}.${tag}`
-      )
-        throw new Error('请填写完整的删除回执')
+      if (!validDeletionReceipt(handle)) throw new Error('请填写完整的删除回执')
       return parseDeletionProgress(
         await request(`deletion-receipts/${encodeURIComponent(handle)}`, signal, {}, true),
       )

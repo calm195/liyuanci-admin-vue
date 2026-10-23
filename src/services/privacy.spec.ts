@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createPrivacyClient, parseDeletionProgress, validDeletionReason } from './privacy'
+import {
+  createPrivacyClient,
+  parseDeletionProgress,
+  validDeletionReason,
+  validDeletionReceipt,
+} from './privacy'
 import { ApiError } from './admin'
 const evidenceId = '11111111-1111-4111-8111-111111111111'
 const jobId = '22222222-2222-4222-8222-222222222222'
@@ -157,5 +162,33 @@ describe('T032 REQ-018/019 删除边界与真实协议', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(client.job(jobId, controller.signal)).rejects.toThrow()
+  })
+})
+
+describe('T032 REQ-018 删除回执格式与请求边界', () => {
+  it.each([
+    '',
+    'not-a-receipt',
+    jobId,
+    `${jobId}.${'a'.repeat(42)}`,
+    `${jobId}.${'a'.repeat(44)}`,
+    `${jobId}.${'a'.repeat(43)}=`,
+    `${jobId}.${'a'.repeat(43)}.extra`,
+    `../${jobId}.${'a'.repeat(43)}`,
+    `00000000-0000-0000-0000-000000000000.${'a'.repeat(43)}`,
+  ])('格式错误的回执不能发起请求：%s', async (handle) => {
+    const transport = vi.fn<typeof fetch>()
+    expect(validDeletionReceipt(handle)).toBe(false)
+    await expect(
+      createPrivacyClient('token', () => true, transport).receipt(handle, signal()),
+    ).rejects.toThrow('完整')
+    expect(transport).not.toHaveBeenCalled()
+  })
+  it('完整URL安全校验串允许不同字符，不改写访问凭据', async () => {
+    const handle = `${jobId}.${'a'.repeat(40)}_Z-`
+    expect(validDeletionReceipt(handle)).toBe(true)
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(envelope({ status: 'processing' }))
+    await createPrivacyClient('token', () => true, transport).receipt(handle, signal())
+    expect(transport.mock.calls[0]?.[0]).toBe(`/api/v1/deletion-receipts/${handle}`)
   })
 })
