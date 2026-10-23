@@ -1,16 +1,16 @@
 # Liyuanci Web administration
 
-Wordlist management previews contract 0.2.0 category heads, complete snapshots, dual-version publication and read-only archive details in explicit DEV Mock mode. Real integration remains pending.
+Content moderation and wordlist management use the contract 0.2.0 backend APIs. Wordlists support category heads, complete snapshots, dual-version publication and read-only archives.
 
 ## 1. Project introduction
 
 The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, admin account management, identity review and content moderation pages.
 
-Administrators use pre-provisioned local accounts and may change their own passwords. Login and password changes connect to same-origin backend APIs by default; no account or password is built into the code. Synthetic Mock previews are available in development; identity review supports synthetic case lists, on-demand card viewing, approval/rejection and receipts. Content moderation previews versioned review, independent business outcomes and ordinary offline/release operations. Login, password changes, logout, account management and identity review connect to same-origin HTTP APIs by default in both development and production builds.
+Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation and wordlists connect directly to same-origin HTTP APIs in development and production. Identity review supports on-demand card viewing and decisions; content moderation submits the case version and displays the business outcome separately. No local demonstration accounts, cases or wordlists are provided.
 
 ## 2. Project options and directory structure
 
-See [.env.example](.env.example). `VITE_ADMIN_MOCK=true` explicitly enables synthetic accounts, sessions, self-service password changes, identity review and content moderation in Vite DEV with a persistent Mock banner. Production builds disable Mock, and synthetic requests never reach real APIs. All `VITE_` variables are public and must contain no secrets.
+The app accesses same-origin `/api/v1` without public environment flags. Vite forwards development requests to the local backend on port `18080`; production hosting must supply a same-origin reverse proxy. All `VITE_` variables are public and must contain no secrets.
 
 ```text
 src/
@@ -37,13 +37,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Synthetic local preview: generate temporary fictional credentials on the login page. Roles only configure the fixture account. You may reveal and record the fictional password before login for the self-service password-change preview, then log in again after success. Generating a new fixture replaces the previous synthetic account; it is not a real account creation/reset API.
-
-```sh
-VITE_ADMIN_MOCK=true pnpm dev
-```
-
-Both `pnpm dev` and production builds connect to same-origin `/api/v1` by default, without integration mode or extra flags. Account management requires super_admin. Initial passwords come from server policy and are neither entered nor displayed on the page. Hosting must supply same-origin backend routes; identity review requires registered verification routes. Moderation and wordlists remain Mock-only because real transports are not yet implemented.
+Both `pnpm dev` and production builds connect to same-origin `/api/v1` by default, without integration mode or extra flags. Account management requires super_admin. Initial passwords come from server policy and are neither entered nor displayed on the page. Hosting must supply same-origin backend routes; identity review requires registered verification routes. Moderation and wordlists use real APIs. Ordinary offline and release-restriction endpoints are not yet available, so the page offers neither operation.
 
 Quality checks and build preview:
 
@@ -68,7 +62,7 @@ After each set of changes, run `pnpm format`, `pnpm check` and `pnpm build` in o
 
 Keep README limited to introduction, options and structure, startup, and development notes; keep both root README languages aligned. All process artifacts belong to the docs repository; this project retains no stage documents.
 
-Before any project change, prepare matching `codex/<topic>` branches in this project and docs. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
+Continue admin development on `develop` with the docs branch `admin-develop`. Check both branches and working trees before changes; use a separate docs worktree when another task is active. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
 
 Admin tokens stay in memory and refresh requires login again. Exclude student sessions and never persist identity data in browser storage. Menu and button visibility does not replace backend authorization. Never commit credentials, local Codex authentication or private environment values.
 

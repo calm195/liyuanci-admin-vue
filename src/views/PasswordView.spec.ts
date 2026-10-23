@@ -9,7 +9,6 @@ import { ApiError, changeAdminPassword } from '@/services/admin'
 import type * as service from '@/services/admin'
 vi.mock('@/services/admin', async (original) => ({
   ...(await original<typeof service>()),
-  mockEnabled: false,
   changeAdminPassword: vi.fn(),
 }))
 let router: ReturnType<typeof createRouter>

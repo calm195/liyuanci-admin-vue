@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, realApiEnabled } from '@/services/admin'
+import { ApiError } from '@/services/admin'
 import { createAccountsClient } from '@/services/accounts'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import { roles } from '@/types/admin'
@@ -47,11 +47,10 @@ function clear() {
 }
 const workspace = useAdminWorkspace(clear, 'super_admin')
 const client = createAccountsClient(owner?.token ?? '', workspace.allowed)
-const enabled = realApiEnabled
 const valid = computed(
   () => (selected.value !== null || !!loginName.value.trim()) && !!reason.value.trim(),
 )
-const canOperate = () => enabled && workspace.allowed() && !busy.value
+const canOperate = () => workspace.allowed() && !busy.value
 watch(
   [loginName, selectedRoles, reason],
   () => {
@@ -151,7 +150,7 @@ async function submit() {
       busy.value = false
     },
   )
-  if (refresh && enabled && workspace.allowed()) {
+  if (refresh && workspace.allowed()) {
     const savedError = error.value
     const savedAttempt = attempt
     const savedName = loginName.value
@@ -170,7 +169,7 @@ async function submit() {
   }
 }
 onMounted(() => {
-  if (enabled) void load()
+  void load()
 })
 </script>
 
@@ -178,8 +177,7 @@ onMounted(() => {
   <main class="panel workflow">
     <h1>后台账号管理</h1>
     <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
-    <p v-if="!enabled" role="status">Mock 环境不连接真实账号接口。</p>
-    <template v-else-if="workspace.allowed()">
+    <template v-if="workspace.allowed()">
       <p class="banner">每次请求由服务端核验当前超管权限。</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="error" role="alert">{{ error }}</p>

@@ -7,25 +7,10 @@ afterEach(() => {
   vi.resetModules()
 })
 
-it.each([
-  [false, 'production', 'false', true],
-  [false, 'production', 'true', true],
-  [true, 'development', 'false', true],
-  [true, 'integration', 'false', true],
-  [true, 'development', 'true', false],
-])('REQ-018 默认真实接口，不依赖运行模式 %s/%s/%s', async (dev, mode, mock, expected) => {
-  vi.stubEnv('DEV', dev)
-  vi.stubEnv('MODE', mode)
-  vi.stubEnv('VITE_ADMIN_MOCK', mock)
-  vi.stubEnv('VITE_ADMIN_AUTH_INTEGRATION', 'false')
-  vi.stubEnv('VITE_ADMIN_IDENTITY_INTEGRATION', 'false')
-  expect((await import('./admin')).realApiEnabled).toBe(expected)
-})
-
 it.each([true, false])('REQ-018 DEV=%s 默认登录、改密、退出和后台请求均可调用', async (dev) => {
   vi.stubEnv('DEV', dev)
   vi.stubEnv('MODE', dev ? 'development' : 'production')
-  vi.stubEnv('VITE_ADMIN_MOCK', 'false')
+  vi.stubEnv('VITE_ADMIN_MOCK', 'true')
   const transport = vi.fn<typeof fetch>().mockResolvedValue(
     Response.json({
       code: 0,
@@ -40,7 +25,6 @@ it.each([true, false])('REQ-018 DEV=%s 默认登录、改密、退出和后台�
   vi.stubGlobal('fetch', transport)
   const storage = vi.spyOn(Storage.prototype, 'setItem')
   const service = await import('./admin')
-  expect(() => service.createSyntheticCredentials('super_admin')).toThrow()
   await service.loginAdmin({ login_name: 'synthetic', password: '合成' })
   transport.mockResolvedValue(new Response(null, { status: 204 }))
   await service.changeAdminPassword(

@@ -5,22 +5,14 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import AccountsView from './AccountsView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
-import type * as service from '@/services/admin'
 import type { AccountPage } from '@/types/accounts'
 import type { AdminAccount } from '@/types/admin'
 const mocks = vi.hoisted(() => ({
-  enabled: true,
   list: vi.fn(),
   create: vi.fn(),
   replaceRoles: vi.fn(),
 }))
 vi.mock('@/services/accounts', () => ({ createAccountsClient: () => mocks }))
-vi.mock('@/services/admin', async (original) => ({
-  ...(await original<typeof service>()),
-  get realApiEnabled() {
-    return mocks.enabled
-  },
-}))
 const target: AdminAccount = {
   id: 'target',
   login_name: '合成目标',
@@ -75,7 +67,6 @@ function deferred<T>() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.enabled = true
   mocks.list.mockResolvedValue({ items: [target, self], next_cursor: null })
   mocks.create.mockResolvedValue({ ...target, id: 'created', login_name: '合成新账号', roles: [] })
   mocks.replaceRoles.mockResolvedValue({ ...target, version: 8, roles: [] })
@@ -85,13 +76,7 @@ afterEach(() => {
   wrapper = undefined
 })
 describe('T010 REQ-018/019 后台账号管理页面', () => {
-  it('Mock及非超管不读取账号列表', async () => {
-    mocks.enabled = false
-    await start()
-    expect(wrapper?.text()).toContain('Mock 环境不连接真实账号接口')
-    expect(mocks.list).not.toHaveBeenCalled()
-    wrapper?.unmount()
-    mocks.enabled = true
+  it('非超管不读取账号列表', async () => {
     await start({ ...self, roles: ['review_operator'] })
     expect(mocks.list).not.toHaveBeenCalled()
     expect(wrapper?.find('form').exists()).toBe(false)

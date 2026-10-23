@@ -2,7 +2,6 @@
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import { mockEnabled } from '@/services/admin'
 import { menu } from '@/router'
 const admin = useAdminStore()
 const router = useRouter()
@@ -25,9 +24,6 @@ async function logout() {
 }
 </script>
 <template>
-  <div v-if="mockEnabled" class="banner" role="status">
-    合成 Mock · 所有会话和角色均为模拟，未完成真实验收
-  </div>
   <header v-if="admin.authenticated">
     <strong>鲤源池 / 管理工作台</strong>
     <nav aria-label="管理菜单">

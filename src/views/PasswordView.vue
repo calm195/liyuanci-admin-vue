@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, mockEnabled } from '@/services/admin'
+import { ApiError } from '@/services/admin'
 const admin = useAdminStore()
 const router = useRouter()
 const owner = admin.session
@@ -67,9 +67,6 @@ onBeforeUnmount(() => {
     <h1>本人修改口令</h1>
     <p>当前账号：{{ admin.session?.account.login_name }}</p>
     <p>核验当前口令后修改；成功后全部旧会话撤销并重新登录，不自动续期。</p>
-    <p v-if="mockEnabled" class="banner">
-      仅本进程合成演示，不证明真实口令存储、全局撤销或审计生效。
-    </p>
     <form @submit.prevent="submit">
       <fieldset :disabled="busy">
         <legend>本人改密</legend>
