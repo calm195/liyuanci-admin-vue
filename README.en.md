@@ -4,11 +4,13 @@ Content moderation and wordlist management use the contract 0.2.0 backend APIs. 
 
 ## 1. Project introduction
 
-The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router and Pinia. It provides a login entry, role menus, a dashboard, admin account management, identity review, content moderation, and report/penalty/appeal management and a crisis workspace.
+The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router, Pinia and Element Plus. It provides a login entry, role menus, a dashboard, admin account management, identity review, content moderation, and report/penalty/appeal management and a crisis workspace.
 
 Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation, wordlists, safety case management and the crisis workspace connect directly to same-origin HTTP APIs in development and production. Identity review supports on-demand card viewing and decisions; content moderation submits the case version and displays the business outcome separately. No local demonstration accounts, cases or wordlists are provided.
 
 Super administrators can read metadata for a known evidence item, confirm deletion of its entire retained scope using the scope version and a reason, and query evidence deletion jobs or anonymous deletion receipts. Acceptance does not mean physical cleanup is complete. Bodies, student numbers and receipts are never persisted to browser storage.
+
+The interface uses a shared sidebar, breadcrumbs and role-filtered menus. Both login and workspace support light, dark and system appearance. Only the theme preference is saved in local storage; switching still works when storage is unavailable. Page titles and breadcrumbs use route metadata. Element Plus components are explicitly imported and configured for Simplified Chinese.
 
 ## 2. Project options and directory structure
 
@@ -57,6 +59,8 @@ pnpm preview
 ## 4. Development standards and notes
 
 Non-test code must contain no milestone, task or requirement IDs. Keep traceability in stage documents or tests. Write code comments in Chinese to explain functionality, business intent, boundaries and design decisions. Use Chinese for logs and user-facing errors. Preserve language directives, API fields, protocol values and identifiers required by tools.
+
+A one-line patch in `patches/` makes Vue 3.5.44 prop validator declarations compatible with Element Plus and `exactOptionalPropertyTypes`. It permits explicit `undefined` validators already supported at runtime, without changing validator function signatures or runtime code. Reassess this patch when upgrading Vue.
 
 Use `<script setup lang="ts">` and respect strict typing and existing formatting/lint rules. Do not bypass checks with `any`, unsafe assertions or suppression comments. Validate external data in services; keep transient UI state in components and only shared state in stores. Place behavioral tests beside implementations.
 

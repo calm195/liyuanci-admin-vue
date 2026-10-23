@@ -8,6 +8,7 @@ import { crisisRoles } from '@/types/crisis'
 export interface MenuItem {
   path: string
   title: string
+  group: string
   role?: Role
   roles?: readonly Role[]
 }
@@ -19,20 +20,24 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
-  { path: '/', title: '工作台' },
-  { path: '/password', title: '本人改密' },
-  { path: '/accounts', title: '后台账号管理', role: 'super_admin' },
-  { path: '/identity', title: '身份审核', role: 'review_operator' },
-  { path: '/moderation', title: '内容审核', role: 'review_operator' },
-  { path: '/wordlists', title: '词库管理', role: 'review_operator' },
-  { path: '/safety', title: '举报、处罚与申诉', roles: safetyRoles },
-  { path: '/crisis', title: '危机工作台', roles: crisisRoles },
-  { path: '/evidence-deletion', title: '证据删除与回执', role: 'super_admin' },
+  { path: '/', group: '总览', title: '工作台' },
+  { path: '/password', group: '系统管理', title: '本人改密' },
+  { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
+  { path: '/identity', group: '认证管理', title: '身份审核', role: 'review_operator' },
+  { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
+  { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
+  { path: '/safety', group: '安全治理', title: '举报、处罚与申诉', roles: safetyRoles },
+  { path: '/crisis', group: '安全治理', title: '危机工作台', roles: crisisRoles },
+  { path: '/evidence-deletion', group: '隐私管理', title: '证据删除与回执', role: 'super_admin' },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/login', component: () => import('@/views/LoginView.vue') },
+    {
+      path: '/login',
+      meta: { title: '后台登录' },
+      component: () => import('@/views/LoginView.vue'),
+    },
     { path: '/', component: () => import('@/views/DashboardView.vue') },
     { path: '/password', component: () => import('@/views/PasswordView.vue') },
     {
@@ -70,9 +75,22 @@ export const router = createRouter({
       component: () => import('@/views/EvidenceDeletionView.vue'),
       meta: { role: 'super_admin' },
     },
-    { path: '/403', component: () => import('@/views/ForbiddenView.vue') },
-    { path: '/:pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue') },
-  ],
+    {
+      path: '/403',
+      meta: { title: '无权访问' },
+      component: () => import('@/views/ForbiddenView.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      meta: { title: '页面不存在' },
+      component: () => import('@/views/NotFoundView.vue'),
+    },
+  ].map((route) => {
+    const item = menu.find((entry) => entry.path === route.path)
+    return item
+      ? { ...route, meta: { ...route.meta, title: item.title, group: item.group } }
+      : route
+  }),
 })
 router.beforeEach((to) => {
   const admin = useAdminStore()
