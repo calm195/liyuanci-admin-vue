@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElDrawer } from 'element-plus'
+import 'element-plus/theme-chalk/el-drawer.css'
+import 'element-plus/theme-chalk/el-overlay.css'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import { createAccountsClient } from '@/services/accounts'
@@ -13,6 +16,7 @@ const items = ref<AdminAccount[]>([])
 const cursor = ref<string | null>(null)
 const nextCursor = ref<string | null>(null)
 const history = ref<(string | null)[]>([])
+const editorOpen = ref(false)
 const selected = ref<AdminAccount | null>(null)
 const loginName = ref('')
 const selectedRoles = ref<Role[]>([])
@@ -28,6 +32,7 @@ const roleLabels: Record<Role, string> = {
   super_admin: '超级管理员',
 }
 function resetForm() {
+  editorOpen.value = false
   selected.value = null
   loginName.value = ''
   selectedRoles.value = []
@@ -58,11 +63,24 @@ watch(
   },
   { deep: true },
 )
+function create() {
+  if (!canOperate()) return
+  resetForm()
+  editorOpen.value = true
+  error.value = ''
+  notice.value = ''
+}
+function closeEditor(done: () => void) {
+  if (busy.value) return
+  resetForm()
+  done()
+}
 function edit(account: AdminAccount) {
   if (!canOperate()) return
   resetForm()
   selected.value = { ...account, roles: [...account.roles] }
   selectedRoles.value = [...account.roles]
+  editorOpen.value = true
   error.value = ''
   notice.value = ''
 }
@@ -160,6 +178,7 @@ async function submit() {
     if (workspace.allowed() && savedError) {
       error.value = savedError + (error.value ? `；列表刷新失败：${error.value}` : '')
       if (!target) {
+        editorOpen.value = true
         loginName.value = savedName
         selectedRoles.value = savedRoles
         reason.value = savedReason
@@ -183,7 +202,8 @@ onMounted(() => {
       <p v-if="error" role="alert">{{ error }}</p>
       <section aria-labelledby="accounts-title" :aria-busy="busy">
         <h2 id="accounts-title">后台账号列表</h2>
-        <button :disabled="busy" @click="load()">从首页刷新</button>
+        <button :disabled="busy || editorOpen" @click="load()">从首页刷新</button>
+        <button :disabled="busy || editorOpen" @click="create">创建后台账号</button>
         <p v-if="busy" role="status">正在处理…</p>
         <p v-else-if="!items.length">暂无后台账号</p>
         <table v-if="items.length">
@@ -210,7 +230,7 @@ onMounted(() => {
               <td>{{ account.version }}</td>
               <td>
                 <button
-                  :disabled="busy"
+                  :disabled="busy || editorOpen"
                   :aria-label="`修改 ${account.login_name} 的角色`"
                   @click="edit(account)"
                 >
@@ -220,46 +240,63 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
-        <button :disabled="busy || !history.length" @click="previousPage">上一页</button>
-        <button :disabled="busy || nextCursor === null" @click="nextPage">下一页</button>
+        <button :disabled="busy || editorOpen || !history.length" @click="previousPage">
+          上一页
+        </button>
+        <button :disabled="busy || editorOpen || nextCursor === null" @click="nextPage">
+          下一页
+        </button>
         <p>列表随账号变化更新；新建后从首页重新读取，不视为冻结快照。</p>
       </section>
-      <section aria-labelledby="account-form-title">
-        <h2 id="account-form-title">{{ selected ? '修改账号角色' : '创建后台账号' }}</h2>
-        <button v-if="selected" :disabled="busy" @click="resetForm">取消修改，返回创建</button>
-        <p v-if="selected">
-          目标：{{ selected.login_name }} · 版本 {{ selected.version }}；账号名不能在此修改。
-        </p>
-        <p v-else>初始口令由服务端仓库外策略提供，此页面不设置或显示口令。</p>
-        <form @submit.prevent="confirm">
-          <fieldset :disabled="busy || confirming">
-            <legend>{{ selected ? '完整替换角色' : '新账号资料' }}</legend>
-            <template v-if="!selected"
-              ><label for="account-login">后台账号名</label
-              ><input id="account-login" v-model="loginName" autocomplete="off" required
-            /></template>
-            <label v-for="role in roles" :key="role"
-              ><input v-model="selectedRoles" type="checkbox" :value="role" />{{
-                roleLabels[role]
-              }}</label
-            >
-            <label for="account-reason">{{ selected ? '角色修改理由' : '创建理由' }}</label>
-            <textarea id="account-reason" v-model="reason" required />
-            <button :disabled="!valid">核对并继续</button>
-          </fieldset>
-        </form>
-        <section v-if="confirming" aria-label="确认账号操作">
-          <h3>确认{{ selected ? '替换角色' : '创建账号' }}</h3>
-          <p>账号：{{ selected?.login_name ?? loginName }}</p>
-          <p>新角色：{{ selectedRoles.map((role) => roleLabels[role]).join('、') || '无角色' }}</p>
-          <p>理由：{{ reason }}</p>
-          <p v-if="selected?.id === owner?.account.id">
-            正在修改本人角色；移除超管后将立即离开账号管理。
+      <ElDrawer
+        v-if="editorOpen"
+        v-model="editorOpen"
+        :title="selected ? '修改账号角色' : '创建后台账号'"
+        size="min(36rem, 100vw)"
+        :before-close="closeEditor"
+        :close-on-click-modal="false"
+        :show-close="!busy"
+      >
+        <section aria-labelledby="account-form-title">
+          <p v-if="error" role="alert">{{ error }}</p>
+          <h2 id="account-form-title">{{ selected ? '修改账号角色' : '创建后台账号' }}</h2>
+          <button :disabled="busy" @click="resetForm">取消并关闭</button>
+          <p v-if="selected">
+            目标：{{ selected.login_name }} · 版本 {{ selected.version }}；账号名不能在此修改。
           </p>
-          <button :disabled="busy" @click="submit">确认提交</button>
-          <button :disabled="busy" @click="confirming = false">返回修改</button>
+          <p v-else>初始口令由服务端仓库外策略提供，此页面不设置或显示口令。</p>
+          <form @submit.prevent="confirm">
+            <fieldset :disabled="busy || confirming">
+              <legend>{{ selected ? '完整替换角色' : '新账号资料' }}</legend>
+              <template v-if="!selected"
+                ><label for="account-login">后台账号名</label
+                ><input id="account-login" v-model="loginName" autocomplete="off" required
+              /></template>
+              <label v-for="role in roles" :key="role"
+                ><input v-model="selectedRoles" type="checkbox" :value="role" />{{
+                  roleLabels[role]
+                }}</label
+              >
+              <label for="account-reason">{{ selected ? '角色修改理由' : '创建理由' }}</label>
+              <textarea id="account-reason" v-model="reason" required />
+              <button :disabled="!valid">核对并继续</button>
+            </fieldset>
+          </form>
+          <section v-if="confirming" aria-label="确认账号操作">
+            <h3>确认{{ selected ? '替换角色' : '创建账号' }}</h3>
+            <p>账号：{{ selected?.login_name ?? loginName }}</p>
+            <p>
+              新角色：{{ selectedRoles.map((role) => roleLabels[role]).join('、') || '无角色' }}
+            </p>
+            <p>理由：{{ reason }}</p>
+            <p v-if="selected?.id === owner?.account.id">
+              正在修改本人角色；移除超管后将立即离开账号管理。
+            </p>
+            <button :disabled="busy" @click="submit">确认提交</button>
+            <button :disabled="busy" @click="confirming = false">返回修改</button>
+          </section>
         </section>
-      </section>
+      </ElDrawer>
     </template>
   </main>
 </template>

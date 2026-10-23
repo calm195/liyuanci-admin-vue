@@ -81,6 +81,18 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
     expect(mocks.list).not.toHaveBeenCalled()
     expect(wrapper?.find('form').exists()).toBe(false)
   })
+  it('查询页默认不展示编辑表单，取消后清空输入且不提交', async () => {
+    await start()
+    expect(wrapper?.find('form').exists()).toBe(false)
+    await edit()
+    await button('取消并关闭').trigger('click')
+    expect(wrapper?.find('form').exists()).toBe(false)
+    await button('创建后台账号').trigger('click')
+    expect(wrapper?.get('#account-reason').element).toHaveProperty('value', '')
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(mocks.replaceRoles).not.toHaveBeenCalled()
+    expect(mocks.list).toHaveBeenCalledTimes(1)
+  })
   it('列表分页透传游标，返回上一页及刷新从首页开始', async () => {
     mocks.list.mockResolvedValueOnce({ items: [target], next_cursor: 'opaque+/=' })
     await start()
@@ -96,6 +108,7 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
   })
   it('创建必须填写理由并二次确认，不提供口令输入，允许空角色', async () => {
     await start()
+    await button('创建后台账号').trigger('click')
     expect(wrapper?.find('input[type="password"]').exists()).toBe(false)
     expect(button('核对并继续').attributes('disabled')).toBeDefined()
     await wrapper?.get('#account-login').setValue('合成新账号')
@@ -111,7 +124,7 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
       expect.any(AbortSignal),
     )
     expect(wrapper?.text()).toContain('已创建；初始口令请通过管理员指定渠道获取')
-    expect(wrapper?.get('#account-login').element).toHaveProperty('value', '')
+    expect(wrapper?.find('form').exists()).toBe(false)
     expect(mocks.list).toHaveBeenCalledTimes(2)
   })
   it('修改角色发送目标版本及完整空角色数组，禁止重复提交', async () => {
@@ -161,6 +174,7 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
   })
   it('创建409保留输入和幂等键，不因自动刷新盲目换键', async () => {
     await start()
+    await button('创建后台账号').trigger('click')
     mocks.create.mockRejectedValue(new ApiError(409))
     await wrapper?.get('#account-login').setValue('合成新账号')
     await wrapper?.get('#account-reason').setValue('合成理由')
