@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
-import { createPrivacyClient, validDeletionId, validDeletionReason } from '@/services/privacy'
+import {
+  createPrivacyClient,
+  validDeletionId,
+  validDeletionReason,
+  validDeletionReceipt,
+} from '@/services/privacy'
 import { useAdminStore } from '@/stores/admin'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import type { DeletionJob, DeletionProgress, EvidenceTarget } from '@/types/privacy'
@@ -119,7 +124,10 @@ async function submit() {
 async function query(kind: 'job' | 'receipt') {
   if (busy.value) return
   const value = kind === 'job' ? jobId.value.trim() : handle.value.trim()
-  if (!value) return
+  if (kind === 'job' ? !validDeletionId(value) : !validDeletionReceipt(value)) {
+    error.value = kind === 'job' ? '请填写有效的待办 ID' : '请填写完整的删除回执，包含标识与校验串'
+    return
+  }
   workspace.cancel()
   progress.value = null
   progressKind.value = ''
@@ -133,10 +141,13 @@ async function query(kind: 'job' | 'receipt') {
       progress.value = result
     },
     (cause) => {
-      error.value =
-        cause instanceof ApiError && cause.status === 404
-          ? '待办或回执不存在、已过期或不可访问；不能据此认定清理完成'
-          : reviewErrorMessage(cause)
+      if (cause instanceof ApiError && cause.status === 404)
+        error.value = '待办或回执不存在、已过期或不可访问；不能据此认定清理完成'
+      else if (cause instanceof ApiError && cause.status === 400)
+        error.value = '查询参数无效，请核对完整的待办 ID 或删除回执'
+      else if (cause instanceof ApiError && (cause.status === 429 || cause.status === 503))
+        error.value = reviewErrorMessage(cause)
+      else error.value = '查询未完成，请稍后重试'
     },
     () => {
       busy.value = false
@@ -231,7 +242,12 @@ function reset() {
               spellcheck="false"
             />
             <p>回执是访问凭据，请勿复制到网址、日志或截图；查询不携带后台令牌。</p>
-            <button type="submit" :disabled="!handle.trim()">查询匿名删除回执</button>
+            <p v-if="handle.trim() && !validDeletionReceipt(handle.trim())" role="status">
+              请填写完整删除回执，包含标识与校验串；待办 ID 不能代替回执。
+            </p>
+            <button type="submit" :disabled="!validDeletionReceipt(handle.trim())">
+              查询匿名删除回执
+            </button>
           </fieldset>
         </form>
         <section v-if="progress" aria-label="清理结果" role="status">
