@@ -21,8 +21,8 @@ export function useAdminWorkspace(
   const owner = admin.session
   const hasRole = () =>
     typeof role === 'string' ? admin.can(role) : role.some((value) => admin.can(value))
-  const allowed = () => admin.session === owner && hasRole()
   let active = true
+  const allowed = () => active && admin.session === owner && hasRole()
   let controller = new AbortController()
   function cancel() {
     controller.abort()

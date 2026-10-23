@@ -11,8 +11,14 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   replaceRoles: vi.fn(),
+  clients: vi.fn<(token: string, allowed: () => boolean) => void>(),
 }))
-vi.mock('@/services/accounts', () => ({ createAccountsClient: () => mocks }))
+vi.mock('@/services/accounts', () => ({
+  createAccountsClient: (token: string, allowed: () => boolean) => {
+    mocks.clients(token, allowed)
+    return mocks
+  },
+}))
 const target: AdminAccount = {
   id: 'target',
   login_name: '合成目标',
@@ -80,6 +86,15 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
     await start({ ...self, roles: ['review_operator'] })
     expect(mocks.list).not.toHaveBeenCalled()
     expect(wrapper?.find('form').exists()).toBe(false)
+  })
+  it('页面卸载后旧客户端授权失效，禁止离页后继续发出请求', async () => {
+    await start()
+    const allowed = mocks.clients.mock.calls[0]?.[1]
+    if (!allowed) throw new Error('未绑定工作区授权')
+    expect(allowed()).toBe(true)
+    wrapper?.unmount()
+    wrapper = undefined
+    expect(allowed()).toBe(false)
   })
   it('查询页默认不展示编辑表单，取消后清空输入且不提交', async () => {
     await start()
