@@ -54,7 +54,7 @@
 .navigation-group a:hover {
   background: var(--surface-muted);
 }
-.navigation-group a.router-link-exact-active {
+.navigation-group a.router-link-active {
   background: var(--selected-surface);
   color: var(--accent-color);
 }

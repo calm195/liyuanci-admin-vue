@@ -84,3 +84,24 @@ it('REQ-019 会话失效时移除工作区及菜单，返回登录', async () =>
   expect(router.currentRoute.value.path).toBe('/login')
   expect(view.find('nav[aria-label="管理菜单"]').exists()).toBe(false)
 })
+
+it('REQ-019 词库子路由继承权限，详情保留菜单高亮与列表面包屑', async () => {
+  await router.push('/wordlists/drafts/new')
+  expect(router.currentRoute.value.path).toBe('/login')
+  login()
+  await router.push('/wordlists/example')
+  const view = render()
+  expect(document.title).toBe('词单详情 · 鲤源池')
+  expect(view.get('nav[aria-label="管理菜单"] a[href="/wordlists"]').classes()).toContain(
+    'router-link-active',
+  )
+  await view.get('[aria-label="面包屑导航"] a[href="/wordlists"]').trigger('click')
+  await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/wordlists'))
+  const session = useAdminStore().session
+  if (!session) throw new Error('缺少合成会话')
+  session.account.roles = ['crisis_operator']
+  await router.push('/wordlists/drafts/new')
+  expect(router.currentRoute.value.path).toBe('/403')
+  await router.push('/wordlists/example')
+  expect(router.currentRoute.value.path).toBe('/403')
+})

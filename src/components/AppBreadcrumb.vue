@@ -17,6 +17,14 @@ const group = computed(() => (typeof route.meta['group'] === 'string' ? route.me
     >
     <ElBreadcrumbItem v-if="group && group !== '总览'">{{ group }}</ElBreadcrumbItem>
     <ElBreadcrumbItem
+      v-if="
+        typeof route.meta['parentPath'] === 'string' &&
+        typeof route.meta['parentTitle'] === 'string'
+      "
+    >
+      <RouterLink :to="route.meta['parentPath']">{{ route.meta['parentTitle'] }}</RouterLink>
+    </ElBreadcrumbItem>
+    <ElBreadcrumbItem
       ><span aria-current="page">{{ title }}</span></ElBreadcrumbItem
     >
   </ElBreadcrumb>

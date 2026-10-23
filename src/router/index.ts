@@ -52,8 +52,24 @@ export const router = createRouter({
     },
     {
       path: '/wordlists',
-      component: () => import('@/views/WordlistsView.vue'),
+      component: () => import('@/views/WordlistLayout.vue'),
       meta: { role: 'review_operator' },
+      children: [
+        { path: '', name: 'wordlist-list', component: () => import('@/views/WordlistsView.vue') },
+        {
+          path: 'drafts/new',
+          name: 'wordlist-draft',
+          component: () => import('@/views/WordlistDraftView.vue'),
+          meta: { title: '创建词单草稿', parentTitle: '词单列表', parentPath: '/wordlists' },
+        },
+        {
+          path: ':id',
+          name: 'wordlist-detail',
+          props: true,
+          component: () => import('@/views/WordlistDetailView.vue'),
+          meta: { title: '词单详情', parentTitle: '词单列表', parentPath: '/wordlists' },
+        },
+      ],
     },
     {
       path: '/accounts',

@@ -12,6 +12,8 @@ Super administrators can read metadata for a known evidence item, confirm deleti
 
 The interface uses a shared sidebar, breadcrumbs and role-filtered menus. Both login and workspace support light, dark and system appearance. Only the theme preference is saved in local storage; switching still works when storage is unavailable. Page titles and breadcrumbs use route metadata. Element Plus components are explicitly imported and configured for Simplified Chinese.
 
+Account queries and editing are separated by a drawer. Wordlist listing, read-only details and draft creation use separate routes; publication requires confirmation on the detail page.
+
 ## 2. Project options and directory structure
 
 The app accesses same-origin `/api/v1` without public environment flags. Vite forwards development requests to the local backend on port `18080`; production hosting must supply a same-origin reverse proxy. All `VITE_` variables are public and must contain no secrets.

@@ -2,7 +2,10 @@ import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import WordlistsView from './WordlistsView.vue'
+import { createRouter, createMemoryHistory, RouterView } from 'vue-router'
+import type { Router } from 'vue-router'
+import { router as applicationRouter } from '@/router'
+import AppBreadcrumb from '@/components/AppBreadcrumb.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { Wordlist, WordlistHead, WordlistPage, WordlistDetail } from '@/types/wordlists'
@@ -33,6 +36,14 @@ const heads: WordlistHead[] = [
   { kind: 'ordinary_violation', version: 1, effective_id: null },
 ]
 let wrapper: VueWrapper | undefined
+let router: Router
+async function go(path: string) {
+  await router.push(path)
+  await flushPromises()
+}
+async function detail(id = draft.id) {
+  await go(`/wordlists/${id}`)
+}
 function button(label: string) {
   const value = wrapper?.findAll('button').find((item) => item.text() === label)
   if (!value) throw new Error(`未找到按钮：${label}`)
@@ -58,7 +69,7 @@ async function submit() {
   await button('确认提交').trigger('click')
   await flushPromises()
 }
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetAllMocks()
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -78,17 +89,57 @@ beforeEach(() => {
   )
   mocks.create.mockResolvedValue({ ...draft, id: 'new-draft', version: 3 })
   mocks.publish.mockResolvedValue({ ...draft, version: 3, status: 'published' })
-  wrapper = mount(WordlistsView, { global: { plugins: [pinia] } })
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: applicationRouter.options.routes,
+  })
+  await router.push('/wordlists/drafts/new')
+  await router.isReady()
+  wrapper = mount(
+    { components: { RouterView, AppBreadcrumb }, template: '<AppBreadcrumb /><RouterView />' },
+    { global: { plugins: [pinia, router] } },
+  )
+  await flushPromises()
 })
 afterEach(() => {
   wrapper?.unmount()
   wrapper = undefined
 })
 describe('T017 REQ-015/018/019 词库页面', () => {
+  it('列表、草稿和详情使用独立路由，面包屑返回列表且离页丢弃未提交词条', async () => {
+    await go('/wordlists')
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
+    await wrapper?.get('a[href="/wordlists/drafts/new"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper?.find('form').exists()).toBe(true))
+    await wrapper?.get('#wordlist-entries').setValue('未提交词条')
+    await wrapper?.get('[aria-label="面包屑导航"] a[href="/wordlists"]').trigger('click')
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/wordlists'))
+    await flushPromises()
+    await wrapper?.get(`a[href="/wordlists/${draft.id}"]`).trigger('click')
+    await vi.waitFor(() => expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(true))
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.text()).not.toContain('未提交词条')
+    expect(wrapper?.get('[aria-current="page"]').text()).toContain('词单详情')
+    await go('/wordlists/drafts/new')
+    expect(wrapper?.get('#wordlist-entries').element).toHaveProperty('value', '')
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(mocks.publish).not.toHaveBeenCalled()
+  })
+  it('详情直达读取完整快照，响应标识不匹配时不展示或允许发布', async () => {
+    mocks.detail.mockResolvedValueOnce({ ...draft, id: 'wrong-id', entries: ['不匹配词条'] })
+    await detail()
+    expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
+    expect(wrapper?.text()).not.toContain('不匹配词条')
+    expect(wrapper?.findAll('button').some((item) => item.text().startsWith('发布 '))).toBe(false)
+    await button('刷新词库').trigger('click')
+    await flushPromises()
+    expect(wrapper?.text()).toContain('合成只读词')
+  })
   it('明确契约边界，创建使用heads而非列表资源最高版本', async () => {
     await flushPromises()
     expect(wrapper?.text()).toContain('不自动全量重扫历史')
-    expect(wrapper?.text()).toContain('分类基准 7')
+    expect(wrapper?.text()).toContain('分类创建基准：7')
     await prepare()
     expect(mocks.create).not.toHaveBeenCalled()
     expect(wrapper?.text()).toContain('完整词条 2 条')
@@ -99,6 +150,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       expect.any(AbortSignal),
     )
     expect(mocks.publish).not.toHaveBeenCalled()
+    expect(wrapper?.get('a[href="/wordlists/new-draft"]').text()).toContain('查看新草稿')
     expect(wrapper?.text()).toContain('尚未发布')
   })
   it('新分类也提交heads基准，空词条按契约允许，返回修改不写入', async () => {
@@ -117,6 +169,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
   })
   it('发布单独确认精确资源与head版本，归档只读', async () => {
     await flushPromises()
+    await detail()
     await button('发布 school-draft').trigger('click')
     expect(mocks.publish).not.toHaveBeenCalled()
     await submit()
@@ -127,6 +180,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       expect.any(AbortSignal),
     )
     expect(wrapper?.text()).toContain('已有审核任务继续使用原词库快照')
+    await go('/wordlists')
     mocks.list.mockResolvedValue({
       items: [{ ...draft, status: 'archived' }],
       next_cursor: null,
@@ -202,7 +256,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     expect(useAdminStore().forbidden).toBe(code === 403 ? 1 : 0)
   })
   it('分页heads变化时失败关闭，不混合不同基准创建', async () => {
-    await flushPromises()
+    await go('/wordlists')
     mocks.list
       .mockResolvedValueOnce({ items: [published], next_cursor: 'next', heads })
       .mockResolvedValueOnce({
@@ -217,6 +271,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
   })
   it('旧生效基准草稿不可发布；发布409后清空确认并显示新生效指针', async () => {
     await flushPromises()
+    await detail()
     await button('发布 school-draft').trigger('click')
     expect(wrapper?.text()).toContain('草稿资源版本 1')
     expect(wrapper?.text()).toContain('分类基准 7')
@@ -239,21 +294,21 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     await flushPromises()
     const old = deferred<WordlistDetail>()
     mocks.detail.mockReturnValueOnce(old.promise)
-    await button('查看 school-old').trigger('click')
-    await button('查看 school-draft').trigger('click')
+    await detail(published.id)
+    await detail(draft.id)
     await flushPromises()
     old.finish({ ...published, status: 'archived', entries: ['旧详情晚到词'] })
     await flushPromises()
     expect(wrapper?.get('[aria-label="词库只读详情"]').text()).toContain('合成只读词')
     expect(wrapper?.text()).not.toContain('旧详情晚到词')
-    await button('关闭详情').trigger('click')
+    await go('/wordlists')
     expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
     mocks.detail.mockResolvedValueOnce({
       ...published,
       status: 'archived',
       entries: ['归档快照词'],
     })
-    await button('查看 school-old').trigger('click')
+    await detail(published.id)
     await flushPromises()
     expect(wrapper?.get('[aria-label="词库只读详情"]').text()).toContain('已归档')
     expect(wrapper?.get('[aria-label="词库只读详情"]').find('textarea').exists()).toBe(false)
@@ -267,7 +322,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     await flushPromises()
     const pending = deferred<WordlistDetail>()
     mocks.detail.mockReturnValueOnce(pending.promise)
-    await button('查看 school-old').trigger('click')
+    await detail(published.id)
     const signal: unknown = mocks.detail.mock.calls[0]?.[1]
     wrapper?.unmount()
     wrapper = undefined
@@ -291,7 +346,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     expect(wrapper?.text()).not.toContain('草稿已创建')
   })
   it('离开取消请求，旧列表晚到不恢复；列表失败后可刷新为空', async () => {
-    await flushPromises()
+    await go('/wordlists')
     mocks.list.mockRejectedValueOnce(new Error('network'))
     await button('刷新词库').trigger('click')
     await flushPromises()
