@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { router, menu } from './index'
+import { router, menu, canAccessMenu } from './index'
 import { useAdminStore } from '@/stores/admin'
 beforeEach(() => setActivePinia(createPinia()))
 describe('T010 REQ-019 路由与菜单', () => {
@@ -27,9 +27,11 @@ describe('T010 REQ-019 路由与菜单', () => {
       }
       await router.push(path)
       expect(router.currentRoute.value.path).toBe('/403')
-      expect(
-        menu.filter((item) => !item.role || admin.can(item.role)).map((item) => item.path),
-      ).toEqual(['/', '/password'])
+      expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
+        '/',
+        '/password',
+        '/safety',
+      ])
     },
   )
   it.each(['/identity', '/moderation', '/wordlists', '/accounts'])('超管可进入%s', async (path) => {
@@ -77,9 +79,29 @@ it('REQ-019 审核运营不能访问超管账号管理', async () => {
   }
   await router.push('/accounts')
   expect(router.currentRoute.value.path).toBe('/403')
-  expect(
-    menu
-      .filter((item) => !item.role || useAdminStore().can(item.role))
-      .some((item) => item.path === '/accounts'),
-  ).toBe(false)
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/accounts')).toBe(false)
+})
+
+it.each(['review_operator', 'crisis_operator', 'super_admin'] as const)(
+  'T028 %s可进入普通安全治理页面',
+  async (role) => {
+    useAdminStore().session = {
+      token: 'test',
+      account: { id: 'admin', login_name: '测试账号', version: 1, active: true, roles: [role] },
+    }
+    await router.push('/safety')
+    expect(router.currentRoute.value.path).toBe('/safety')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety')).toBe(true)
+  },
+)
+it('T028 空角色和未登录拒绝安全治理入口', async () => {
+  await router.push('/safety')
+  expect(router.currentRoute.value.path).toBe('/login')
+  useAdminStore().session = {
+    token: 'test',
+    account: { id: 'admin', login_name: '测试账号', version: 1, active: true, roles: [] },
+  }
+  await router.push('/safety')
+  expect(router.currentRoute.value.path).toBe('/403')
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety')).toBe(false)
 })

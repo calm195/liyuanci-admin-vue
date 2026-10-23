@@ -2,10 +2,10 @@
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import { menu } from '@/router'
+import { menu, canAccessMenu } from '@/router'
 const admin = useAdminStore()
 const router = useRouter()
-const visibleMenu = computed(() => menu.filter((item) => !item.role || admin.can(item.role)))
+const visibleMenu = computed(() => menu.filter(canAccessMenu))
 watch(
   () => admin.authenticated,
   (active) => {
