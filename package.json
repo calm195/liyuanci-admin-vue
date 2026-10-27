@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run && node --test scripts/eslint/*.test.js",
     "test:watch": "vitest",
+    "test:browser": "node scripts/whispers-browser.spec.js",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "codex": "codex",
     "codex:login": "codex login"

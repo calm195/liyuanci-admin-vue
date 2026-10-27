@@ -81,3 +81,5 @@ Continue admin development on `develop` with the docs branch `admin-develop`. Ch
 Admin tokens stay in memory and refresh requires login again. Exclude student sessions and never persist identity data in browser storage. Menu and button visibility does not replace backend authorization. Never commit credentials, local Codex authentication or private environment values.
 
 Production hosting requires HTTPS, history fallback and a same-origin `/api/v1` reverse proxy. Sensitive API responses must not be cached. See [AGENTS.md](AGENTS.md) for the full project guidance.
+
+Browser regression: start `pnpm dev --host 127.0.0.1 --port 5173 --strictPort`, then run `pnpm test:browser`. Tests require resolvable Playwright and installed Chrome. Set `PLAYWRIGHT_MODULE` to an existing module’s absolute path, `ADMIN_TEST_BROWSER_CHANNEL` to an installed browser channel, or `ADMIN_TEST_OUTPUT` to an evidence directory. The script accesses local pages and intercepts every business API with synthetic responses, covering both themes, desktop/mobile layouts, drawers, role menus and session cleanup. It does not replace real backend integration.

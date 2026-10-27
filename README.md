@@ -81,3 +81,5 @@ README 仅维护项目介绍、项目选项与目录结构、启动方式、开�
 后台令牌仅存内存，刷新需重新登录，不接学生会话，不在浏览器存储身份资料。菜单和按钮隐藏不能替代后端授权。禁止提交凭据、本地 Codex 认证或私有环境值。
 
 生产静态托管需 HTTPS、history fallback 和同源 `/api/v1` 反向代理，禁止缓存敏感 API 响应。完整项目约定见 [AGENTS.md](AGENTS.md)。
+
+浏览器回归：先运行 `pnpm dev --host 127.0.0.1 --port 5173 --strictPort`，再运行 `pnpm test:browser`。测试需要可解析的 Playwright 和已安装的 Chrome；可用 `PLAYWRIGHT_MODULE` 指定已有模块绝对路径，用 `ADMIN_TEST_BROWSER_CHANNEL` 选择已有浏览器通道，用 `ADMIN_TEST_OUTPUT` 指定证据目录。脚本只访问本机页面并拦截全部业务接口为合成响应，覆盖双主题、桌面/窄屏、抽屉、角色菜单与会话清理；不能代替真实后端联调。
