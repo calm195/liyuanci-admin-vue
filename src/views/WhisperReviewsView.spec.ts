@@ -443,3 +443,31 @@ describe('WA-02 树洞审核页面', () => {
     expect(view().find('#whisper-reason').exists()).toBe(false)
   })
 })
+
+it.each(['editing', 'pending', 'uncertain'] as const)(
+  'WA-05 升级权限撤销但普通权限保留时清理%s抽屉与正文',
+  async (mode) => {
+    await flushPromises()
+    const session = useAdminStore().session
+    if (!session) throw new Error('缺少会话')
+    session.account.roles = ['super_admin']
+    await open()
+    await button('升级危机').trigger('click')
+    await flushPromises()
+    await view().get('#whisper-reason').setValue('合成升级理由')
+    const pending = deferred<{ id: string }>()
+    if (mode === 'pending') mocks.whisperAdminReviewEscalate.mockReturnValueOnce(pending.promise)
+    if (mode === 'uncertain')
+      mocks.whisperAdminReviewEscalate.mockRejectedValueOnce(new TypeError('合成中断'))
+    if (mode !== 'editing') await confirm()
+    session.account.roles = ['review_operator']
+    await flushPromises()
+    expect(view().find('form').exists()).toBe(false)
+    expect(view().find('blockquote').exists()).toBe(false)
+    expect(view().text()).toContain('危机升级权限已撤销')
+    pending.resolve({ id: '迟到回执' })
+    await flushPromises()
+    expect(view().text()).not.toContain('迟到回执')
+    expect(mocks.whisperAdminReviewEscalate).toHaveBeenCalledTimes(mode === 'editing' ? 0 : 1)
+  },
+)

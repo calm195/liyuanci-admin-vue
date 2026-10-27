@@ -478,3 +478,29 @@ it('WA-03 危机角色也不能绕过举报的动作投影', async () => {
   await open()
   expect(hasButton('升级危机')).toBe(false)
 })
+
+it.each(['editing', 'pending', 'uncertain'] as const)(
+  'WA-05 升级权限撤销但普通权限保留时清理%s抽屉与正文',
+  async (mode) => {
+    await flushPromises()
+    const session = useAdminStore().session
+    if (!session) throw new Error('缺少会话')
+    session.account.roles = ['crisis_operator']
+    await open()
+    await processing('升级危机')
+    const pending = deferred<{ id: string }>()
+    if (mode === 'pending') mocks.whisperAdminReportEscalate.mockReturnValueOnce(pending.promise)
+    if (mode === 'uncertain')
+      mocks.whisperAdminReportEscalate.mockRejectedValueOnce(new TypeError('合成中断'))
+    if (mode !== 'editing') await confirm()
+    session.account.roles = ['review_operator']
+    await flushPromises()
+    expect(view().find('form').exists()).toBe(false)
+    expect(view().find('blockquote').exists()).toBe(false)
+    expect(view().text()).toContain('危机升级权限已撤销')
+    pending.resolve({ id: '迟到回执' })
+    await flushPromises()
+    expect(view().text()).not.toContain('迟到回执')
+    expect(mocks.whisperAdminReportEscalate).toHaveBeenCalledTimes(mode === 'editing' ? 0 : 1)
+  },
+)

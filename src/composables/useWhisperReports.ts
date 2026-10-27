@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createWhispersClient } from '@/services/whispers'
 import {
@@ -424,6 +424,18 @@ export function useWhisperReports() {
       },
     )
   }
+  watch(
+    () => admin.can('crisis_operator'),
+    (allowed, previouslyAllowed) => {
+      // 页面仍可读取普通案件时，也须单独撤销升级操作及其原请求。
+      if (!allowed && previouslyAllowed && editorOpen.value && task.value === 'crisis') {
+        cancelReads()
+        clearDetail()
+        notice.value = '危机升级权限已撤销，已清除正文和表单；请在恢复权限后先核对处理结果。'
+      }
+    },
+    { flush: 'sync' },
+  )
   onMounted(refresh)
   return {
     items,
