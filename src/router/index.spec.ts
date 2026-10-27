@@ -48,6 +48,7 @@ describe('T010 REQ-019 路由与菜单', () => {
       '/safety/reports',
       '/safety/penalties',
       '/safety/appeals',
+      '/whispers/crises',
       '/crisis',
     ])
   })
@@ -191,3 +192,41 @@ it('回执查询面包屑与菜单独立，普通审核角色不可见', async (
     role: 'super_admin',
   })
 })
+
+it.each(['/whispers/crises', '/whispers/evidence'])(
+  'WA-04 %s独立投影严格隔离角色与菜单',
+  async (path) => {
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/login')
+    for (const role of ['review_operator', 'crisis_operator', 'super_admin'] as const) {
+      useAdminStore().session = {
+        token: 'test',
+        account: {
+          id: 'admin',
+          login_name: '合成角色',
+          version: 1,
+          active: true,
+          roles: [role],
+        },
+      }
+      const allowed =
+        role === 'super_admin' || (path === '/whispers/crises' && role === 'crisis_operator')
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe(allowed ? path : '/403')
+      expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(allowed)
+    }
+    useAdminStore().session = {
+      token: 'test',
+      account: {
+        id: 'admin',
+        login_name: '空角色',
+        version: 1,
+        active: true,
+        roles: [],
+      },
+    }
+    await router.replace('/')
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/403')
+  },
+)
