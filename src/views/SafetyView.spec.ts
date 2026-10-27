@@ -465,3 +465,33 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(wrapper?.text()).not.toContain('仅本案可见正文')
   })
 })
+
+it('WA-03 新树洞申诉复用既有页面和判定，不读取胶囊原文', async () => {
+  mocks.appeals.mockResolvedValue({
+    items: [{ id: 'appeal', version: 4, status: 'pending', kind: 'whisper_capsule' }],
+    next_cursor: null,
+  })
+  mocks.appeal.mockResolvedValue({
+    id: 'appeal',
+    version: 4,
+    status: 'pending',
+    kind: 'whisper_capsule',
+    penalty_id: 'penalty',
+    body: '合成申诉理由',
+    penalty_reason: '原处罚理由',
+    reason: null,
+  })
+  await go('/safety/appeals')
+  expect(wrapper?.text()).toContain('私密胶囊')
+  expect(wrapper?.text()).not.toContain('合成申诉理由')
+  await open()
+  expect(wrapper?.text()).toContain('合成申诉理由')
+  await prepare()
+  await submit()
+  expect(mocks.decideAppeal).toHaveBeenCalledWith(
+    'appeal',
+    expect.objectContaining({ expected_version: 4 }),
+    expect.any(String),
+    expect.any(AbortSignal),
+  )
+})

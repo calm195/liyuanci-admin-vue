@@ -27,6 +27,7 @@ export const menu: MenuItem[] = [
   { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
   { path: '/whispers/reviews', group: '内容治理', title: '树洞审核', role: 'review_operator' },
   { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
+  { path: '/whispers/reports', group: '安全治理', title: '树洞举报', roles: safetyRoles },
   { path: '/safety/reports', group: '安全治理', title: '举报管理', roles: safetyRoles },
   { path: '/safety/penalties', group: '安全治理', title: '处罚管理', roles: safetyRoles },
   { path: '/safety/appeals', group: '安全治理', title: '申诉管理', roles: safetyRoles },
@@ -107,6 +108,11 @@ export const router = createRouter({
           meta: { title: '申诉管理' },
         },
       ],
+    },
+    {
+      path: '/whispers/reports',
+      component: () => import('@/views/WhisperReportsView.vue'),
+      meta: { roles: safetyRoles },
     },
     {
       path: '/crisis',

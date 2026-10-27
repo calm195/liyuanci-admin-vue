@@ -16,6 +16,8 @@ Account queries and editing are separated by a drawer. Wordlist listing, read-on
 
 Whisper review is available at `/whispers/reviews` using the separate `whispers/1.0.0` contract for flagged posts, comments, nicknames and private capsules. The list, read-only details and processing drawer are separate. Decisions submit both case and content versions; content decisions are displayed separately from publication, nickname activation or capsule unlocking. Review operators and super administrators may enter; escalation from ordinary review details requires a super administrator. All actions remain subject to server projections and authorization. Missing backend routes show real errors; subsequent whisper crisis handling uses a separate integration.
 
+Whisper reports are available at `/whispers/reports` to all three case roles subject to authorization, with separate listing, read-only details and processing drawers. Governance targets and versions come from the report source. Confirmed reports may lead to a minor warning, general 7-day mute or severe permanent ban without entering author account IDs or versions. Releasing ordinary restrictions does not publish content. Crisis escalation requires a crisis operator or super administrator and a server-granted action. Appeals for whisper penalties use the existing appeals workspace without adding private source bodies or identity fields.
+
 ## 2. Project options and directory structure
 
 The app accesses same-origin `/api/v1` without public environment flags. Vite forwards development requests to the local backend on port `18080`; production hosting must supply a same-origin reverse proxy. All `VITE_` variables are public and must contain no secrets.

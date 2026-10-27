@@ -1,9 +1,10 @@
 import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { reviewPage, reviewRecord, reviewText, reviewVersion } from './review-boundary'
-import { contentKinds, penaltyLevels } from '@/types/safety'
+import { appealContentKinds, contentKinds, penaltyLevels } from '@/types/safety'
 import type {
   AppealDetail,
+  AppealSummary,
   ContentKind,
   ReasonInput,
   ReportDetail,
@@ -51,10 +52,27 @@ export function parseReportDetail(value: unknown): ReportDetail {
     reason: reason(data['reason']),
   }
 }
+/** 新来源仅由申诉投影消费，旧举报和内容处置仍限制为原类型。 */
+export function parseAppealSummary(value: unknown): AppealSummary {
+  const data = reviewRecord(value)
+  const result: AppealSummary = {
+    id: reviewText(data['id']),
+    version: reviewVersion(data['version']),
+    status: reviewText(data['status']),
+  }
+  if (data['kind'] !== undefined) {
+    const found = appealContentKinds.find((item) => item === data['kind'])
+    if (!found) throw new Error('申诉来源类型异常')
+    result.kind = found
+  }
+  if (data['content_version'] !== undefined)
+    result.content_version = reviewVersion(data['content_version'])
+  return result
+}
 export function parseAppealDetail(value: unknown): AppealDetail {
   const data = reviewRecord(value)
   return {
-    ...parseSafetySummary(value),
+    ...parseAppealSummary(value),
     penalty_id: reviewText(data['penalty_id']),
     body: text(data['body']),
     penalty_reason: text(data['penalty_reason']),
@@ -128,7 +146,11 @@ export function createSafetyClient(
   }
   return {
     reports: (cursor, signal) => list('reports', cursor, signal),
-    appeals: (cursor, signal) => list('appeals', cursor, signal),
+    async appeals(cursor, signal) {
+      const query = new URLSearchParams({ limit: '20' })
+      if (cursor !== null) query.set('cursor', cursor)
+      return reviewPage(await request(`appeals?${query}`, signal), parseAppealSummary)
+    },
     async report(id, signal) {
       const value = parseReportDetail(await request(`reports/${segment(id)}`, signal))
       if (value.id !== id) throw new Error('举报详情响应不匹配')
@@ -162,7 +184,7 @@ export function createSafetyClient(
     async decideAppeal(id, input, key, signal) {
       if (input.decision !== 'uphold' && input.decision !== 'revoke')
         throw new Error('申诉决定无效')
-      return bound(
+      const result = parseAppealSummary(
         await request(
           `appeals/${segment(id)}/decision`,
           signal,
@@ -176,8 +198,9 @@ export function createSafetyClient(
             key,
           ),
         ),
-        id,
       )
+      if (result.id !== id) throw new Error('申诉处理回执不匹配')
+      return result
     },
     async penalize(subjectId, input, key, signal) {
       segment(input.violation_ref)

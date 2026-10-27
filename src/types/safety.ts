@@ -2,6 +2,14 @@ import type { CursorPage } from './moderation'
 
 export const safetyRoles = ['review_operator', 'crisis_operator', 'super_admin'] as const
 export const contentKinds = ['wish', 'application', 'message', 'story'] as const
+export const appealContentKinds = [
+  ...contentKinds,
+  'whisper_post',
+  'whisper_comment',
+  'whisper_nickname',
+  'whisper_capsule',
+] as const
+export type AppealContentKind = (typeof appealContentKinds)[number]
 export type ContentKind = (typeof contentKinds)[number]
 export const penaltyLevels = ['minor', 'general', 'severe'] as const
 export type PenaltyLevel = (typeof penaltyLevels)[number]
@@ -25,7 +33,10 @@ export interface ReportDetail extends SafetySummary {
   description: string
   reason: string | null
 }
-export interface AppealDetail extends SafetySummary {
+export interface AppealSummary extends Omit<SafetySummary, 'kind'> {
+  kind?: AppealContentKind
+}
+export interface AppealDetail extends AppealSummary {
   penalty_id: string
   body: string
   penalty_reason: string
@@ -63,14 +74,14 @@ export interface SafetyClient {
     key: string,
     signal: AbortSignal,
   ): Promise<SafetySummary>
-  appeals(cursor: string | null, signal: AbortSignal): Promise<CursorPage<SafetySummary>>
+  appeals(cursor: string | null, signal: AbortSignal): Promise<CursorPage<AppealSummary>>
   appeal(id: string, signal: AbortSignal): Promise<AppealDetail>
   decideAppeal(
     id: string,
     input: AppealDecisionInput,
     key: string,
     signal: AbortSignal,
-  ): Promise<SafetySummary>
+  ): Promise<AppealSummary>
   restrict(
     kind: ContentKind,
     id: string,

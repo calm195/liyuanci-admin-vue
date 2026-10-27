@@ -226,3 +226,72 @@ describe('T028 REQ-014/016/018/019 安全治理协议', () => {
     ).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
+
+describe('WA-03 树洞申诉来源兼容', () => {
+  it.each(['whisper_post', 'whisper_comment', 'whisper_nickname', 'whisper_capsule'])(
+    '仅申诉接受%s，旧举报拒绝且不返回私密原文',
+    async (kind) => {
+      const data = {
+        id: 'appeal',
+        version: 4,
+        status: 'pending',
+        kind,
+        content_version: 9,
+        penalty_id: 'penalty',
+        body: '申诉人填写的理由',
+        penalty_reason: '原处罚理由',
+        reason: null,
+        capsule_body: '不可返回的私密原文',
+        subject_id: '匿名作者',
+      }
+      const transport = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(envelope({ items: [data], next_cursor: null }))
+        .mockResolvedValueOnce(envelope(data))
+        .mockResolvedValueOnce(envelope({ id: 'appeal', version: 5, status: 'accepted', kind }))
+        .mockResolvedValueOnce(envelope({ id: 'other', version: 5, status: 'accepted', kind }))
+      const client = createSafetyClient('token', () => true, transport)
+      expect((await client.appeals(null, signal())).items).toEqual([
+        { id: 'appeal', version: 4, status: 'pending', kind, content_version: 9 },
+      ])
+      const detail = await client.appeal('appeal', signal())
+      expect(detail.body).toBe('申诉人填写的理由')
+      expect(detail).not.toHaveProperty('capsule_body')
+      expect(detail).not.toHaveProperty('subject_id')
+      expect(
+        (
+          await client.decideAppeal(
+            'appeal',
+            { expected_version: 4, decision: 'revoke', reason: '核对撤销' },
+            'stable',
+            signal(),
+          )
+        ).kind,
+      ).toBe(kind)
+      await expect(
+        client.decideAppeal(
+          'appeal',
+          { expected_version: 4, decision: 'revoke', reason: '核对撤销' },
+          'stable',
+          signal(),
+        ),
+      ).rejects.toThrow('不匹配')
+      expect(() => parseSafetySummary(data)).toThrow()
+      expect(() => parseReportDetail({ ...report, kind })).toThrow()
+    },
+  )
+  it('未知申诉类型仍拒绝', () => {
+    expect(() =>
+      parseAppealDetail({
+        id: 'appeal',
+        version: 1,
+        status: 'pending',
+        kind: 'future',
+        penalty_id: 'p',
+        body: '理由',
+        penalty_reason: '',
+        reason: null,
+      }),
+    ).toThrow()
+  })
+})

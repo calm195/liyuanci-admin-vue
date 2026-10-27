@@ -1,4 +1,5 @@
 import { useRouter } from 'vue-router'
+import type { CursorPage } from '@/types/moderation'
 import type { CrisisSummary } from '@/types/crisis'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
@@ -9,6 +10,8 @@ import { safetyRoles } from '@/types/safety'
 import type {
   AppealDecisionInput,
   AppealDetail,
+  AppealSummary,
+  AppealContentKind,
   ContentKind,
   PenaltyInput,
   PenaltyLevel,
@@ -38,7 +41,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   const editorOpen = ref(false)
   const editorTask = ref<'case' | 'crisis'>('case')
   const escalating = ref(false)
-  const items = ref<SafetySummary[]>([])
+  const items = ref<(SafetySummary | AppealSummary)[]>([])
   const cursor = ref<string | null>(null)
   const nextCursor = ref<string | null>(null)
   const history = ref<(string | null)[]>([])
@@ -51,7 +54,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   const selected = ref('')
   const report = ref<ReportDetail | null>(null)
   const appeal = ref<AppealDetail | null>(null)
-  const receipt = ref<SafetySummary | null>(null)
+  const receipt = ref<SafetySummary | AppealSummary | null>(null)
   const operation = ref<Operation>('confirmed')
   const reason = ref('')
   const level = ref<PenaltyLevel>('minor')
@@ -86,7 +89,11 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
     general: '一般：禁言 7 天',
     severe: '严重：永久封禁',
   }
-  const kindLabels: Record<ContentKind, string> = {
+  const kindLabels: Record<AppealContentKind, string> = {
+    whisper_post: '树洞帖子',
+    whisper_comment: '树洞暖评',
+    whisper_nickname: '树洞昵称',
+    whisper_capsule: '私密胶囊',
     wish: '心愿',
     application: '应愿留言',
     message: '私聊消息',
@@ -197,7 +204,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
     items.value = []
     nextCursor.value = null
     listError.value = ''
-    await workspace.run(
+    await workspace.run<CursorPage<SafetySummary | AppealSummary>>(
       (signal) =>
         mode !== 'appeals'
           ? client.reports(cursor.value, signal)
@@ -351,7 +358,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
     const caseId = selected.value
     writing.value = true
     error.value = ''
-    await workspace.run(
+    await workspace.run<SafetySummary | AppealSummary>(
       (signal) => {
         switch (current.type) {
           case 'report':

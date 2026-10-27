@@ -44,6 +44,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
       '/',
       '/password',
+      '/whispers/reports',
       '/safety/reports',
       '/safety/penalties',
       '/safety/appeals',
@@ -153,7 +154,7 @@ it('T030 普通审核与空角色不能进入危机工作台，未登录回登�
   }
 })
 
-it.each(['/safety/reports', '/safety/penalties', '/safety/appeals'])(
+it.each(['/safety/reports', '/safety/penalties', '/safety/appeals', '/whispers/reports'])(
   'REQ-019 %s独立路由要求登录与案件角色，三类案件角色均可访问',
   async (path) => {
     await router.push(path)
