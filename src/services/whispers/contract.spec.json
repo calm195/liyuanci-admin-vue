@@ -1,0 +1,674 @@
+{
+  "exchanges": [
+    {
+      "operation_id": "whisperAdminReviewsList",
+      "direction": "response",
+      "path_template": "/admin/whispers/reviews",
+      "method": "GET",
+      "schema": "ReviewSummaryPageResponse",
+      "status": 200,
+      "parameters": {
+        "limit": 1,
+        "cursor": "合成文本"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "items": [],
+          "next_cursor": "合成文本"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReviewGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/reviews/{review_id}",
+      "method": "GET",
+      "schema": "ReviewDetailResponse",
+      "status": 200,
+      "parameters": {
+        "review_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "pending",
+          "created_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": [],
+          "body": "合成文本",
+          "school_related": false,
+          "privacy_recheck": false
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReviewDecide",
+      "direction": "request",
+      "path_template": "/admin/whispers/reviews/{review_id}/decision",
+      "method": "POST",
+      "schema": "ReviewCommand",
+      "status": null,
+      "parameters": {
+        "review_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "expected_content_version": 1,
+        "decision": "approved"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReviewDecide",
+      "direction": "response",
+      "path_template": "/admin/whispers/reviews/{review_id}/decision",
+      "method": "POST",
+      "schema": "ReviewOutcomeResponse",
+      "status": 200,
+      "parameters": {
+        "review_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "content_decision": "approved",
+          "business_outcome": "published"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReviewEscalate",
+      "direction": "request",
+      "path_template": "/admin/whispers/reviews/{review_id}/escalate",
+      "method": "POST",
+      "schema": "ReasonCommand",
+      "status": null,
+      "parameters": {
+        "review_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReviewEscalate",
+      "direction": "response",
+      "path_template": "/admin/whispers/reviews/{review_id}/escalate",
+      "method": "POST",
+      "schema": "CrisisSummaryResponse",
+      "status": 200,
+      "parameters": {
+        "review_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "open",
+          "handoff_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminContentGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/contents/{kind}/{content_id}",
+      "method": "GET",
+      "schema": "ContentControlResponse",
+      "status": 200,
+      "parameters": {
+        "kind": "whisper_post",
+        "content_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "version": 1,
+          "restricted": false,
+          "state": "draft",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminRestrictionSet",
+      "direction": "request",
+      "path_template": "/admin/whispers/contents/{kind}/{content_id}/restriction",
+      "method": "PUT",
+      "schema": "RestrictionCommand",
+      "status": null,
+      "parameters": {
+        "kind": "whisper_post",
+        "content_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "restricted": false,
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminRestrictionSet",
+      "direction": "response",
+      "path_template": "/admin/whispers/contents/{kind}/{content_id}/restriction",
+      "method": "PUT",
+      "schema": "ContentControlResponse",
+      "status": 200,
+      "parameters": {
+        "kind": "whisper_post",
+        "content_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "version": 1,
+          "restricted": false,
+          "state": "draft",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminPenaltyCreate",
+      "direction": "request",
+      "path_template": "/admin/whispers/contents/{kind}/{content_id}/penalties",
+      "method": "POST",
+      "schema": "PenaltyCommand",
+      "status": null,
+      "parameters": {
+        "kind": "whisper_post",
+        "content_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "report_id": "6c500000-0000-4000-8000-000000000001",
+        "expected_report_version": 1,
+        "level": "minor",
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminPenaltyCreate",
+      "direction": "response",
+      "path_template": "/admin/whispers/contents/{kind}/{content_id}/penalties",
+      "method": "POST",
+      "schema": "PenaltyResultResponse",
+      "status": 200,
+      "parameters": {
+        "kind": "whisper_post",
+        "content_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "kind": "warning",
+          "ends_at": "2026-10-28T04:00:00Z"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportsList",
+      "direction": "response",
+      "path_template": "/admin/whispers/reports",
+      "method": "GET",
+      "schema": "ReportSummaryPageResponse",
+      "status": 200,
+      "parameters": {
+        "limit": 1,
+        "cursor": "合成文本"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "items": [],
+          "next_cursor": "合成文本"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/reports/{report_id}",
+      "method": "GET",
+      "schema": "ReportDetailResponse",
+      "status": 200,
+      "parameters": {
+        "report_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "pending",
+          "created_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": [],
+          "type_code": "合成文本",
+          "description": "合成文本",
+          "body": "合成文本"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportDecide",
+      "direction": "request",
+      "path_template": "/admin/whispers/reports/{report_id}/decision",
+      "method": "POST",
+      "schema": "ReportDecision",
+      "status": null,
+      "parameters": {
+        "report_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "decision": "confirmed",
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportDecide",
+      "direction": "response",
+      "path_template": "/admin/whispers/reports/{report_id}/decision",
+      "method": "POST",
+      "schema": "ReportSummaryResponse",
+      "status": 200,
+      "parameters": {
+        "report_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "pending",
+          "created_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportEscalate",
+      "direction": "request",
+      "path_template": "/admin/whispers/reports/{report_id}/escalate",
+      "method": "POST",
+      "schema": "ReasonCommand",
+      "status": null,
+      "parameters": {
+        "report_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminReportEscalate",
+      "direction": "response",
+      "path_template": "/admin/whispers/reports/{report_id}/escalate",
+      "method": "POST",
+      "schema": "CrisisSummaryResponse",
+      "status": 200,
+      "parameters": {
+        "report_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "open",
+          "handoff_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisesList",
+      "direction": "response",
+      "path_template": "/admin/whispers/crises",
+      "method": "GET",
+      "schema": "CrisisSummaryPageResponse",
+      "status": 200,
+      "parameters": {
+        "limit": 1,
+        "cursor": "合成文本"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "items": [],
+          "next_cursor": "合成文本"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisisGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/crises/{crisis_id}",
+      "method": "GET",
+      "schema": "CrisisDetailResponse",
+      "status": 200,
+      "parameters": {
+        "crisis_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "open",
+          "handoff_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": [],
+          "body": "合成文本",
+          "student_number": "合成文本",
+          "identity_status": "verified",
+          "evidence_scope_id": "6c500000-0000-4000-8000-000000000001",
+          "timeline": [],
+          "care_delivery": "pending",
+          "staff_delivery": "pending"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisisAct",
+      "direction": "request",
+      "path_template": "/admin/whispers/crises/{crisis_id}/actions",
+      "method": "POST",
+      "schema": "CrisisCommand",
+      "status": null,
+      "parameters": {
+        "crisis_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "action": "take_over",
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisisAct",
+      "direction": "response",
+      "path_template": "/admin/whispers/crises/{crisis_id}/actions",
+      "method": "POST",
+      "schema": "CrisisDetailResponse",
+      "status": 200,
+      "parameters": {
+        "crisis_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "open",
+          "handoff_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": [],
+          "body": "合成文本",
+          "student_number": "合成文本",
+          "identity_status": "verified",
+          "evidence_scope_id": "6c500000-0000-4000-8000-000000000001",
+          "timeline": [],
+          "care_delivery": "pending",
+          "staff_delivery": "pending"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisisFalsePositive",
+      "direction": "request",
+      "path_template": "/admin/whispers/crises/{crisis_id}/false-positive",
+      "method": "POST",
+      "schema": "ReasonCommand",
+      "status": null,
+      "parameters": {
+        "crisis_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminCrisisFalsePositive",
+      "direction": "response",
+      "path_template": "/admin/whispers/crises/{crisis_id}/false-positive",
+      "method": "POST",
+      "schema": "CrisisDetailResponse",
+      "status": 200,
+      "parameters": {
+        "crisis_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "source": {
+            "kind": "whisper_post",
+            "id": "6c500000-0000-4000-8000-000000000001",
+            "content_version": 1
+          },
+          "status": "open",
+          "handoff_at": "2026-10-28T04:00:00Z",
+          "allowed_actions": [],
+          "body": "合成文本",
+          "student_number": "合成文本",
+          "identity_status": "verified",
+          "evidence_scope_id": "6c500000-0000-4000-8000-000000000001",
+          "timeline": [],
+          "care_delivery": "pending",
+          "staff_delivery": "pending"
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminEvidenceGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/evidence/{evidence_id}",
+      "method": "GET",
+      "schema": "EvidenceScopeResponse",
+      "status": 200,
+      "parameters": {
+        "evidence_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "version": 1,
+          "state": "retained",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminEvidenceDelete",
+      "direction": "request",
+      "path_template": "/admin/whispers/evidence/{evidence_id}/deletion-requests",
+      "method": "POST",
+      "schema": "EvidenceDelete",
+      "status": null,
+      "parameters": {
+        "evidence_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "expected_version": 1,
+        "confirmation": "DELETE_EVIDENCE_SCOPE",
+        "reason": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminEvidenceDelete",
+      "direction": "response",
+      "path_template": "/admin/whispers/evidence/{evidence_id}/deletion-requests",
+      "method": "POST",
+      "schema": "DeletionJobResponse",
+      "status": 202,
+      "parameters": {
+        "evidence_id": "6c500000-0000-4000-8000-000000000001",
+        "Idempotency-Key": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "status": "processing",
+          "scope": "evidence",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    },
+    {
+      "operation_id": "whisperAdminDeletionGet",
+      "direction": "response",
+      "path_template": "/admin/whispers/deletions/{job_id}",
+      "method": "GET",
+      "schema": "DeletionJobResponse",
+      "status": 200,
+      "parameters": {
+        "job_id": "6c500000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "code": 0,
+        "message": "合成文本",
+        "data": {
+          "id": "6c500000-0000-4000-8000-000000000001",
+          "status": "processing",
+          "scope": "evidence",
+          "allowed_actions": []
+        },
+        "request_id": "合成文本"
+      },
+      "synthetic": true
+    }
+  ]
+}
