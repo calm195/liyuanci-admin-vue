@@ -25,6 +25,7 @@ export const menu: MenuItem[] = [
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
   { path: '/identity', group: '认证管理', title: '身份审核', role: 'review_operator' },
   { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
+  { path: '/whispers/reviews', group: '内容治理', title: '树洞审核', role: 'review_operator' },
   { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
   { path: '/safety/reports', group: '安全治理', title: '举报管理', roles: safetyRoles },
   { path: '/safety/penalties', group: '安全治理', title: '处罚管理', roles: safetyRoles },
@@ -51,6 +52,11 @@ export const router = createRouter({
     {
       path: '/moderation',
       component: () => import('@/views/ModerationView.vue'),
+      meta: { role: 'review_operator' },
+    },
+    {
+      path: '/whispers/reviews',
+      component: () => import('@/views/WhisperReviewsView.vue'),
       meta: { role: 'review_operator' },
     },
     {

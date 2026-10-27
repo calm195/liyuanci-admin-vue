@@ -14,6 +14,8 @@ The interface uses a shared sidebar, breadcrumbs and role-filtered menus. Both l
 
 Account queries and editing are separated by a drawer. Wordlist listing, read-only details and draft creation use separate routes; publication requires confirmation on the detail page. Reports, penalties and appeals have separate pages with read-only queries/details and action drawers. Penalty grounds are confirmed reports from the current result page; the integrated APIs do not provide a penalty history list.
 
+Whisper review is available at `/whispers/reviews` using the separate `whispers/1.0.0` contract for flagged posts, comments, nicknames and private capsules. The list, read-only details and processing drawer are separate. Decisions submit both case and content versions; content decisions are displayed separately from publication, nickname activation or capsule unlocking. Review operators and super administrators may enter; escalation from ordinary review details requires a super administrator. All actions remain subject to server projections and authorization. Missing backend routes show real errors; subsequent whisper crisis handling uses a separate integration.
+
 ## 2. Project options and directory structure
 
 The app accesses same-origin `/api/v1` without public environment flags. Vite forwards development requests to the local backend on port `18080`; production hosting must supply a same-origin reverse proxy. All `VITE_` variables are public and must contain no secrets.

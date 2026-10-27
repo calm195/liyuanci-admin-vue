@@ -10,6 +10,7 @@ describe('T010 REQ-019 路由与菜单', () => {
   it.each([
     '/identity',
     '/moderation',
+    '/whispers/reviews',
     '/wordlists',
     '/accounts',
     '/evidence-deletion',
@@ -21,6 +22,7 @@ describe('T010 REQ-019 路由与菜单', () => {
   it.each([
     '/identity',
     '/moderation',
+    '/whispers/reviews',
     '/wordlists',
     '/accounts',
     '/evidence-deletion',
@@ -51,6 +53,7 @@ describe('T010 REQ-019 路由与菜单', () => {
   it.each([
     '/identity',
     '/moderation',
+    '/whispers/reviews',
     '/wordlists',
     '/accounts',
     '/evidence-deletion',
