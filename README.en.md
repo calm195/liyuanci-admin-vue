@@ -4,7 +4,7 @@ Content moderation and wordlist management use the contract 0.2.0 backend APIs. 
 
 ## 1. Project introduction
 
-The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router, Pinia and Element Plus. It provides a login entry, role menus, a dashboard, admin account management, identity review, content moderation, and report/penalty/appeal management and a crisis workspace.
+The Liyuanci administration app uses Vue 3 Composition API, Vite, strict TypeScript, Vue Router, Pinia and Element Plus. It provides a login entry, role menus, a dashboard, admin account management, platform user queries, identity review, content moderation, and report/penalty/appeal management and a crisis workspace.
 
 Administrators use pre-provisioned local accounts and may change their own passwords. Login, password changes, logout, account management, identity review, content moderation, wordlists, safety case management and the crisis workspace connect directly to same-origin HTTP APIs in development and production. Identity review separates the query list, read-only case details and processing drawer, with on-demand card viewing and decisions; content moderation also separates read-only details from its processing drawer, submits the case version and displays the business outcome separately; authorized crisis escalation opens an explicit operation from the details. No local demonstration accounts, cases or wordlists are provided.
 
@@ -83,3 +83,7 @@ Admin tokens stay in memory and refresh requires login again. Exclude student se
 Production hosting requires HTTPS, history fallback and a same-origin `/api/v1` reverse proxy. Sensitive API responses must not be cached. See [AGENTS.md](AGENTS.md) for the full project guidance.
 
 Browser regression: start `pnpm dev --host 127.0.0.1 --port 5173 --strictPort`, then run `pnpm test:browser`. Tests require resolvable Playwright and installed Chrome. Set `PLAYWRIGHT_MODULE` to an existing module’s absolute path, `ADMIN_TEST_BROWSER_CHANNEL` to an installed browser channel, or `ADMIN_TEST_OUTPUT` to an evidence directory. The script accesses local pages and intercepts every business API with synthetic responses, covering both themes, desktop/mobile layouts, drawers, role menus and session cleanup. It does not replace real backend integration.
+
+The `/users` entry supports combined nickname/status filters, cursor pagination, details and authorized penalty history. Ordinary penalties are confirmed in the case workspace after re-reading the account version. Nickname queries stay in memory. The backend must enable the three GET endpoints from `admin-users/1.0.0`; unavailable endpoints display an error. Run `pnpm test:browser:users` for the user-page browser regression, using the same environment options as the browser regression above.
+
+Super administrators can ban/unban and mute/unmute users directly from user details, with a required reason and explicit confirmation. Mutes last seven days; removal affects only the selected restriction type. This capability requires backend migration 0028 and the `user-restrictions/1.0.0` endpoints.

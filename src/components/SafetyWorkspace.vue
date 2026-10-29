@@ -12,6 +12,7 @@ const props = defineProps<{ mode: SafetyMode }>()
 const mode = props.mode
 const route = useRoute()
 const initialReport = typeof route.query['report'] === 'string' ? route.query['report'] : undefined
+const initialAppeal = typeof route.query['appeal'] === 'string' ? route.query['appeal'] : undefined
 const title = { reports: '举报管理', penalties: '处罚管理', appeals: '申诉管理' }[mode]
 const processingTitle = { reports: '举报处理', penalties: '账号处罚', appeals: '申诉处理' }[mode]
 const admin = useAdminStore()
@@ -58,14 +59,15 @@ const {
   prepare,
   submit,
   crisisEscalated,
-} = useSafety(mode, initialReport)
+} = useSafety(mode, initialReport, initialAppeal)
 </script>
 <template>
   <main class="panel workflow">
     <p class="eyebrow">安全治理 / 普通案件</p>
     <h1>{{ title }}</h1>
     <p v-if="mode === 'penalties'" class="banner">
-      本页从已确认举报查询处罚依据；当前接入接口不提供处罚历史列表。仅显示当前分页中的已确认举报，可继续翻页查询。
+      本页从已确认举报查询处罚依据；处罚历史可在“用户管理 →
+      平台用户”查询。仅显示当前分页中的已确认举报，可继续翻页查询。
     </p>
     <p>仅处理服务端授权的普通案件；账号角色管理请进入“后台账号管理”。</p>
     <template v-if="workspace.allowed()">
@@ -215,7 +217,7 @@ const {
         />
         <template v-else-if="detail">
           <form v-if="options.length" @submit.prevent="prepare">
-            <fieldset :disabled="writing || !!confirmation">
+            <fieldset :disabled="writing || loading || !!confirmation">
               <legend>案件处理</legend>
               <label for="safety-operation">处理方式</label>
               <select id="safety-operation" v-model="operation">
@@ -231,18 +233,10 @@ const {
                     {{ levelLabels[value] }}
                   </option>
                 </select>
-                <label for="account-version">被处置账号当前版本</label>
-                <input
-                  id="account-version"
-                  v-model="accountVersion"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[1-9][0-9]*"
-                  required
-                  aria-describedby="account-version-note"
-                />
-                <p id="account-version-note">
-                  请填写授权交接中该账号的当前版本；举报版本与正文版本不能代替。当前详情接口不提供此值。
+                <p>
+                  核对处理时将重新读取案件及账号版本。{{
+                    accountVersion ? `本次读取的账号版本：${accountVersion}` : ''
+                  }}
                 </p>
               </template>
               <template v-if="operation === 'offline' || operation === 'release-restriction'">
@@ -268,7 +262,7 @@ const {
               </p>
               <label for="safety-reason">处理理由（必填）</label>
               <textarea id="safety-reason" v-model="reason" rows="4" required></textarea>
-              <button type="submit" :disabled="!valid">核对处理</button>
+              <button type="submit" :disabled="!valid || loading">核对处理</button>
             </fieldset>
           </form>
           <p v-else>当前案件已处理，仅供查看。</p>

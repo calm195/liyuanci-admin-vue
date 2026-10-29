@@ -3,6 +3,8 @@ import type { CursorPage } from '@/types/moderation'
 import type { CrisisSummary } from '@/types/crisis'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
+import { createUsersClient } from '@/services/users'
+import { useUserNavigation } from '@/stores/userNavigation'
 import { createSafetyClient } from '@/services/safety'
 import { useAdminStore } from '@/stores/admin'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
@@ -37,7 +39,7 @@ type Confirmation =
       input: ReasonInput
     }
 /** 路由分别持有查询与处理状态，离页清除正文、确认及回执。 */
-export function useSafety(mode: SafetyMode, initialReport?: string) {
+export function useSafety(mode: SafetyMode, initialReport?: string, initialAppeal?: string) {
   const editorOpen = ref(false)
   const editorTask = ref<'case' | 'crisis'>('case')
   const escalating = ref(false)
@@ -63,6 +65,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   const confirmation = ref<Confirmation | null>(null)
   let attempt: { fingerprint: string; key: string } | null = null
   let generation = 0
+  let preparation = 0
   const router = useRouter()
   async function crisisEscalated(value: CrisisSummary) {
     close()
@@ -74,6 +77,9 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   }
   const workspace = useAdminWorkspace(clearAll, safetyRoles)
   const client = createSafetyClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const users = createUsersClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const navigation = useUserNavigation()
+  const target = navigation.target
   const detail = computed(() => report.value ?? appeal.value)
   const operationLabels: Record<Operation, string> = {
     confirmed: '确认举报',
@@ -132,12 +138,13 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   }
   const valid = computed(() => {
     if (!reason.value.trim() || !options.value.includes(operation.value)) return false
-    if (operation.value === 'penalty') return positiveVersion(accountVersion.value) !== null
+    if (operation.value === 'penalty') return report.value !== null
     if (operation.value === 'offline' || operation.value === 'release-restriction')
       return positiveVersion(resourceVersion.value) !== null
     return true
   })
   function resetProcessing() {
+    preparation++
     editorOpen.value = false
     reason.value = ''
     accountVersion.value = ''
@@ -171,11 +178,13 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
   function closeProcessing(done: () => void) {
     if (writing.value || escalating.value) return
     resetProcessing()
+    loading.value = false
     done()
   }
   function cancelProcessing() {
     if (writing.value || escalating.value) return
     resetProcessing()
+    loading.value = false
   }
   function clearEditor() {
     resetProcessing()
@@ -263,8 +272,13 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
           ? { type: 'report' as const, value: await client.report(id, signal) }
           : { type: 'appeal' as const, value: await client.appeal(id, signal) },
       (result) => {
-        if (result.type === 'report') report.value = result.value
-        else appeal.value = result.value
+        if (result.type === 'report') {
+          if (target && result.value.subject_id !== target) {
+            error.value = '案件作者与所选用户不一致，不能从此入口处置'
+            return
+          }
+          report.value = result.value
+        } else appeal.value = result.value
         operation.value = options.value[0] ?? 'confirmed'
       },
       (cause) => {
@@ -285,7 +299,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
     workspace.cancel()
     clearEditor()
   }
-  function prepare() {
+  async function prepare() {
     if (
       !editorOpen.value ||
       editorTask.value !== 'case' ||
@@ -304,20 +318,65 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
           input: { decision: operation.value, reason: message, expected_version: current.version },
         }
       } else if (operation.value === 'penalty') {
-        const version = positiveVersion(accountVersion.value)
-        if (version === null) return
-        confirmation.value = {
-          type: 'penalty',
-          id: current.subject_id,
-          input: {
-            violation_ref: current.id,
-            content_ref: current.content_ref,
-            content_version: current.content_version,
-            level: level.value,
-            reason: message,
-            expected_version: version,
+        const selectedLevel = level.value
+        const currentPreparation = ++preparation
+        loading.value = true
+        confirmation.value = null
+        error.value = ''
+        await workspace.run(
+          async (signal) => {
+            const fresh = await client.report(current.id, signal)
+            if (
+              fresh.status !== 'resolved' ||
+              fresh.subject_id !== current.subject_id ||
+              (target && fresh.subject_id !== target) ||
+              fresh.content_ref !== current.content_ref ||
+              fresh.content_version !== current.content_version ||
+              fresh.version !== current.version
+            )
+              throw new ApiError(409)
+            const user = await users.user(fresh.subject_id, signal)
+            return { fresh, user }
           },
-        }
+          ({ fresh, user }) => {
+            if (
+              currentPreparation !== preparation ||
+              !editorOpen.value ||
+              selected.value !== fresh.id ||
+              operation.value !== 'penalty' ||
+              reason.value.trim() !== message ||
+              level.value !== selectedLevel
+            )
+              return
+            report.value = fresh
+            accountVersion.value = String(user.account_version)
+            confirmation.value = {
+              type: 'penalty',
+              id: fresh.subject_id,
+              input: {
+                violation_ref: fresh.id,
+                content_ref: fresh.content_ref,
+                content_version: fresh.content_version,
+                level: selectedLevel,
+                reason: message,
+                expected_version: user.account_version,
+              },
+            }
+          },
+          async (cause) => {
+            if (currentPreparation !== preparation) return
+            if (cause instanceof ApiError && cause.status === 409) {
+              await readDetail(current.id)
+              error.value = '案件已变化，已重新读取，请再次核对后处理'
+            } else if (cause instanceof ApiError && cause.status === 404) {
+              clearEditor()
+              error.value = reviewErrorMessage(cause)
+            } else error.value = reviewErrorMessage(cause)
+          },
+          () => {
+            if (currentPreparation === preparation) loading.value = false
+          },
+        )
       } else if (operation.value === 'offline' || operation.value === 'release-restriction') {
         const version = positiveVersion(resourceVersion.value)
         if (version === null) return
@@ -391,11 +450,23 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
         if (cause instanceof ApiError && cause.status === 409) {
           const expected = generation + 1
           await readDetail(caseId)
+          if (current.type === 'penalty' && report.value && workspace.allowed()) {
+            await workspace.run(
+              (signal) => users.user(current.id, signal),
+              (user) => {
+                accountVersion.value = String(user.account_version)
+              },
+              (cause) => {
+                error.value = reviewErrorMessage(cause)
+              },
+              () => {},
+            )
+          }
           if (generation === expected && workspace.allowed()) {
             editorOpen.value = options.value.length > 0
             error.value =
               current.type === 'penalty' || current.type === 'restriction'
-                ? '目标版本或状态已变化，已重读案件并清空版本与确认；请重新取得目标当前版本后核对，不会自动重提'
+                ? '目标版本或状态已变化，已重读案件并清空版本与确认；请再次核对处理，系统将重新读取账号版本，不会自动重提'
                 : '案件版本或状态已变化，已重新读取；请重新核对，旧决定不会自动重提'
           }
         } else if (cause instanceof ApiError && cause.status === 404) {
@@ -423,6 +494,8 @@ export function useSafety(mode: SafetyMode, initialReport?: string) {
     await loadList()
     if (generation === expected && mode === 'penalties' && initialReport && workspace.allowed())
       await open(initialReport)
+    else if (generation === expected && mode === 'appeals' && initialAppeal && workspace.allowed())
+      await open(initialAppeal)
   })
   return {
     editorOpen,

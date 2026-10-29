@@ -6,6 +6,7 @@ import { createRouter, createMemoryHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { router as applicationRouter } from '@/router'
 import { useAdminStore } from '@/stores/admin'
+import { useUserNavigation } from '@/stores/userNavigation'
 import { ApiError } from '@/services/admin'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import type { ReportDetail, SafetySummary } from '@/types/safety'
@@ -17,6 +18,7 @@ vi.mock('@/components/CrisisEscalation.vue', () => ({
   },
 }))
 const mocks = vi.hoisted(() => ({
+  user: vi.fn(),
   reports: vi.fn(),
   report: vi.fn(),
   decideReport: vi.fn(),
@@ -26,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   decideAppeal: vi.fn(),
   restrict: vi.fn(),
 }))
+vi.mock('@/services/users', () => ({ createUsersClient: () => mocks }))
 vi.mock('@/services/safety', () => ({ createSafetyClient: () => mocks }))
 const report: ReportDetail = {
   id: 'report',
@@ -67,6 +70,7 @@ async function open(edit = true) {
 async function prepare(reason = '核对处理') {
   await wrapper?.get('#safety-reason').setValue(reason)
   await wrapper?.get('form').trigger('submit')
+  await flushPromises()
 }
 async function submit() {
   await button('确认提交').trigger('click')
@@ -74,6 +78,7 @@ async function submit() {
 }
 beforeEach(async () => {
   vi.resetAllMocks()
+  mocks.user.mockResolvedValue({ id: 'student', account_version: 19 })
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -168,7 +173,7 @@ describe('T028 举报、处罚与申诉页面', () => {
     })
     await go('/safety/penalties')
     expect(wrapper?.text()).toContain('本页暂无已确认举报')
-    expect(wrapper?.text()).toContain('不提供处罚历史列表')
+    expect(wrapper?.text()).toContain('处罚历史可在')
     mocks.reports.mockResolvedValueOnce({
       items: [{ id: 'report', version: 7, status: 'resolved' }],
       next_cursor: null,
@@ -320,7 +325,7 @@ describe('T028 举报、处罚与申诉页面', () => {
   })
   it('仅已确认举报可处罚，必须取得账号版本并固定作者与精确内容', async () => {
     await flushPromises()
-    mocks.report.mockResolvedValueOnce({ ...report, status: 'resolved' })
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
     mocks.reports.mockResolvedValue({
       items: [{ id: 'report', version: 7, status: 'resolved' }],
       next_cursor: null,
@@ -329,10 +334,8 @@ describe('T028 举报、处罚与申诉页面', () => {
     await open()
     expect(wrapper?.get('#safety-operation').element).toHaveProperty('value', 'penalty')
     await wrapper?.get('#penalty-level').setValue('general')
-    await prepare()
-    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    expect(wrapper?.find('#account-version').exists()).toBe(false)
     expect(mocks.penalize).not.toHaveBeenCalled()
-    await wrapper?.get('#account-version').setValue('19')
     await prepare()
     expect(wrapper?.text()).toContain('禁言 7 天')
     await submit()
@@ -393,14 +396,81 @@ describe('T028 举报、处罚与申诉页面', () => {
     })
     await go('/safety/penalties')
     await open()
-    await wrapper?.get('#account-version').setValue('19')
     await prepare()
     mocks.penalize.mockRejectedValueOnce(new ApiError(409))
     await submit()
     expect(mocks.penalize).toHaveBeenCalledTimes(1)
-    expect(wrapper?.text()).toContain('请重新取得目标当前版本')
-    expect(wrapper?.get('#account-version').element).toHaveProperty('value', '')
+    expect(wrapper?.text()).toContain('系统将重新读取账号版本')
+    expect(wrapper?.find('#account-version').exists()).toBe(false)
     expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+  })
+  it('用户导航绑定目标，其他作者案件不得进入处置', async () => {
+    useUserNavigation().target = 'another-user'
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/penalties?report=report')
+    expect(wrapper?.text()).toContain('案件作者与所选用户不一致')
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(mocks.user).not.toHaveBeenCalled()
+  })
+  it('申诉链接重新读取指定ID，决定使用申诉自身版本', async () => {
+    await go('/safety/appeals?appeal=appeal')
+    expect(mocks.appeal).toHaveBeenCalledWith('appeal', expect.any(AbortSignal))
+    await button('处理申诉').trigger('click')
+    await prepare()
+    await submit()
+    expect(mocks.decideAppeal.mock.calls[0]?.[1]).toMatchObject({ expected_version: 4 })
+    expect(mocks.user).not.toHaveBeenCalled()
+  })
+  it('账号查询失败阻止处罚确认，不回退人工版本', async () => {
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/penalties?report=report')
+    await button('给予账号处罚').trigger('click')
+    mocks.user.mockRejectedValueOnce(new ApiError(503))
+    await prepare()
+    expect(wrapper?.text()).toContain('服务暂不可用')
+    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    expect(mocks.penalize).not.toHaveBeenCalled()
+  })
+  it('核对期间案件内容换版，重新读取而不生成处罚确认', async () => {
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/penalties?report=report')
+    await button('给予账号处罚').trigger('click')
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved', content_version: 4 })
+    await prepare()
+    expect(wrapper?.text()).toContain('案件已变化')
+    expect(mocks.user).not.toHaveBeenCalled()
+    expect(mocks.penalize).not.toHaveBeenCalled()
+  })
+  it('普通处罚网络结果不明时保留同键同请求重试', async () => {
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/penalties?report=report')
+    await button('给予账号处罚').trigger('click')
+    await prepare()
+    mocks.penalize.mockRejectedValueOnce(new Error('合成网络故障'))
+    await submit()
+    await submit()
+    expect(mocks.penalize.mock.calls[0]?.slice(0, 3)).toEqual(
+      mocks.penalize.mock.calls[1]?.slice(0, 3),
+    )
+    expect(mocks.user).toHaveBeenCalledTimes(1)
+  })
+  it('取消核对后晚到账号版本不能恢复处罚确认', async () => {
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/penalties?report=report')
+    await button('给予账号处罚').trigger('click')
+    let finish: ((value: { account_version: number }) => void) | undefined
+    mocks.user.mockReturnValueOnce(
+      new Promise<{ account_version: number }>((resolve) => {
+        finish = resolve
+      }),
+    )
+    await prepare()
+    await button('取消并关闭').trigger('click')
+    if (!finish) throw new Error('账号查询尚未开始')
+    finish({ account_version: 88 })
+    await flushPromises()
+    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    expect(mocks.penalize).not.toHaveBeenCalled()
   })
   it('未知举报状态仅供查看，不展示处罚或内容处置表单', async () => {
     await flushPromises()

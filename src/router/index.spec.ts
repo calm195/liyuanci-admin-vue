@@ -42,6 +42,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     await router.push(path)
     expect(router.currentRoute.value.path).toBe('/403')
     expect(menu.filter(canAccessMenu).map((item) => item.path)).toEqual([
+      '/users',
       '/',
       '/password',
       '/whispers/reports',

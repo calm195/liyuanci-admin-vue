@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useUserNavigation } from '@/stores/userNavigation'
 import { useAdminStore } from '@/stores/admin'
 import { isRole } from '@/types/admin'
 import type { Role } from '@/types/admin'
 import { safetyRoles } from '@/types/safety'
+import { userRoles } from '@/types/users'
 import { crisisRoles } from '@/types/crisis'
 
 export interface MenuItem {
@@ -20,6 +22,7 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
+  { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
   { path: '/', group: '总览', title: '工作台' },
   { path: '/password', group: '系统管理', title: '本人改密' },
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
@@ -40,6 +43,11 @@ export const menu: MenuItem[] = [
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/users',
+      component: () => import('@/views/UsersView.vue'),
+      meta: { roles: userRoles },
+    },
     {
       path: '/login',
       meta: { title: '后台登录' },
@@ -159,6 +167,7 @@ export const router = createRouter({
   }),
 })
 router.beforeEach((to) => {
+  if (to.path !== '/users' && !to.path.startsWith('/safety/')) useUserNavigation().target = null
   const admin = useAdminStore()
   if (to.path === '/login') return admin.authenticated ? '/' : true
   if (!admin.authenticated) return '/login'

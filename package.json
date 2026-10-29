@@ -22,7 +22,8 @@
     "test:browser": "node scripts/whispers-browser.spec.js",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "codex": "codex",
-    "codex:login": "codex login"
+    "codex:login": "codex login",
+    "test:browser:users": "node scripts/users-browser.spec.js"
   },
   "dependencies": {
     "element-plus": "2.14.7",
