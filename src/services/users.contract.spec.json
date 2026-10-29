@@ -1,0 +1,694 @@
+{
+  "contract_id": "admin-users/1.0.0",
+  "synthetic_only": true,
+  "note": "opaque游标仅为schema/Mock占位，不是后端有效签名令牌。语义向量不代表真实数据库检查。",
+  "exchanges": [
+    {
+      "operation_id": "adminUsersList",
+      "path_params": {},
+      "query": {
+        "nickname": "小鲤",
+        "limit": 1
+      },
+      "status": 200,
+      "body": {
+        "code": 0,
+        "message": "成功",
+        "data": {
+          "items": [
+            {
+              "id": "ac220000-0000-4000-8000-000000000001",
+              "display_name": "校园小鲤鱼",
+              "verification": "verified",
+              "restriction": "muted",
+              "muted_until": "2026-11-05T03:00:00Z",
+              "created_at": "2026-10-01T00:00:00Z",
+              "as_of": "2026-10-29T04:00:00Z"
+            }
+          ],
+          "next_cursor": "synthetic-opaque-page-2"
+        },
+        "request_id": "synthetic-user-management-request"
+      }
+    },
+    {
+      "operation_id": "adminUsersList",
+      "path_params": {},
+      "query": {
+        "nickname": "小鲤",
+        "limit": 1,
+        "cursor": "synthetic-opaque-page-2"
+      },
+      "status": 200,
+      "body": {
+        "code": 0,
+        "message": "成功",
+        "data": {
+          "items": [
+            {
+              "id": "ac220000-0000-4000-8000-000000000002",
+              "display_name": "校园小鲤鱼",
+              "verification": "verified",
+              "restriction": "normal",
+              "muted_until": null,
+              "created_at": "2026-09-30T00:00:00Z",
+              "as_of": "2026-10-29T04:00:00Z"
+            }
+          ],
+          "next_cursor": null
+        },
+        "request_id": "synthetic-user-management-request"
+      }
+    },
+    {
+      "operation_id": "adminUsersList",
+      "path_params": {},
+      "query": {
+        "nickname": "无命中"
+      },
+      "status": 200,
+      "body": {
+        "code": 0,
+        "message": "成功",
+        "data": {
+          "items": [],
+          "next_cursor": null
+        },
+        "request_id": "synthetic-user-management-request"
+      }
+    },
+    {
+      "operation_id": "adminUserDetail",
+      "path_params": {
+        "id": "ac220000-0000-4000-8000-000000000001"
+      },
+      "query": {},
+      "status": 200,
+      "body": {
+        "code": 0,
+        "message": "成功",
+        "data": {
+          "id": "ac220000-0000-4000-8000-000000000001",
+          "display_name": "校园小鲤鱼",
+          "verification": "verified",
+          "restriction": "muted",
+          "muted_until": "2026-11-05T03:00:00Z",
+          "created_at": "2026-10-01T00:00:00Z",
+          "as_of": "2026-10-29T04:00:00Z",
+          "account_version": 7,
+          "active_penalties": [
+            {
+              "id": "ac220000-0000-4000-8000-000000000011",
+              "kind": "mute",
+              "starts_at": "2026-10-29T03:00:00Z",
+              "ends_at": "2026-11-05T03:00:00Z"
+            }
+          ],
+          "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"]
+        },
+        "request_id": "synthetic-user-management-request"
+      }
+    },
+    {
+      "operation_id": "adminUserPenaltiesList",
+      "path_params": {
+        "id": "ac220000-0000-4000-8000-000000000001"
+      },
+      "query": {
+        "limit": 20
+      },
+      "status": 200,
+      "body": {
+        "code": 0,
+        "message": "成功",
+        "data": {
+          "items": [
+            {
+              "id": "ac220000-0000-4000-8000-000000000011",
+              "level": "general",
+              "kind": "mute",
+              "status": "active",
+              "starts_at": "2026-10-29T03:00:00Z",
+              "ends_at": "2026-11-05T03:00:00Z",
+              "revoked_at": null,
+              "reason": "一般违规处置",
+              "case_link": {
+                "kind": "ordinary_report",
+                "id": "ac220000-0000-4000-8000-000000000021"
+              },
+              "appeal_id": "ac220000-0000-4000-8000-000000000031"
+            }
+          ],
+          "next_cursor": null
+        },
+        "request_id": "synthetic-user-management-request"
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "http_status": 400,
+      "body": {
+        "code": 400,
+        "message": "请求未完成",
+        "error_code": "VALIDATION_FAILED",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 401,
+      "body": {
+        "code": 401,
+        "message": "请求未完成",
+        "error_code": "UNAUTHENTICATED",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 403,
+      "body": {
+        "code": 403,
+        "message": "请求未完成",
+        "error_code": "FORBIDDEN",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 404,
+      "body": {
+        "code": 404,
+        "message": "请求未完成",
+        "error_code": "NOT_FOUND",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 429,
+      "body": {
+        "code": 429,
+        "message": "请求未完成",
+        "error_code": "RATE_LIMITED",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 500,
+      "body": {
+        "code": 500,
+        "message": "请求未完成",
+        "error_code": "INTERNAL_ERROR",
+        "request_id": "synthetic-error-request"
+      }
+    },
+    {
+      "http_status": 503,
+      "body": {
+        "code": 503,
+        "message": "请求未完成",
+        "error_code": "DEPENDENCY_UNAVAILABLE",
+        "request_id": "synthetic-error-request"
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "detail-valid",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"]
+      },
+      "valid": true
+    },
+    {
+      "name": "penalty-valid",
+      "schema": "UserPenalty",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000011",
+        "level": "general",
+        "kind": "mute",
+        "status": "active",
+        "starts_at": "2026-10-29T03:00:00Z",
+        "ends_at": "2026-11-05T03:00:00Z",
+        "revoked_at": null,
+        "reason": "一般违规处置",
+        "case_link": {
+          "kind": "ordinary_report",
+          "id": "ac220000-0000-4000-8000-000000000021"
+        },
+        "appeal_id": "ac220000-0000-4000-8000-000000000031"
+      },
+      "valid": true
+    },
+    {
+      "name": "nullable-name",
+      "schema": "UserSummary",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000002",
+        "display_name": null,
+        "verification": "verified",
+        "restriction": "normal",
+        "muted_until": null,
+        "created_at": "2026-09-30T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z"
+      },
+      "valid": true
+    },
+    {
+      "name": "empty-page",
+      "schema": "UserPage",
+      "body": {
+        "items": [],
+        "next_cursor": null
+      },
+      "valid": true
+    },
+    {
+      "name": "reject-private-student_number",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "student_number": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "reject-private-student_card_url",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "student_card_url": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "reject-private-openid",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "openid": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "reject-private-whisper_nickname",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "whisper_nickname": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "reject-private-body",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "body": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "reject-private-crisis_count",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"],
+        "crisis_count": "forbidden"
+      },
+      "valid": false
+    },
+    {
+      "name": "missing-account-version",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "open_case_workspace", "open_appeal_workspace"]
+      },
+      "valid": false
+    },
+    {
+      "name": "wrong-action",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["delete_user"]
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate-action",
+      "schema": "UserDetail",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z",
+        "account_version": 7,
+        "active_penalties": [
+          {
+            "id": "ac220000-0000-4000-8000-000000000011",
+            "kind": "mute",
+            "starts_at": "2026-10-29T03:00:00Z",
+            "ends_at": "2026-11-05T03:00:00Z"
+          }
+        ],
+        "allowed_actions": ["view_penalties", "view_penalties"]
+      },
+      "valid": false
+    },
+    {
+      "name": "bad-restriction",
+      "schema": "UserSummary",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "online",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "muted-without-end",
+      "schema": "UserSummary",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": null,
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "normal-with-mute-end",
+      "schema": "UserSummary",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "normal",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "2026-10-01T00:00:00Z",
+        "as_of": "2026-10-29T04:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "penalty-level-kind-mismatch",
+      "schema": "UserPenalty",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000011",
+        "level": "severe",
+        "kind": "mute",
+        "status": "active",
+        "starts_at": "2026-10-29T03:00:00Z",
+        "ends_at": "2026-11-05T03:00:00Z",
+        "revoked_at": null,
+        "reason": "一般违规处置",
+        "case_link": {
+          "kind": "ordinary_report",
+          "id": "ac220000-0000-4000-8000-000000000021"
+        },
+        "appeal_id": "ac220000-0000-4000-8000-000000000031"
+      },
+      "valid": false
+    },
+    {
+      "name": "revoked-without-time",
+      "schema": "UserPenalty",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000011",
+        "level": "general",
+        "kind": "mute",
+        "status": "revoked",
+        "starts_at": "2026-10-29T03:00:00Z",
+        "ends_at": "2026-11-05T03:00:00Z",
+        "revoked_at": null,
+        "reason": "一般违规处置",
+        "case_link": {
+          "kind": "ordinary_report",
+          "id": "ac220000-0000-4000-8000-000000000021"
+        },
+        "appeal_id": "ac220000-0000-4000-8000-000000000031"
+      },
+      "valid": false
+    },
+    {
+      "name": "bad-date",
+      "schema": "UserSummary",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000001",
+        "display_name": "校园小鲤鱼",
+        "verification": "verified",
+        "restriction": "muted",
+        "muted_until": "2026-11-05T03:00:00Z",
+        "created_at": "yesterday",
+        "as_of": "2026-10-29T04:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "reason-not-body",
+      "schema": "UserPenalty",
+      "body": {
+        "id": "ac220000-0000-4000-8000-000000000011",
+        "level": "general",
+        "kind": "mute",
+        "status": "active",
+        "starts_at": "2026-10-29T03:00:00Z",
+        "ends_at": "2026-11-05T03:00:00Z",
+        "revoked_at": null,
+        "reason": "一般违规处置",
+        "case_link": {
+          "kind": "ordinary_report",
+          "id": "ac220000-0000-4000-8000-000000000021"
+        },
+        "appeal_id": "ac220000-0000-4000-8000-000000000031",
+        "body": "forbidden"
+      },
+      "valid": false
+    }
+  ],
+  "search_vectors": [
+    {
+      "name": "middle",
+      "nickname": "小鲤",
+      "stored": "校园小鲤鱼",
+      "match": true
+    },
+    {
+      "name": "ascii-case",
+      "nickname": "fish",
+      "stored": "LiFish",
+      "match": true
+    },
+    {
+      "name": "literal-percent",
+      "nickname": "%",
+      "stored": "小鲤%",
+      "match": true
+    },
+    {
+      "name": "percent-no-wildcard",
+      "nickname": "%",
+      "stored": "小鲤",
+      "match": false
+    },
+    {
+      "name": "underscore-no-wildcard",
+      "nickname": "_",
+      "stored": "小鲤",
+      "match": false
+    },
+    {
+      "name": "spaces",
+      "nickname": "  小鲤  ",
+      "stored": "校园小鲤鱼",
+      "match": true
+    },
+    {
+      "name": "blank-unset",
+      "nickname": " \t\n",
+      "stored": null,
+      "match": true
+    },
+    {
+      "name": "no-placeholder-match",
+      "nickname": "未设置",
+      "stored": null,
+      "match": false
+    },
+    {
+      "name": "no-nfkc",
+      "nickname": "A",
+      "stored": "Ａ",
+      "match": false
+    },
+    {
+      "name": "no-unicode-fold",
+      "nickname": "é",
+      "stored": "É",
+      "match": false
+    },
+    {
+      "name": "quote-literal",
+      "nickname": "' OR 1=1",
+      "stored": "小鲤",
+      "match": false
+    },
+    {
+      "name": "backslash-literal",
+      "nickname": "\\",
+      "stored": "小\\鲤",
+      "match": true
+    }
+  ]
+}

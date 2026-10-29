@@ -50,6 +50,7 @@ export function useAdminWorkspace(
     } catch (error) {
       if (!valid()) return
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        active = false
         invalidate()
         if (error.status === 401) admin.clear('会话已失效，请重新登录')
         else admin.forbidden++

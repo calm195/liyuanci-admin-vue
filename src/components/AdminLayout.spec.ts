@@ -53,6 +53,7 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   expect(document.title).toBe('身份审核 · 鲤源池')
   const navigation = view.get('nav[aria-label="管理菜单"]')
   expect(navigation.find('a[href="/accounts"]').exists()).toBe(false)
+  expect(navigation.get('a[href="/users"]').text()).toBe('平台用户')
   expect(navigation.find('a[href="/crisis"]').exists()).toBe(false)
   expect(navigation.find('a[href="/identity"]').attributes('aria-current')).toBe('page')
   await breadcrumb.get('a[href="/"]').trigger('click')
