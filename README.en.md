@@ -76,7 +76,7 @@ After each set of changes, run `pnpm format`, `pnpm check` and `pnpm build` in o
 
 Keep README limited to introduction, options and structure, startup, and development notes; keep both root README languages aligned. All process artifacts belong to the docs repository; this project retains no stage documents.
 
-Continue admin development on `develop` with the docs branch `admin-develop`. Check both branches and working trees before changes; use a separate docs worktree when another task is active. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
+Keep only `develop` and `main` locally and remotely in both the source and docs repositories; use `develop` for daily work. Check both branches and working trees before changes; coordinate concurrent writes and use detached worktrees when necessary, removing them after integration. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
 
 Admin tokens stay in memory and refresh requires login again. Exclude student sessions and never persist identity data in browser storage. Menu and button visibility does not replace backend authorization. Never commit credentials, local Codex authentication or private environment values.
 
