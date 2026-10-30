@@ -38,7 +38,7 @@ src/
 public/         Public static assets
 ```
 
-Development records, milestones and validation evidence are managed in the [admin documentation index](../docs/development/admin/README.md).
+Current status, defects and next steps are maintained in the [admin documentation index](../docs/development/admin/README.md).
 
 ## 3. Getting started
 
@@ -66,17 +66,17 @@ pnpm preview
 
 ## 4. Development standards and notes
 
-Non-test code must contain no milestone, task or requirement IDs. Keep traceability in stage documents or tests. Write code comments in Chinese to explain functionality, business intent, boundaries and design decisions. Use Chinese for logs and user-facing errors. Preserve language directives, API fields, protocol values and identifiers required by tools.
+Non-test code must contain no milestone, task or requirement IDs. Keep traceability in current docs or tests. Write code comments in Chinese to explain functionality, business intent, boundaries and design decisions. Use Chinese for logs and user-facing errors. Preserve language directives, API fields, protocol values and identifiers required by tools.
 
 A one-line patch in `patches/` makes Vue 3.5.44 prop validator declarations compatible with Element Plus and `exactOptionalPropertyTypes`. It permits explicit `undefined` validators already supported at runtime, without changing validator function signatures or runtime code. Reassess this patch when upgrading Vue.
 
 Use `<script setup lang="ts">` and respect strict typing and existing formatting/lint rules. Do not bypass checks with `any`, unsafe assertions or suppression comments. Validate external data in services; keep transient UI state in components and only shared state in stores. Place behavioral tests beside implementations.
 
-After each set of changes, run `pnpm format`, `pnpm check` and `pnpm build` in order. Use `pnpm lint:fix` when automated lint fixes are needed. Report validation and unfinished dependencies accurately.
+After business source changes, run `pnpm format`, `pnpm check` and `pnpm build` in order. Use `pnpm lint:fix` when automated lint fixes are needed. For documentation-only cleanup, check formatting, links, fixed inputs and diffs. Report validation and unfinished dependencies accurately.
 
-Keep README limited to introduction, options and structure, startup, and development notes; keep both root README languages aligned. All process artifacts belong to the docs repository; this project retains no stage documents.
+Keep README limited to introduction, options and structure, startup, and development notes; keep both root README languages aligned. Current status, defects and next steps are maintained in docs; this project retains no stage documents.
 
-Keep only `develop` and `main` locally and remotely in both the source and docs repositories; use `develop` for daily work. Check both branches and working trees before changes; coordinate concurrent writes and use detached worktrees when necessary, removing them after integration. Fixed stage records are immutable; add new delivery, correction or evidence files in docs with exact source commits. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
+Keep only `develop` and `main` locally and remotely in both the source and docs repositories; use `develop` for daily work. Check both branches and working trees before changes; coordinate concurrent writes and use detached worktrees when necessary, removing them after integration. Keep only three rolling documents per client in docs: current status, defects and next steps, with exact source commits. Retrieve retired stage records from Git history; do not add new milestone reports. Follow the [documentation policy](../docs/governance/README.md). Commit by feature scope with user authorization; do not automatically push, deploy or release. Requirements, approvals and fixed designs remain read-only.
 
 Admin tokens stay in memory and refresh requires login again. Exclude student sessions and never persist identity data in browser storage. Menu and button visibility does not replace backend authorization. Never commit credentials, local Codex authentication or private environment values.
 
