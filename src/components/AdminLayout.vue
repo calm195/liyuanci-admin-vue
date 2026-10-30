@@ -14,7 +14,16 @@ const menuOpen = ref(false)
 const error = ref('')
 const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
-  return ['总览', '用户管理', '认证管理', '内容治理', '安全治理', '隐私管理', '系统管理']
+  return [
+    '总览',
+    '用户管理',
+    '认证管理',
+    '内容管理',
+    '内容治理',
+    '安全治理',
+    '隐私管理',
+    '系统管理',
+  ]
     .filter((title) => visible.some((item) => item.group === title))
     .map((title) => ({
       title,

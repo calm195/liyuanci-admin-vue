@@ -5,6 +5,7 @@ import { isRole } from '@/types/admin'
 import type { Role } from '@/types/admin'
 import { safetyRoles } from '@/types/safety'
 import { userRoles } from '@/types/users'
+import { resourceRoles } from '@/types/resources'
 import { crisisRoles } from '@/types/crisis'
 
 export interface MenuItem {
@@ -22,6 +23,8 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
+  { path: '/resources', group: '内容管理', title: '资料管理', roles: resourceRoles },
+  { path: '/resource-categories', group: '内容管理', title: '资料分类', roles: resourceRoles },
   { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
   { path: '/', group: '总览', title: '工作台' },
   { path: '/password', group: '系统管理', title: '本人改密' },
@@ -43,6 +46,16 @@ export const menu: MenuItem[] = [
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/resources',
+      component: () => import('@/views/ResourcesView.vue'),
+      meta: { roles: resourceRoles },
+    },
+    {
+      path: '/resource-categories',
+      component: () => import('@/views/ResourceCategoriesView.vue'),
+      meta: { roles: resourceRoles },
+    },
     {
       path: '/users',
       component: () => import('@/views/UsersView.vue'),

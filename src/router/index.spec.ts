@@ -231,3 +231,23 @@ it.each(['/whispers/crises', '/whispers/evidence'])(
     expect(router.currentRoute.value.path).toBe('/403')
   },
 )
+
+it.each(['/resources', '/resource-categories'])(
+  'REQ-023 %s仅审核运营和超管可访问，菜单与深链一致',
+  async (path) => {
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/login')
+    for (const role of ['review_operator', 'crisis_operator', 'super_admin'] as const) {
+      useAdminStore().session = {
+        token: 'synthetic',
+        account: { id: 'a', login_name: '合成角色', active: true, version: 1, roles: [role] },
+      }
+      await router.replace('/')
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe(role === 'crisis_operator' ? '/403' : path)
+      expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(
+        role !== 'crisis_operator',
+      )
+    }
+  },
+)

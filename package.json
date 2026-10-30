@@ -23,7 +23,8 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "codex": "codex",
     "codex:login": "codex login",
-    "test:browser:users": "node scripts/users-browser.spec.js"
+    "test:browser:users": "node scripts/users-browser.spec.js",
+    "test:browser:resources": "node scripts/resources-browser.spec.js"
   },
   "dependencies": {
     "element-plus": "2.14.7",

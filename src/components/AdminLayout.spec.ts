@@ -54,6 +54,8 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   const navigation = view.get('nav[aria-label="管理菜单"]')
   expect(navigation.find('a[href="/accounts"]').exists()).toBe(false)
   expect(navigation.get('a[href="/users"]').text()).toBe('平台用户')
+  expect(navigation.get('a[href="/resources"]').text()).toBe('资料管理')
+  expect(navigation.get('a[href="/resource-categories"]').text()).toBe('资料分类')
   expect(navigation.find('a[href="/crisis"]').exists()).toBe(false)
   expect(navigation.find('a[href="/identity"]').attributes('aria-current')).toBe('page')
   await breadcrumb.get('a[href="/"]').trigger('click')
