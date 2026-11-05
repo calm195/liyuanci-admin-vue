@@ -27,7 +27,7 @@ function button(label: string) {
   if (!value) throw new Error(`按钮缺失：${label}`)
   return value
 }
-async function start(superAdmin = true) {
+async function start(superAdmin = true, restriction: 'normal' | 'banned' = 'normal') {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -40,11 +40,18 @@ async function start(superAdmin = true) {
       roles: [superAdmin ? 'super_admin' : 'review_operator'],
     },
   }
-  wrapper = mount(UserRestrictionActions, { props: { userId: id }, global: { plugins: [pinia] } })
+  wrapper = mount(UserRestrictionActions, {
+    props: { userId: id, displayName: '合成用户', restriction },
+    global: { plugins: [pinia], stubs: { ElDialog: { template: '<section><slot /></section>' } } },
+  })
   await flushPromises()
 }
 async function prepare(label = '封禁') {
-  await button(label).trigger('click')
+  await wrapper
+    .get(
+      `[role='switch'][aria-label='合成用户的${label === '解封' ? '封禁' : label === '取消禁言' ? '禁言' : label}']`,
+    )
+    .trigger('click')
   await wrapper.get('textarea').setValue('合成操作理由')
   await wrapper.get('form').trigger('submit')
   await flushPromises()
@@ -63,7 +70,7 @@ afterEach(() => wrapper?.unmount())
 it('普通运营不请求或展示直接操作', async () => {
   await start(false)
   expect(mocks.restrictions).not.toHaveBeenCalled()
-  expect(wrapper.find('section').exists()).toBe(false)
+  expect(wrapper.find('[role="switch"]').exists()).toBe(false)
 })
 it('封禁先重读版本并填写理由，确认后才提交并通知父页刷新', async () => {
   await start()
@@ -92,7 +99,8 @@ it.each([
     muted_until: '2026-11-05T04:00:00Z',
     allowed_actions: ['unban', 'unmute'],
   })
-  await start()
+  await start(true, 'banned')
+  expect(wrapper.findAll('[aria-checked="true"]')).toHaveLength(2)
   await prepare(label)
   expect(wrapper.text()).toContain(
     action === 'unban' ? '仍有效的禁言继续生效' : '仍有效的封禁继续生效',
@@ -103,7 +111,7 @@ it.each([
 })
 it('禁言明确7天，取消填写不产生请求', async () => {
   await start()
-  await button('禁言').trigger('click')
+  await wrapper.get('[role="switch"][aria-label="合成用户的禁言"]').trigger('click')
   expect(wrapper.text()).toContain('禁言7天')
   expect(button('核对用户操作').attributes('disabled')).toBeDefined()
   await wrapper.get('textarea').setValue('合成')
@@ -118,7 +126,7 @@ it('409清空旧确认并重读，必须重新选择', async () => {
   await flushPromises()
   expect(wrapper.find('[aria-label="用户操作确认"]').exists()).toBe(false)
   expect(wrapper.text()).toContain('重新选择并确认')
-  expect(mocks.restrictions).toHaveBeenCalledTimes(3)
+  expect(mocks.restrictions).toHaveBeenCalledTimes(2)
 })
 it('网络不明同键同请求重试，不伪装成功', async () => {
   await start()

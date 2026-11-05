@@ -1,12 +1,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
-import { useUserNavigation } from '@/stores/userNavigation'
 import { createUsersClient, normalizeUserFilters } from '@/services/users'
 import { ApiError } from '@/services/admin'
 import { useAdminWorkspace, reviewErrorMessage } from './useAdminWorkspace'
 import { userRoles } from '@/types/users'
-import type { UserDetail, UserFilters, UserPenalty, UserSummary } from '@/types/users'
+import type { UserFilters, UserSummary } from '@/types/users'
 
 const defaults = (): UserFilters => ({
   user_id: '',
@@ -24,23 +22,8 @@ export function useUsers() {
   const history = ref<(string | null)[]>([])
   const busy = ref(false)
   const error = ref('')
-  const selected = ref('')
-  const detail = ref<UserDetail | null>(null)
-  const loading = ref(false)
-  const detailError = ref('')
-  const penalties = ref<UserPenalty[]>([])
-  const penaltyCursor = ref<string | null>(null)
-  const penaltyNext = ref<string | null>(null)
-  const penaltyHistory = ref<(string | null)[]>([])
-  const penaltyBusy = ref(false)
-  const penaltyError = ref('')
+  const notice = ref('')
   let listRequest = new AbortController()
-  let detailRequest = new AbortController()
-  let penaltyRequest = new AbortController()
-  const router = useRouter()
-  const navigation = useUserNavigation()
-  const returnTarget = navigation.target
-  navigation.target = null
   const workspace = useAdminWorkspace(clear, userRoles)
   const client = createUsersClient(useAdminStore().session?.token ?? '', workspace.allowed)
   const dirty = computed(() => JSON.stringify(draft) !== JSON.stringify(submitted.value))
@@ -51,23 +34,8 @@ export function useUsers() {
       ? reviewErrorMessage(cause)
       : '用户查询失败，请检查条件后重试；数据格式异常时请联系管理员'
   }
-  function close() {
-    detailRequest.abort()
-    penaltyRequest.abort()
-    selected.value = ''
-    detail.value = null
-    penalties.value = []
-    detailError.value = ''
-    penaltyError.value = ''
-    loading.value = false
-    penaltyBusy.value = false
-    penaltyCursor.value = null
-    penaltyNext.value = null
-    penaltyHistory.value = []
-  }
   function clear() {
     listRequest.abort()
-    close()
     items.value = []
     cursor.value = null
     next.value = null
@@ -76,12 +44,12 @@ export function useUsers() {
     Object.assign(draft, defaults())
     submitted.value = defaults()
     error.value = ''
+    notice.value = ''
   }
-  async function load(preserveSelection = false) {
+  async function load() {
     listRequest.abort()
     const current = new AbortController()
     listRequest = current
-    if (!preserveSelection) close()
     items.value = []
     next.value = null
     busy.value = true
@@ -104,6 +72,7 @@ export function useUsers() {
     )
   }
   async function search() {
+    notice.value = ''
     try {
       submitted.value = normalizeUserFilters(draft)
       Object.assign(draft, submitted.value)
@@ -117,6 +86,7 @@ export function useUsers() {
   }
   async function page(forward: boolean) {
     if (busy.value || dirty.value) return
+    notice.value = ''
     if (forward) {
       if (!next.value) return
       history.value.push(cursor.value)
@@ -127,122 +97,23 @@ export function useUsers() {
     }
     await load()
   }
-  async function missing() {
-    close()
+  async function refreshRestrictions(message: string) {
+    notice.value = message
     await load()
-    error.value = '该用户已不可访问，列表已刷新'
   }
-  async function loadPenalties() {
-    if (!detail.value?.allowed_actions.includes('view_penalties')) return
-    penaltyRequest.abort()
-    const current = new AbortController()
-    penaltyRequest = current
-    const id = selected.value
-    penalties.value = []
-    penaltyNext.value = null
-    penaltyBusy.value = true
-    penaltyError.value = ''
-    await workspace.run(
-      (signal) =>
-        client.userPenalties(id, penaltyCursor.value, AbortSignal.any([signal, current.signal])),
-      (result) => {
-        if (!current.signal.aborted) {
-          penalties.value = result.items
-          penaltyNext.value = result.next_cursor
-        }
-      },
-      async (cause) => {
-        if (current.signal.aborted) return
-        if (cause instanceof ApiError && cause.status === 404) await missing()
-        else penaltyError.value = message(cause)
-      },
-      () => {
-        if (!current.signal.aborted) penaltyBusy.value = false
-      },
-    )
-  }
-  async function open(id: string) {
-    close()
-    const current = new AbortController()
-    detailRequest = current
-    selected.value = id
-    loading.value = true
-    await workspace.run(
-      (signal) => client.user(id, AbortSignal.any([signal, current.signal])),
-      async (result) => {
-        if (!current.signal.aborted) {
-          detail.value = result
-          loading.value = false
-          await loadPenalties()
-        }
-      },
-      async (cause) => {
-        if (current.signal.aborted) return
-        if (cause instanceof ApiError && cause.status === 404) await missing()
-        else detailError.value = message(cause)
-      },
-      () => {
-        if (!current.signal.aborted) loading.value = false
-      },
-    )
-  }
-  async function historyPage(forward: boolean) {
-    if (penaltyBusy.value) return
-    if (forward) {
-      if (!penaltyNext.value) return
-      penaltyHistory.value.push(penaltyCursor.value)
-      penaltyCursor.value = penaltyNext.value
-    } else {
-      if (!penaltyHistory.value.length) return
-      penaltyCursor.value = penaltyHistory.value.pop() ?? null
-    }
-    await loadPenalties()
-  }
-  async function refreshSelected() {
-    const id = selected.value
-    if (!id || !workspace.allowed()) return
-    await Promise.all([load(true), open(id)])
-  }
-  async function navigate(path: string, query?: Record<string, string>) {
-    if (!detail.value || !workspace.allowed()) return
-    navigation.target = detail.value.id
-    try {
-      await router.push({ path, query: query ?? {} })
-    } catch {
-      navigation.target = null
-      detailError.value = '页面跳转未完成，请重试'
-    }
-  }
-  onMounted(async () => {
-    await search()
-    if (returnTarget && workspace.allowed()) await open(returnTarget)
-  })
+  onMounted(search)
   return {
     draft,
-    submitted,
     items,
     next,
     history,
     busy,
     error,
+    notice,
     dirty,
-    selected,
-    detail,
-    loading,
-    detailError,
-    penalties,
-    penaltyNext,
-    penaltyHistory,
-    penaltyBusy,
-    penaltyError,
     workspace,
     search,
     page,
-    open,
-    close,
-    loadPenalties,
-    historyPage,
-    navigate,
-    refreshSelected,
+    refreshRestrictions,
   }
 }
