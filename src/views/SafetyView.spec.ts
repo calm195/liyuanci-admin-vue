@@ -56,7 +56,7 @@ function button(label: string) {
   return found
 }
 async function open(edit = true) {
-  const found = wrapper?.find('.workflow-list button')
+  const found = wrapper?.find('.business-table tbody button')
   if (!found) throw new Error('没有案件按钮')
   await found.trigger('click')
   await flushPromises()
@@ -374,9 +374,10 @@ describe('T028 举报、处罚与申诉页面', () => {
     await flushPromises()
     await open()
     await go('/safety/appeals')
-    expect(wrapper?.get('[aria-label="案件详情"]').text()).not.toContain('举报说明')
-    await open()
+    expect(wrapper?.find('[aria-label="案件详情"]').exists()).toBe(false)
+    await open(false)
     expect(wrapper?.text()).toContain('原处罚理由')
+    await button('处理申诉').trigger('click')
     await wrapper?.get('#safety-operation').setValue('revoke')
     await prepare('复核撤销')
     await submit()
@@ -554,8 +555,9 @@ it('WA-03 新树洞申诉复用既有页面和判定，不读取胶囊原文', a
   await go('/safety/appeals')
   expect(wrapper?.text()).toContain('私密胶囊')
   expect(wrapper?.text()).not.toContain('合成申诉理由')
-  await open()
+  await open(false)
   expect(wrapper?.text()).toContain('合成申诉理由')
+  await button('处理申诉').trigger('click')
   await prepare()
   await submit()
   expect(mocks.decideAppeal).toHaveBeenCalledWith(

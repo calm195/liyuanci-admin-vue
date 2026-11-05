@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { onMounted } from 'vue'
+import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { RouterLink } from 'vue-router'
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
+import { crisisStatusLabel } from '@/composables/useCrisisReview'
 import { validDeletionId } from '@/services/privacy'
 import { useEvidenceDeletion } from '@/composables/useEvidenceDeletion'
 const {
@@ -25,28 +29,42 @@ const {
   cancelProcessing,
   closeProcessing,
 } = useEvidenceDeletion()
+const {
+  open: openPrivacy,
+  pending: privacyPending,
+  error: privacyError,
+  consume,
+} = usePrivacyHandoff()
+onMounted(() => {
+  const id = consume()
+  if (id && workspace.allowed()) {
+    evidenceId.value = id
+    void loadTarget()
+  }
+})
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">隐私管理 / 超级管理员</p>
-    <h1>证据删除</h1>
+  <main class="panel workflow" aria-label="证据删除">
     <template v-if="workspace.allowed()">
       <p class="banner">删除作用于该证据所属的整个保留范围，无法撤回。受理不代表物理清理完成。</p>
-      <p>
-        按已知证据 ID 读取元信息，核对后显式处理。后台未提供证据列表；信息仅保留在当前页面内存中。
-      </p>
+      <p>可从授权危机案件进入，或输入已知证据条目标识查询元信息。信息仅保留在当前页面内存中。</p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="busy" role="status">正在处理请求…</p>
-      <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
-      <section class="workflow-box" aria-label="证据删除">
+      <section class="business-card" aria-label="证据删除">
         <h2>读取并核对证据</h2>
+        <BusinessToolbar label="查询操作栏">
+          <template #tools>
+            <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
+          </template>
+        </BusinessToolbar>
         <form @submit.prevent="loadTarget">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据条目标识</legend>
-            <label for="delete-evidence-id">证据条目 ID</label>
+            <label for="delete-evidence-id">证据条目标识</label>
             <input
               id="delete-evidence-id"
               v-model="evidenceId"
+              type="password"
               autocomplete="off"
               spellcheck="false"
             />
@@ -55,28 +73,75 @@ const {
             </button>
           </fieldset>
         </form>
-        <template v-if="target">
-          <p>证据条目：{{ target.id }} · 关联危机案件：{{ target.case_id }}</p>
-          <p>证据范围版本：{{ target.version }} · 案件状态：{{ target.status }}</p>
-          <p>不展示正文或学号。此处使用证据范围版本，关联案件状态不能代替清理状态。</p>
-          <button :disabled="busy || editorOpen" @click="startProcessing">处理证据删除</button>
-        </template>
+        <div v-if="target" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">证据类型</th>
+                <th scope="col">关联案件状态</th>
+                <th scope="col">证据范围版本</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>危机限定证据</td>
+                <td>{{ crisisStatusLabel(target.status) }}</td>
+                <td>{{ target.version }}</td>
+                <td>
+                  <button :disabled="busy || editorOpen" @click="startProcessing">
+                    处理证据删除
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-if="target">关联案件状态仅用于核对范围。清理状态请前往回执查询。</p>
       </section>
-      <p v-if="accepted" role="status">
-        已受理，尚未确认清理完成。待办：{{ accepted.id }} · 待办版本：{{ accepted.version }}
-      </p>
-      <RouterLink to="/deletion-receipts">前往回执查询</RouterLink>
-      <ElDrawer
+      <section v-if="accepted" aria-label="证据删除受理回执" role="status">
+        <p>已受理，尚未确认清理完成。</p>
+        <div class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">任务类型</th>
+                <th scope="col">待办版本</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>危机证据清理</td>
+                <td>{{ accepted.version }}</td>
+                <td>
+                  <button
+                    :disabled="privacyPending"
+                    @click="openPrivacy('/deletion-receipts', accepted.id)"
+                  >
+                    前往回执查询
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p v-if="privacyError" role="alert">{{ privacyError }}</p>
+      <RouterLink v-if="!accepted" to="/deletion-receipts">前往回执查询</RouterLink>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         title="处理证据删除"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :before-close="closeProcessing"
         :show-close="!busy"
       >
         <template v-if="target">
-          <p>{{ target.id }} · 证据范围版本 {{ target.version }}</p>
+          <p>危机限定证据 · 证据范围版本 {{ target.version }}</p>
           <p v-if="error" role="alert">{{ error }}</p>
           <form @submit.prevent="prepare">
             <fieldset :disabled="busy || confirmation">
@@ -89,11 +154,7 @@ const {
           </form>
           <section v-if="confirmation" aria-label="最终删除确认">
             <h3>确认删除整个证据范围</h3>
-            <p>
-              证据条目：{{ target.id }} · 关联案件：{{ target.case_id }} · 范围版本：{{
-                target.version
-              }}
-            </p>
+            <p>危机限定证据 · 证据范围版本 {{ target.version }}</p>
             <p class="workflow-body">删除理由：{{ reason }}</p>
             <p>将停止该范围的证据读取并进入异步清理，不能撤回，也不会解除普通内容的危机限制。</p>
             <button :disabled="busy" @click="submit">确认删除证据范围</button>
@@ -101,7 +162,7 @@ const {
           </section>
           <button :disabled="busy" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from './BusinessToolbar.vue'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useRoute } from 'vue-router'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
@@ -62,9 +63,7 @@ const {
 } = useSafety(mode, initialReport, initialAppeal)
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">安全治理 / 普通案件</p>
-    <h1>{{ title }}</h1>
+  <main class="panel workflow" :aria-label="title">
     <p v-if="mode === 'penalties'" class="banner">
       本页从已确认举报查询处罚依据；处罚历史可在“用户管理 →
       平台用户”查询。仅显示当前分页中的已确认举报，可继续翻页查询。
@@ -72,56 +71,86 @@ const {
     <p>仅处理服务端授权的普通案件；账号角色管理请进入“后台账号管理”。</p>
     <template v-if="workspace.allowed()">
       <p v-if="notice" role="status">{{ notice }}</p>
+      <p v-if="error && !selected && !editorOpen" role="alert">{{ error }}</p>
       <section v-if="receipt" class="workflow-box" aria-label="处理回执">
         <h2>处理回执</h2>
-        <p>{{ receipt.id }} · {{ status(receipt.status) }} · 版本 {{ receipt.version }}</p>
+        <p>{{ status(receipt.status) }} · 版本 {{ receipt.version }}</p>
         <RouterLink
           v-if="mode === 'reports' && receipt.status === 'resolved'"
           :to="{ path: '/safety/penalties', query: { report: receipt.id } }"
           >进入该举报的处罚管理</RouterLink
         >
       </section>
-      <div class="workflow-grid">
-        <section aria-label="案件列表" :aria-busy="busy">
+
+      <section aria-label="案件列表" :aria-busy="busy">
+        <BusinessToolbar label="安全治理操作栏">
           <h2>
             {{
               mode === 'appeals' ? '申诉案件' : mode === 'penalties' ? '本页已确认举报' : '举报案件'
             }}
           </h2>
-          <button :disabled="busy || editorOpen || writing" @click="refresh()">从首页刷新</button>
-          <p v-if="busy" role="status">正在读取案件…</p>
-          <div v-else-if="listError" role="alert">
-            <p>{{ listError }}</p>
-            <button :disabled="busy || editorOpen || writing" @click="loadList">重试列表</button>
-          </div>
-          <p v-else-if="!items.length">
-            {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}
-          </p>
-          <ul v-else class="workflow-list">
-            <li v-for="item in items" :key="item.id">
-              <button
-                :aria-pressed="selected === item.id"
-                :disabled="writing || editorOpen"
-                @click="open(item.id)"
-              >
-                {{ item.id }} · {{ status(item.status) }} · 案件版本 {{ item.version
-                }}<span v-if="item.kind"> · {{ kindLabels[item.kind] }}</span>
-              </button>
-            </li>
-          </ul>
-          <div class="workflow-actions">
-            <button
-              :disabled="busy || editorOpen || writing || !history.length"
-              @click="page(false)"
-            >
-              上一页
-            </button>
-            <button :disabled="busy || editorOpen || writing || !nextCursor" @click="page(true)">
-              下一页
-            </button>
-          </div>
-          <p>列表不展示举报说明、申诉正文或学生身份。</p>
-        </section>
+          <template #tools>
+            <button :disabled="busy || editorOpen || writing" @click="refresh()">从首页刷新</button>
+          </template>
+        </BusinessToolbar>
+        <p v-if="busy" role="status">正在读取案件…</p>
+        <div v-else-if="listError" role="alert">
+          <p>{{ listError }}</p>
+          <button :disabled="busy || editorOpen || writing" @click="loadList">重试列表</button>
+        </div>
+        <p v-else-if="!items.length">
+          {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}
+        </p>
+        <div v-else class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">本页序号</th>
+                <th scope="col">内容类型</th>
+                <th scope="col">状态</th>
+                <th scope="col">案件版本</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in items" :key="item.id">
+                <th scope="row">{{ index + 1 }}</th>
+                <td>{{ item.kind ? kindLabels[item.kind] : '—' }}</td>
+                <td>{{ status(item.status) }}</td>
+                <td>{{ item.version }}</td>
+                <td>
+                  <button
+                    :disabled="writing || editorOpen"
+                    :aria-label="`查看第 ${index + 1} 条案件`"
+                    @click="open(item.id)"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
+          <button :disabled="busy || editorOpen || writing || !history.length" @click="page(false)">
+            上一页
+          </button>
+          <button :disabled="busy || editorOpen || writing || !nextCursor" @click="page(true)">
+            下一页
+          </button>
+        </div>
+        <p>列表不展示举报说明、申诉正文或学生身份。</p>
+      </section>
+      <ElDialog
+        v-if="selected && !editorOpen"
+        :model-value="true"
+        title="案件详情"
+        width="min(56rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
+        :close-on-click-modal="false"
+        @update:model-value="!$event && close()"
+      >
         <section aria-label="案件详情" :aria-busy="loading || writing">
           <h2>案件详情（只读）</h2>
           <p v-if="loading" role="status">正在读取案件详情…</p>
@@ -129,19 +158,17 @@ const {
           <button v-if="selected && !detail && !loading" @click="open(selected)">重试详情</button>
           <template v-if="detail">
             <button :disabled="writing || editorOpen" @click="close">关闭案件</button>
-            <p>{{ detail.id }} · {{ status(detail.status) }} · 案件版本 {{ detail.version }}</p>
+            <p>{{ status(detail.status) }} · 案件版本 {{ detail.version }}</p>
             <template v-if="report">
               <dl class="case-fields">
                 <dt>内容类型</dt>
                 <dd>{{ kindLabels[report.target_kind] }}</dd>
-                <dt>内容对象</dt>
-                <dd>{{ report.target_id }}</dd>
                 <dt>正文版本</dt>
                 <dd>{{ report.content_version }}</dd>
                 <dt>举报类型代码</dt>
                 <dd>{{ report.type_code }}</dd>
-                <dt>被处置账号</dt>
-                <dd>{{ report.subject_id }}</dd>
+                <dt>处置对象</dt>
+                <dd>本案内容作者</dd>
               </dl>
               <h3>案件允许查看的正文</h3>
               <blockquote v-if="report.body" class="workflow-body">{{ report.body }}</blockquote>
@@ -150,7 +177,6 @@ const {
               <p class="case-text">{{ report.description || '未提供说明' }}</p>
             </template>
             <template v-if="appeal">
-              <p>原处罚编号：{{ appeal.penalty_id }}</p>
               <h3>申诉正文</h3>
               <blockquote class="workflow-body">{{ appeal.body }}</blockquote>
               <h3>原处罚理由</h3>
@@ -192,19 +218,21 @@ const {
           </template>
           <p v-else-if="!loading && !selected">选择案件，按需读取详情。</p>
         </section>
-      </div>
-      <ElDrawer
+      </ElDialog>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         :title="editorTask === 'crisis' ? '升级危机' : processingTitle"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :before-close="closeProcessing"
         :close-on-click-modal="false"
         :show-close="!writing && !escalating"
       >
         <p v-if="error" role="alert">{{ error }}</p>
         <button :disabled="writing || escalating" @click="cancelProcessing">取消并关闭</button>
-        <p>案件 {{ detail?.id }} · 版本 {{ detail?.version }}</p>
+        <p>案件版本 {{ detail?.version }}</p>
         <CrisisEscalation
           v-if="editorTask === 'crisis' && report"
           :key="`${report.id}:${report.version}`"
@@ -268,14 +296,11 @@ const {
           <p v-else>当前案件已处理，仅供查看。</p>
           <section v-if="confirmation" class="workflow-box" aria-label="处理确认">
             <h3>确认{{ operationLabels[operation] }}</h3>
-            <p>案件 {{ detail.id }} · 案件版本 {{ detail.version }}</p>
-            <p>
-              操作目标 {{ confirmation.id }} · 目标版本 {{ confirmation.input.expected_version }}
-            </p>
+            <p>案件版本 {{ detail.version }}</p>
+            <p>目标版本 {{ confirmation.input.expected_version }}</p>
             <p v-if="confirmation.type === 'penalty'">
               {{ levelLabels[confirmation.input.level] }} · 正文版本
-              {{ confirmation.input.content_version }} · 精确内容
-              {{ confirmation.input.content_ref }}
+              {{ confirmation.input.content_version }}
             </p>
             <p v-if="confirmation.type === 'restriction'">
               内容类型：{{ kindLabels[confirmation.kind] }}
@@ -290,7 +315,7 @@ const {
             </div>
           </section>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

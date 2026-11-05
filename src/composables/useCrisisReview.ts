@@ -13,6 +13,22 @@ import type {
   CrisisWork,
 } from '@/types/crisis'
 
+export function crisisStatusLabel(value: string) {
+  const labels: Record<string, string> = {
+    pending_handling: '待人工接手',
+    handling: '处理中',
+    resolved: '处置已结束',
+    false_positive: '误报，已转普通复核',
+    pending: '等待投递或重试',
+    leased: '投递处理中',
+    completed: '已完成',
+    sent: '已送达',
+    delivered: '已送达',
+    cancelled: '已取消',
+  }
+  return labels[value] ?? '未知状态（仅供查看）'
+}
+
 export function useCrisisReview() {
   const editorOpen = ref(false)
   const route = useRoute()
@@ -65,21 +81,6 @@ export function useCrisisReview() {
     retry_notification: '重试人员通知',
     false_positive: '判定误报并转普通复核',
   }
-  function status(value: string) {
-    const labels: Record<string, string> = {
-      pending_handling: '待人工接手',
-      handling: '处理中',
-      resolved: '处置已结束',
-      false_positive: '误报，已转普通复核',
-      pending: '等待投递或重试',
-      leased: '投递处理中',
-      completed: '已完成',
-      sent: '已送达',
-      delivered: '已送达',
-      cancelled: '已取消',
-    }
-    return labels[value] ?? '未知状态（仅供查看）'
-  }
   function eventLabel(value: string) {
     const labels: Record<string, string> = {
       ...actionLabels,
@@ -89,14 +90,6 @@ export function useCrisisReview() {
       evidence_view: '限定证据查看',
     }
     return labels[value] ?? '其他服务端动作'
-  }
-  function displayTime(value: string) {
-    return new Intl.DateTimeFormat('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-      hour12: false,
-    }).format(new Date(value))
   }
   function hideEvidence() {
     evidenceGeneration++
@@ -402,9 +395,8 @@ export function useCrisisReview() {
     canAct,
     valid,
     actionLabels,
-    status,
+    status: crisisStatusLabel,
     eventLabel,
-    displayTime,
     hideEvidence,
     loadList,
     refresh,

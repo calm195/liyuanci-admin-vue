@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { displayBeijingTime } from '@/utils/admin-time'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import {
   useWhisperReports,
@@ -48,50 +50,81 @@ const {
 } = useWhisperReports()
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">安全治理 / 树洞举报</p>
-    <h1>树洞举报</h1>
+  <main class="panel workflow" aria-label="树洞举报">
     <p>仅处理当前授权举报及其来源，不提供匿名作者身份查询。</p>
     <template v-if="workspace.allowed()">
       <p v-if="notice" role="status">{{ notice }}</p>
+      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
       <section v-if="penaltyReceipt" class="workflow-box" aria-label="树洞处罚回执">
         <h2>处罚回执</h2>
         <p>
-          {{ penaltyReceipt.id }} ·
           {{ { warning: '警告', mute: '禁言', ban: '封禁' }[penaltyReceipt.kind] }}
         </p>
         <p v-if="penaltyReceipt.ends_at">截至 {{ penaltyReceipt.ends_at }}</p>
         <p v-else>{{ penaltyReceipt.kind === 'ban' ? '永久封禁' : '无到期时间' }}</p>
       </section>
-      <div class="workflow-grid">
-        <section aria-label="树洞举报列表" :aria-busy="listBusy">
-          <div class="workflow-actions">
-            <h2>举报案件</h2>
+
+      <section aria-label="树洞举报列表" :aria-busy="listBusy">
+        <BusinessToolbar label="树洞举报操作栏">
+          <h2>举报案件</h2>
+          <template #tools>
             <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
-          </div>
-          <p v-if="listBusy" role="status">正在读取举报…</p>
-          <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-          <p v-if="listNotice" role="status">{{ listNotice }}</p>
-          <p v-if="!listBusy && !listError && !items.length">当前页暂无举报</p>
-          <ul v-if="items.length" class="workflow-list">
-            <li v-for="item in items" :key="item.id">
-              <button
-                :disabled="editorOpen"
-                :aria-pressed="selectedId === item.id"
-                @click="openCase(item.id)"
-              >
-                {{ whisperKindLabels[item.source.kind] }} ·
-                {{ whisperReportStatuses[item.status] }} · {{ item.id }}
-                <span
-                  >举报版本 {{ item.version }} · 正文版本 {{ item.source.content_version }}</span
-                >
-              </button>
-            </li>
-          </ul>
+          </template>
+        </BusinessToolbar>
+        <p v-if="listBusy" role="status">正在读取举报…</p>
+        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
+        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <p v-if="!listBusy && !listError && !items.length">当前页暂无举报</p>
+        <div v-if="items.length" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">本页序号</th>
+                <th scope="col">内容类型</th>
+                <th scope="col">状态</th>
+                <th scope="col">举报版本</th>
+                <th scope="col">正文版本</th>
+                <th scope="col">创建时间（北京时间）</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in items" :key="item.id">
+                <th scope="row">{{ index + 1 }}</th>
+                <td>{{ whisperKindLabels[item.source.kind] }}</td>
+                <td>{{ whisperReportStatuses[item.status] }}</td>
+                <td>{{ item.version }}</td>
+                <td>{{ item.source.content_version }}</td>
+                <td>{{ displayBeijingTime(item.created_at) }}</td>
+                <td>
+                  <button
+                    :disabled="editorOpen"
+                    :aria-label="`查看第 ${index + 1} 条举报`"
+                    @click="openCase(item.id)"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多举报' }}
           </button>
-        </section>
+        </div>
+      </section>
+      <ElDialog
+        v-if="selectedId && !editorOpen"
+        :model-value="true"
+        title="树洞举报详情"
+        width="min(56rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
+        :close-on-click-modal="false"
+        @update:model-value="!$event && close()"
+      >
         <section aria-label="树洞举报详情" :aria-busy="loading">
           <h2>举报详情（只读）</h2>
           <p v-if="error" role="alert">{{ error }}</p>
@@ -106,7 +139,7 @@ const {
           <template v-if="detail">
             <button :disabled="editorOpen" @click="close">关闭举报</button>
             <p>
-              {{ detail.id }} · {{ whisperReportStatuses[detail.status] }} · 举报版本
+              {{ whisperReportStatuses[detail.status] }} · 举报版本
               {{ detail.version }}
             </p>
             <p>
@@ -145,12 +178,14 @@ const {
           </template>
           <p v-else-if="!selectedId && !loading">选择举报，按需读取授权内容。</p>
         </section>
-      </div>
-      <ElDrawer
+      </ElDialog>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         :title="whisperTaskLabels[task]"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :before-close="closeProcessing"
@@ -158,7 +193,7 @@ const {
       >
         <template v-if="detail">
           <p>
-            {{ detail.id }} · 举报版本 {{ detail.version }} · 正文版本
+            举报版本 {{ detail.version }} · 正文版本
             {{ detail.source.content_version }}
           </p>
           <p v-if="task === 'restriction' || task === 'penalty'">治理版本 {{ control?.version }}</p>
@@ -208,7 +243,7 @@ const {
           </form>
           <section v-if="confirming" class="workflow-box" aria-label="树洞举报操作确认">
             <h3>确认操作</h3>
-            <p>{{ detail.id }} · 举报版本 {{ detail.version }}</p>
+            <p>举报版本 {{ detail.version }}</p>
             <p>
               {{
                 task === 'decision'
@@ -233,7 +268,7 @@ const {
           </section>
           <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { displayBeijingTime } from '@/utils/admin-time'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import {
   useWhisperCrises,
@@ -9,6 +10,7 @@ import {
   whisperCrisisActions,
   whisperDeliveryLabels,
 } from '@/composables/useWhisperCrises'
+import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
 const {
   items,
@@ -43,48 +45,87 @@ const {
   back,
   submit,
 } = useWhisperCrises()
+const { open: openPrivacy, pending: privacyPending, error: privacyError } = usePrivacyHandoff()
+const timelineActions: Readonly<Record<string, string>> = {
+  ...whisperCrisisActions,
+  isolated: '自动隔离',
+}
+function timelineActionLabel(action: string) {
+  return timelineActions[action] ?? '其他服务端动作'
+}
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">安全治理 / 树洞危机</p>
-    <h1>树洞危机</h1>
+  <main class="panel workflow" aria-label="树洞危机">
     <p>仅供危机岗位及超级管理员按授权案件读取限定正文；不提供学生卡或身份反查。</p>
     <template v-if="workspace.allowed()">
       <p v-if="notice" role="status">{{ notice }}</p>
+      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
       <p v-if="outcome" role="status">
-        危机回执：{{ outcome.id }} · {{ whisperCrisisStatuses[outcome.status] }} · 案件版本
+        危机回执：{{ whisperCrisisStatuses[outcome.status] }} · 案件版本
         {{ outcome.version }}
       </p>
-      <div class="workflow-grid">
-        <section aria-label="树洞危机列表" :aria-busy="listBusy">
-          <div class="workflow-actions">
-            <h2>危机案件</h2>
+
+      <section aria-label="树洞危机列表" :aria-busy="listBusy">
+        <BusinessToolbar label="树洞危机操作栏">
+          <h2>危机案件</h2>
+          <template #tools>
             <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
-          </div>
-          <p v-if="listBusy" role="status">正在读取危机…</p>
-          <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-          <p v-if="listNotice" role="status">{{ listNotice }}</p>
-          <p v-if="!listBusy && !listError && !items.length">当前页暂无危机</p>
-          <ul v-if="items.length" class="workflow-list">
-            <li v-for="item in items" :key="item.id">
-              <button
-                :disabled="editorOpen"
-                :aria-pressed="selectedId === item.id"
-                @click="openCase(item.id)"
-              >
-                {{ whisperKindLabels[item.source.kind] }} ·
-                {{ whisperCrisisStatuses[item.status] }} · {{ item.id }}
-                <span
-                  >案件版本 {{ item.version }} · 正文版本 {{ item.source.content_version }} ·
-                  交接时间 {{ item.handoff_at }}</span
-                >
-              </button>
-            </li>
-          </ul>
+          </template>
+        </BusinessToolbar>
+        <p v-if="listBusy" role="status">正在读取危机…</p>
+        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
+        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <p v-if="!listBusy && !listError && !items.length">当前页暂无危机</p>
+        <div v-if="items.length" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">本页序号</th>
+                <th scope="col">内容类型</th>
+                <th scope="col">状态</th>
+                <th scope="col">案件版本</th>
+                <th scope="col">正文版本</th>
+                <th scope="col">交接时间（北京时间）</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in items" :key="item.id">
+                <th scope="row">{{ index + 1 }}</th>
+                <td>{{ whisperKindLabels[item.source.kind] }}</td>
+                <td>{{ whisperCrisisStatuses[item.status] }}</td>
+                <td>{{ item.version }}</td>
+                <td>{{ item.source.content_version }}</td>
+                <td>{{ displayBeijingTime(item.handoff_at) }}</td>
+                <td>
+                  <button
+                    :disabled="editorOpen"
+                    :aria-label="`查看第 ${index + 1} 条危机`"
+                    @click="openCase(item.id)"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多危机' }}
           </button>
-        </section>
+        </div>
+      </section>
+      <ElDialog
+        v-if="selectedId && !editorOpen"
+        :model-value="true"
+        title="树洞危机详情"
+        width="min(56rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
+        :close-on-click-modal="false"
+        @update:model-value="!$event && close()"
+      >
         <section aria-label="树洞危机详情" :aria-busy="loading">
           <h2>危机详情（只读）</h2>
           <p v-if="error" role="alert">{{ error }}</p>
@@ -99,12 +140,13 @@ const {
           <template v-if="detail">
             <button :disabled="editorOpen" @click="close">关闭危机</button>
             <p>
-              {{ detail.id }} · {{ whisperCrisisStatuses[detail.status] }} · 案件版本
+              {{ whisperCrisisStatuses[detail.status] }} · 案件版本
               {{ detail.version }}
             </p>
             <p>
               {{ whisperKindLabels[detail.source.kind] }} · 正文版本
-              {{ detail.source.content_version }} · 交接时间 {{ detail.handoff_at }}
+              {{ detail.source.content_version }} · 交接时间
+              {{ displayBeijingTime(detail.handoff_at) }}（北京时间）
             </p>
             <p v-if="detail.identity_status === 'verified' && detail.student_number !== null">
               已认证学号：{{ detail.student_number }}
@@ -125,7 +167,10 @@ const {
               <p v-if="!detail.timeline.length">暂无时间线记录</p>
               <ol>
                 <li v-for="(entry, index) in detail.timeline" :key="index">
-                  <p>{{ entry.at }} · {{ entry.action }} · {{ entry.operator_label }}</p>
+                  <p>
+                    {{ displayBeijingTime(entry.at) }} · {{ timelineActionLabel(entry.action) }} ·
+                    {{ entry.operator_label }}
+                  </p>
                   <p class="workflow-body">{{ entry.reason ?? '未填写理由' }}</p>
                 </li>
               </ol>
@@ -145,25 +190,32 @@ const {
               结案不解除隔离；误报只转普通复核，不代表公开，也不会重建已取消、注销或换版的内容。
             </p>
             <section v-if="admin.can('super_admin')" aria-label="限定证据范围">
-              <p>证据范围 ID：{{ detail.evidence_scope_id }}</p>
-              <RouterLink to="/whispers/evidence">前往树洞证据删除与进度查询</RouterLink>
+              <button
+                :disabled="privacyPending"
+                @click="openPrivacy('/whispers/evidence', detail.evidence_scope_id)"
+              >
+                前往树洞证据删除与进度查询
+              </button>
+              <p v-if="privacyError" role="alert">{{ privacyError }}</p>
             </section>
           </template>
           <p v-else-if="!selectedId && !loading">选择危机，按需读取授权限定正文。</p>
         </section>
-      </div>
-      <ElDrawer
+      </ElDialog>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         :title="whisperCrisisActions[task]"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :before-close="closeProcessing"
         :show-close="!writing && !uncertain"
       >
         <template v-if="detail">
-          <p>{{ detail.id }} · 案件版本 {{ detail.version }}</p>
+          <p>案件版本 {{ detail.version }}</p>
           <p v-if="error" role="alert">{{ error }}</p>
           <form @submit.prevent="check">
             <fieldset :disabled="writing || confirming || uncertain">
@@ -184,9 +236,7 @@ const {
           </form>
           <section v-if="confirming" class="workflow-box" aria-label="树洞危机操作确认">
             <h3>确认操作</h3>
-            <p>
-              {{ whisperCrisisActions[task] }} · {{ detail.id }} · 案件版本 {{ detail.version }}
-            </p>
+            <p>{{ whisperCrisisActions[task] }} · 案件版本 {{ detail.version }}</p>
             <p class="workflow-body">理由：{{ reason }}</p>
             <p>以当前服务端状态为准，冲突后不会自动重提。</p>
             <button :disabled="writing || !options.includes(task)" @click="submit">
@@ -196,7 +246,7 @@ const {
           </section>
           <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

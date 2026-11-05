@@ -1,11 +1,12 @@
 import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as privacyService from '@/services/privacy'
 import EvidenceDeletionView from './EvidenceDeletionView.vue'
 import DeletionReceiptsView from './DeletionReceiptsView.vue'
-import { ElDrawer } from 'element-plus'
+import { ElDialog } from 'element-plus'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 const mocks = vi.hoisted(() => ({
@@ -92,13 +93,45 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
     expect(wrapper.text()).toContain('已受理，尚未确认清理完成')
     expect(wrapper.find('#delete-reason').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('核对删除理由')
-    expect(wrapper.text()).toContain(jobId)
+    expect(wrapper.text()).not.toContain(jobId)
     expect(wrapper.find('#delete-job-id').exists()).toBe(false)
     showReceipts()
     await wrapper.get('#delete-job-id').setValue(jobId)
     await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
     await flushPromises()
     expect(wrapper.get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
+  })
+  it('从受理回执直接查询同一任务，返回后不重复携带待办', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/evidence-deletion', component: EvidenceDeletionView },
+        { path: '/deletion-receipts', component: DeletionReceiptsView },
+      ],
+    })
+    await router.push('/evidence-deletion')
+    wrapper.unmount()
+    wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
+    await prepare()
+    await button('确认删除证据范围').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain(jobId)
+    expect(mocks.job).not.toHaveBeenCalled()
+
+    await button('前往回执查询').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/deletion-receipts')
+    expect(mocks.job).toHaveBeenCalledWith(jobId, expect.any(AbortSignal))
+    expect(wrapper.get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
+    expect(wrapper.get('#delete-job-id').attributes('type')).toBe('password')
+    expect(wrapper.text()).not.toContain(jobId)
+
+    await router.push('/evidence-deletion')
+    await flushPromises()
+    await router.push('/deletion-receipts')
+    await flushPromises()
+    expect(mocks.job).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[aria-label="清理结果"]').exists()).toBe(false)
   })
   it('超出中文UTF-8字节限制不能准备删除', async () => {
     await load()
@@ -205,7 +238,12 @@ describe('证据删除与查询隔离', () => {
     await wrapper.get('#delete-reason').setValue('未提交理由')
     await button('取消处理').trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('证据范围版本：9')
+    expect(
+      wrapper
+        .findAll('tbody td')
+        .map((cell) => cell.text())
+        .slice(0, 3),
+    ).toEqual(['危机限定证据', '处置已结束', '9'])
     expect(wrapper.find('#delete-reason').exists()).toBe(false)
     expect(mocks.evidence).toHaveBeenCalledTimes(1)
     expect(mocks.remove).not.toHaveBeenCalled()
@@ -225,7 +263,7 @@ describe('证据删除与查询隔离', () => {
     expect(button('取消处理').attributes('disabled')).toBeDefined()
     expect(button('清空页面').attributes('disabled')).toBeDefined()
     const done = vi.fn()
-    wrapper.findComponent(ElDrawer).props('beforeClose')?.(done)
+    wrapper.findComponent(ElDialog).props('beforeClose')?.(done)
     expect(done).not.toHaveBeenCalled()
     const signal: unknown = mocks.remove.mock.calls[0]?.[3]
     showReceipts()

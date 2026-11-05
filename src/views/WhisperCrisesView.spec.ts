@@ -91,9 +91,7 @@ function hasButton(label: string) {
     .some((item) => item.text() === label)
 }
 async function open(id = first.id) {
-  const found = view()
-    .findAll('.workflow-list button')
-    .find((item) => item.text().includes(id))
+  const found = view().findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('无案件')
   await found.trigger('click')
   await flushPromises()
@@ -191,7 +189,8 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     })
     await open()
     expect(view().text()).toContain('已认证学号：SYNTHETIC')
-    expect(view().text()).toContain(first.evidence_scope_id)
+    expect(view().text()).not.toContain(first.evidence_scope_id)
+    expect(hasButton('前往树洞证据删除与进度查询')).toBe(true)
     expect(view().find('blockquote script').exists()).toBe(false)
     expect(view().find('[aria-label="危机时间线"] img').exists()).toBe(false)
     expect(view().findAll('input')).toHaveLength(0)
@@ -346,7 +345,7 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     expect(view().text()).toContain('服务暂不可用')
     await button('重试加载').trigger('click')
     await flushPromises()
-    expect(view().findAll('.workflow-list li')).toHaveLength(1)
+    expect(view().findAll('.business-table tbody tr')).toHaveLength(1)
     expect(view().text()).toContain('分页游标重复')
   })
   it('切案取消旧读取，晚到正文不可覆盖新案', async () => {

@@ -1,25 +1,44 @@
 <script setup lang="ts">
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { onMounted } from 'vue'
+import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { validDeletionId, validDeletionReceipt } from '@/services/privacy'
 import { useDeletionReceipts } from '@/composables/useDeletionReceipts'
 const { busy, error, jobId, handle, progress, progressKind, workspace, retryHint, query, reset } =
   useDeletionReceipts()
+const privacy = usePrivacyHandoff()
+onMounted(() => {
+  const id = privacy.consume()
+  if (id && workspace.allowed()) {
+    jobId.value = id
+    void query('job')
+  }
+})
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">隐私管理 / 超级管理员</p>
-    <h1>回执查询</h1>
-    <p>按已知待办 ID 或完整匿名回执查询，后台未提供列表。查询不会触发删除。</p>
+  <main class="panel workflow" aria-label="回执查询">
+    <p>查询刚受理的证据清理任务，也可输入已知待办标识或完整匿名回执。查询不会触发删除。</p>
     <template v-if="workspace.allowed()">
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="busy" role="status">正在查询清理进度…</p>
-      <button :disabled="busy" @click="reset">清空页面</button>
-      <section class="workflow-box" aria-label="删除进度查询">
+      <section class="business-card" aria-label="删除进度查询">
         <h2>查询清理进度</h2>
+        <BusinessToolbar label="查询操作栏">
+          <template #tools>
+            <button :disabled="busy" @click="reset">清空页面</button>
+          </template>
+        </BusinessToolbar>
         <form @submit.prevent="query('job')">
           <fieldset :disabled="busy">
             <legend>后台证据删除待办</legend>
-            <label for="delete-job-id">待办 ID（不是证据 ID）</label>
-            <input id="delete-job-id" v-model="jobId" autocomplete="off" spellcheck="false" />
+            <label for="delete-job-id">删除待办标识</label>
+            <input
+              id="delete-job-id"
+              v-model="jobId"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+            />
             <button type="submit" :disabled="!validDeletionId(jobId.trim())">
               查询证据删除待办
             </button>
@@ -46,9 +65,29 @@ const { busy, error, jobId, handle, progress, progressKind, workspace, retryHint
           </fieldset>
         </form>
         <section v-if="progress" aria-label="清理结果" role="status">
-          <h3>{{ progressKind }}</h3>
-          <p v-if="progress.status === 'completed'">清理已完成（后端确认）。</p>
-          <p v-else>正在清理，尚未全部完成；请稍后手动刷新查询。</p>
+          <h3>清理结果</h3>
+          <div class="business-table">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">查询来源</th>
+                  <th scope="col">清理状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{{ progressKind }}</td>
+                  <td>
+                    {{
+                      progress.status === 'completed'
+                        ? '清理已完成（后端确认）。'
+                        : '正在清理，尚未全部完成；请稍后手动刷新查询。'
+                    }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <p v-if="retryHint">{{ retryHint }}</p>
         </section>
       </section>

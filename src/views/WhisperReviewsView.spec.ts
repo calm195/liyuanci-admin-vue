@@ -2,7 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ElDrawer } from 'element-plus'
+import { ElDialog } from 'element-plus'
 import WhisperReviewsView from './WhisperReviewsView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
@@ -86,9 +86,7 @@ function login(roles: Role[] = ['review_operator']) {
   }
 }
 async function open(id = first.id) {
-  const item = view()
-    .findAll('.workflow-list button')
-    .find((entry) => entry.text().includes(id))
+  const item = view().findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!item) throw new Error('未找到案件')
   await item.trigger('click')
   await flushPromises()
@@ -281,10 +279,10 @@ describe('WA-02 树洞审核页面', () => {
     expect(view().text()).toContain('当前页暂无审核案件')
     await button('加载更多案件').trigger('click')
     await flushPromises()
-    expect(view().findAll('.workflow-list li')).toHaveLength(1)
+    expect(view().findAll('.business-table tbody tr')).toHaveLength(1)
     await button('加载更多案件').trigger('click')
     await flushPromises()
-    expect(view().findAll('.workflow-list li')).toHaveLength(2)
+    expect(view().findAll('.business-table tbody tr')).toHaveLength(2)
     expect(view().text()).toContain('分页游标重复')
     expect(
       view()
@@ -437,7 +435,7 @@ describe('WA-02 树洞审核页面', () => {
     await processing()
     await view().get('input[value="rejected"]').setValue()
     await view().get('#whisper-reason').setValue('暂存意见')
-    await view().findComponent(ElDrawer).get('.el-drawer__close-btn').trigger('click')
+    await view().findComponent(ElDialog).get('.el-dialog__headerbtn').trigger('click')
     await flushPromises()
     await processing()
     expect(view().find('#whisper-reason').exists()).toBe(false)

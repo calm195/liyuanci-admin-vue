@@ -71,7 +71,7 @@ async function process() {
   await view().get('#whisper-delete-confirmation').setValue('DELETE_EVIDENCE_SCOPE')
 }
 async function confirm() {
-  await view().get('.el-drawer form').trigger('submit')
+  await view().get('.el-dialog form').trigger('submit')
   await button('确认删除证据范围').trigger('click')
   await flushPromises()
 }
@@ -235,7 +235,7 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
     await flushPromises()
     expect(view().get<HTMLInputElement>('#whisper-delete-confirmation').element.value).toBe('')
     expect(view().get<HTMLTextAreaElement>('#whisper-delete-reason').element.value).toBe('')
-    await view().get('.el-drawer__close-btn').trigger('click')
+    await view().get('.el-dialog__headerbtn').trigger('click')
     await flushPromises()
     expect(view().find('#whisper-delete-reason').exists()).toBe(false)
   })
@@ -265,7 +265,7 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
       await process()
       const pending = deferred<DeletionJob>()
       mocks.whisperAdminEvidenceDelete.mockReturnValueOnce(pending.promise)
-      await view().get('.el-drawer form').trigger('submit')
+      await view().get('.el-dialog form').trigger('submit')
       await button('确认删除证据范围').trigger('click')
       const signal: unknown = mocks.whisperAdminEvidenceDelete.mock.calls[0]?.[3]
       const session = useAdminStore().session

@@ -1,4 +1,4 @@
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { CrisisSummary } from '@/types/crisis'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/services/admin'
@@ -38,6 +38,7 @@ export function useModerationReview() {
   let editorGeneration = 0
   let attempt: { fingerprint: string; key: string } | null = null
   const router = useRouter()
+  const route = useRoute()
   async function crisisEscalated(value: CrisisSummary) {
     close()
     try {
@@ -249,8 +250,10 @@ export function useModerationReview() {
       },
     )
   }
-  onMounted(() => {
-    void loadList()
+  onMounted(async () => {
+    const target = route.query['case']
+    await loadList()
+    if (typeof target === 'string' && target && workspace.allowed()) await openCase(target)
   })
 
   return {

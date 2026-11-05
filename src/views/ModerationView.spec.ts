@@ -3,7 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ModerationView from './ModerationView.vue'
-import { ElDrawer } from 'element-plus'
+import { ElDialog } from 'element-plus'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
@@ -16,13 +16,20 @@ vi.mock('@/components/CrisisEscalation.vue', () => ({
     template: '<span />',
   },
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
-const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
-  list: vi.fn(),
-  detail: vi.fn(),
-  decide: vi.fn(),
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mocks.push }),
+  useRoute: () => ({ query: mocks.query }),
 }))
+const mocks = vi.hoisted(() => {
+  const query: { case?: string } = {}
+  return {
+    query,
+    push: vi.fn(),
+    list: vi.fn(),
+    detail: vi.fn(),
+    decide: vi.fn(),
+  }
+})
 vi.mock('@/services/content-transport', async (original) => ({
   ...(await original<typeof contentService>()),
   createModerationTransport: () => mocks,
@@ -61,7 +68,7 @@ function deferred<T>() {
   }
 }
 async function open(id = 'case-a') {
-  const found = wrapper?.findAll('.workflow-list button').find((item) => item.text().startsWith(id))
+  const found = wrapper?.findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('未找到案件')
   await found.trigger('click')
   await flushPromises()
@@ -80,6 +87,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  delete mocks.query.case
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -269,7 +277,7 @@ describe('T017 真实内容审核页面交互', () => {
     current.account.roles = ['crisis_operator']
     await flushPromises()
     expect(wrapper?.text()).not.toContain('合成涉校命中正文')
-    expect(wrapper?.find('.workflow-list button').exists()).toBe(false)
+    expect(wrapper?.find('.business-table tbody button').exists()).toBe(false)
     const requestSignal: unknown = mocks.detail.mock.calls[0]?.[1]
     wrapper?.unmount()
     wrapper = undefined
@@ -336,13 +344,13 @@ it('处理期间禁用切案和查询，提交期间不能取消，404后关闭�
   await wrapper?.get('form').trigger('submit')
   await button('确认提交').trigger('click')
   const done = vi.fn()
-  const beforeClose = wrapper?.findComponent(ElDrawer).props('beforeClose')
+  const beforeClose = wrapper?.findComponent(ElDialog).props('beforeClose')
   if (typeof beforeClose !== 'function') throw new Error('缺少关闭拦截')
   beforeClose(done)
   expect(done).not.toHaveBeenCalled()
   await button('取消处理').trigger('click')
   await open('case-b')
-  expect(wrapper?.text()).toContain('合成涉校命中正文')
+  expect(wrapper?.text()).not.toContain('合成涉校命中正文')
   expect(wrapper?.text()).not.toContain('另一合成正文')
   expect(wrapper?.find('form').exists()).toBe(true)
   pending.resolve(Promise.reject(new ApiError(404)))
@@ -397,4 +405,16 @@ it('危机升级确认后清除原正文与操作，并跳转危机工作台', a
   expect(wrapper?.find('blockquote').exists()).toBe(false)
   expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(false)
   expect(mocks.decide).not.toHaveBeenCalled()
+})
+
+it('通过关联入口直接读取授权审核案件，无需从列表手动匹配编号', async () => {
+  await flushPromises()
+  wrapper?.unmount()
+  const pinia = getActivePinia()
+  if (!pinia) throw new Error('缺少后台会话')
+  mocks.query.case = second.id
+  wrapper = mount(ModerationView, { global: { plugins: [pinia] } })
+  await flushPromises()
+  expect(mocks.detail).toHaveBeenLastCalledWith(second.id, expect.any(AbortSignal))
+  expect(wrapper.text()).toContain(second.body)
 })

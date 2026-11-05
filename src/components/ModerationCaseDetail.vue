@@ -20,7 +20,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
     <template v-if="detail">
       <button :disabled="locked" @click="$emit('close')">关闭案件</button>
       <p>
-        {{ detail.id }} · 案件版本 {{ detail.version }} · 正文版本
+        案件版本 {{ detail.version }} · 正文版本
         {{ detail.content_version }}
       </p>
       <p v-if="detail.school_related === true" class="banner">

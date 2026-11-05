@@ -73,9 +73,7 @@ function hasButton(label: string) {
     .some((item) => item.text() === label)
 }
 async function open(id = first.id) {
-  const item = view()
-    .findAll('.workflow-list button')
-    .find((item) => item.text().includes(id))
+  const item = view().findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!item) throw new Error('没有举报')
   await item.trigger('click')
   await flushPromises()
@@ -375,7 +373,7 @@ describe('WA-03 树洞举报与治理', () => {
     expect(view().text()).toContain('服务暂不可用')
     await button('重试加载').trigger('click')
     await flushPromises()
-    expect(view().findAll('.workflow-list li')).toHaveLength(1)
+    expect(view().findAll('.business-table tbody tr')).toHaveLength(1)
     expect(view().text()).toContain('分页游标重复')
     expect(hasButton('加载更多举报')).toBe(false)
   })

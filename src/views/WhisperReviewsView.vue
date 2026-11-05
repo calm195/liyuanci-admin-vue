@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { displayBeijingTime } from '@/utils/admin-time'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import WhisperReviewDetail from '@/components/WhisperReviewDetail.vue'
 import {
@@ -47,12 +49,11 @@ const {
 } = useWhisperReviews()
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">内容治理 / 树洞人工复核</p>
-    <h1>树洞审核</h1>
+  <main class="panel workflow" aria-label="树洞审核">
     <p>仅按当前授权案件读取命中版本，不提供匿名作者查询或私密胶囊全量浏览。</p>
     <template v-if="workspace.allowed()">
       <p v-if="notice" role="status">{{ notice }}</p>
+      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
       <section v-if="outcome" class="workflow-box" aria-label="树洞审核回执">
         <h2>审核回执</h2>
         <p>内容判定：{{ outcome.content_decision === 'approved' ? '通过' : '驳回' }}</p>
@@ -60,35 +61,68 @@ const {
         <p>案件版本：{{ outcome.version }}</p>
         <p>内容通过不代表必然公开、激活昵称或解锁胶囊。</p>
       </section>
-      <div class="workflow-grid">
-        <section aria-label="树洞案件列表" :aria-busy="listBusy">
-          <div class="workflow-actions">
-            <h2>审核案件</h2>
+
+      <section aria-label="树洞案件列表" :aria-busy="listBusy">
+        <BusinessToolbar label="树洞审核操作栏">
+          <h2>审核案件</h2>
+          <template #tools>
             <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
-          </div>
-          <p v-if="listBusy" role="status">正在加载案件…</p>
-          <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-          <p v-if="listNotice" role="status">{{ listNotice }}</p>
-          <p v-if="!listBusy && !listError && !items.length">当前页暂无审核案件</p>
-          <ul v-if="items.length" class="workflow-list">
-            <li v-for="item in items" :key="item.id">
-              <button
-                :disabled="editorOpen"
-                :aria-pressed="selectedId === item.id"
-                @click="openCase(item.id)"
-              >
-                {{ whisperKindLabels[item.source.kind] }} · {{ whisperStatusLabels[item.status] }} ·
-                {{ item.id }}
-                <span
-                  >案件版本 {{ item.version }} · 正文版本 {{ item.source.content_version }}</span
-                >
-              </button>
-            </li>
-          </ul>
+          </template>
+        </BusinessToolbar>
+        <p v-if="listBusy" role="status">正在加载案件…</p>
+        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
+        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <p v-if="!listBusy && !listError && !items.length">当前页暂无审核案件</p>
+        <div v-if="items.length" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">本页序号</th>
+                <th scope="col">内容类型</th>
+                <th scope="col">状态</th>
+                <th scope="col">案件版本</th>
+                <th scope="col">正文版本</th>
+                <th scope="col">创建时间（北京时间）</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in items" :key="item.id">
+                <th scope="row">{{ index + 1 }}</th>
+                <td>{{ whisperKindLabels[item.source.kind] }}</td>
+                <td>{{ whisperStatusLabels[item.status] }}</td>
+                <td>{{ item.version }}</td>
+                <td>{{ item.source.content_version }}</td>
+                <td>{{ displayBeijingTime(item.created_at) }}</td>
+                <td>
+                  <button
+                    :disabled="editorOpen"
+                    :aria-label="`查看第 ${index + 1} 条案件`"
+                    @click="openCase(item.id)"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多案件' }}
           </button>
-        </section>
+        </div>
+      </section>
+      <ElDialog
+        v-if="selectedId && !editorOpen"
+        :model-value="true"
+        title="树洞案件详情"
+        width="min(56rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
+        :close-on-click-modal="false"
+        @update:model-value="!$event && close()"
+      >
         <WhisperReviewDetail
           :detail="detail"
           :selected-id="selectedId"
@@ -101,12 +135,14 @@ const {
           @close="close"
           @process="startProcessing"
         />
-      </div>
-      <ElDrawer
+      </ElDialog>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         :title="task === 'crisis' ? '升级树洞危机' : '处理树洞审核'"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :before-close="closeProcessing"
@@ -114,8 +150,8 @@ const {
       >
         <template v-if="detail">
           <p>
-            {{ whisperKindLabels[detail.source.kind] }} · {{ detail.id }} · 案件版本
-            {{ detail.version }} · 正文版本 {{ detail.source.content_version }}
+            {{ whisperKindLabels[detail.source.kind] }} · 案件版本 {{ detail.version }} · 正文版本
+            {{ detail.source.content_version }}
           </p>
           <p v-if="detail.source.kind === 'whisper_capsule'" class="banner">
             私密胶囊仅供当前命中案件复核；通过不等于立即解锁。
@@ -159,7 +195,7 @@ const {
           <section v-if="confirming" class="workflow-box" aria-label="树洞操作确认">
             <h3>确认操作</h3>
             <p>
-              {{ detail.id }} · 案件版本 {{ detail.version }} · 正文版本
+              案件版本 {{ detail.version }} · 正文版本
               {{ detail.source.content_version }}
             </p>
             <p>
@@ -188,7 +224,7 @@ const {
           </section>
           <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

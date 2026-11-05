@@ -24,7 +24,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       <button :disabled="locked" @click="$emit('close')">关闭案件</button>
       <p>{{ whisperKindLabels[detail.source.kind] }} · {{ whisperStatusLabels[detail.status] }}</p>
       <p>
-        {{ detail.id }} · 案件版本 {{ detail.version }} · 正文版本
+        案件版本 {{ detail.version }} · 正文版本
         {{ detail.source.content_version }}
       </p>
       <p v-if="detail.source.kind === 'whisper_capsule'" class="banner">

@@ -185,6 +185,11 @@ export function useWhisperEvidence() {
       },
     )
   }
+  async function queryAccepted() {
+    if (busy.value || editorOpen.value || !acceptedId.value) return
+    jobId.value = acceptedId.value
+    await query()
+  }
   async function query() {
     if (busy.value || editorOpen.value || !validWhisperId(jobId.value)) return
     workspace.cancel()
@@ -231,5 +236,6 @@ export function useWhisperEvidence() {
     back,
     submit,
     query,
+    queryAccepted,
   }
 }

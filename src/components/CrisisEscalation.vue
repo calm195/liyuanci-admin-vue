@@ -93,14 +93,16 @@ async function submit() {
     <h3>判定危机并升级</h3>
     <p>仅使用当前来源案件及其精确内容，升级后由后端隔离；不在这里搜索其他私聊或录入学生身份。</p>
     <template v-if="result"
-      ><p role="status">危机升级已确认：{{ result.id }}</p>
+      ><p role="status">危机升级已确认</p>
       <RouterLink :to="{ path: '/crisis', query: { case: result.id } }"
         >进入该危机案件</RouterLink
       ></template
     >
     <form v-else @submit.prevent="confirm">
       <fieldset :disabled="busy || confirming || stale">
-        <legend>来源 {{ sourceId }} · 版本 {{ version }}</legend>
+        <legend>
+          {{ source === 'report' ? '来源举报' : '来源审核案件' }} · 版本 {{ version }}
+        </legend>
         <label :for="`crisis-escalation-${sourceId}`">判定理由（必填，最多 2000 个字符）</label
         ><textarea
           :id="`crisis-escalation-${sourceId}`"
@@ -114,7 +116,7 @@ async function submit() {
     <p v-if="error" role="alert">{{ error }}</p>
     <section v-if="confirming" aria-label="危机升级确认">
       <p>
-        确认将 {{ sourceId }}（版本
+        确认将当前来源（版本
         {{ version }}）升级为危机案件？后端将按当前案件权限与状态复核，并隔离对应内容。
       </p>
       <p>{{ reason.trim() }}</p>

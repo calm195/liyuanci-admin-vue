@@ -4,7 +4,8 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CrisisView from './CrisisView.vue'
-import { ElDrawer } from 'element-plus'
+import { ElDialog } from 'element-plus'
+import type * as VueRouter from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { CrisisDetail, CrisisEvidence, CrisisSummary } from '@/types/crisis'
@@ -21,7 +22,10 @@ vi.mock('@/services/crisis', async (original) => ({
   ...(await original<typeof crisisService>()),
   createCrisisClient: () => mocks,
 }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
+vi.mock('vue-router', async (original) => ({
+  ...(await original<typeof VueRouter>()),
+  useRoute: () => ({ query: {} }),
+}))
 const first: CrisisDetail = {
   id: 'case-a',
   version: 7,
@@ -56,7 +60,7 @@ function deferred<T>() {
   }
 }
 async function open(id = 'case-a') {
-  const found = wrapper?.findAll('.workflow-list button').find((item) => item.text().startsWith(id))
+  const found = wrapper?.findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('案件未找到')
   await found.trigger('click')
   await flushPromises()
@@ -156,7 +160,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await open()
     const pending = deferred<CrisisEvidence>()
     mocks.evidence.mockReturnValueOnce(pending.promise)
-    await button('查看证据 evidence-a').trigger('click')
+    await button('查看证据 1').trigger('click')
     expect(mocks.evidence).toHaveBeenCalledWith('case-a', 'evidence-a', expect.any(AbortSignal))
     await button('收起证据').trigger('click')
     pending.resolve({
@@ -321,7 +325,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await open()
     expect(wrapper?.find('form').exists()).toBe(false)
     await button('显示完整学号').trigger('click')
-    await button('查看证据 evidence-a').trigger('click')
+    await button('查看证据 1').trigger('click')
     await flushPromises()
     await process()
     expect(wrapper?.text()).not.toContain(first.student_number)
@@ -345,9 +349,9 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await confirm()
     expect(button('从首页刷新').attributes('disabled')).toBeDefined()
     expect(button('取消处理').attributes('disabled')).toBeDefined()
-    expect(button('关闭案件并清除材料').attributes('disabled')).toBeDefined()
+    expect(wrapper?.find('[aria-label="危机案件详情"]').exists()).toBe(false)
     const done = vi.fn()
-    const beforeClose = wrapper?.findComponent(ElDrawer).props('beforeClose')
+    const beforeClose = wrapper?.findComponent(ElDialog).props('beforeClose')
     beforeClose?.(done)
     expect(done).not.toHaveBeenCalled()
     pending.resolve({ id: first.id, version: 8, status: 'handling' })

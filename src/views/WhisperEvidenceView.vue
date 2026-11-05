@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { onMounted } from 'vue'
+import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useWhisperEvidence, validWhisperId } from '@/composables/useWhisperEvidence'
 const {
@@ -29,78 +32,136 @@ const {
   back,
   submit,
   query,
+  queryAccepted,
 } = useWhisperEvidence()
+const privacy = usePrivacyHandoff()
+onMounted(() => {
+  const id = privacy.consume()
+  if (id && workspace.allowed()) {
+    evidenceId.value = id
+    void loadTarget()
+  }
+})
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">隐私管理 / 超级管理员</p>
-    <h1>树洞证据</h1>
+  <main class="panel workflow" aria-label="树洞证据">
     <template v-if="workspace.allowed()">
       <p class="banner">
         删除作用于整个限定证据范围，无法撤回。受理不代表清理完成，也不会恢复普通内容。
       </p>
       <p>
-        仅按已知范围或删除任务 ID 查询元信息，不展示原始证据、正文或学号；信息仅保存在当前页面内存。
+        可从授权树洞危机进入，或输入已知范围及任务标识查询元信息。仅保留当前页面内存中的查询结果。
       </p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="busy" role="status">正在处理请求…</p>
-      <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
-      <section class="workflow-box" aria-label="树洞证据范围">
+      <section class="business-card" aria-label="树洞证据范围">
         <h2>读取证据范围</h2>
+        <BusinessToolbar label="查询操作栏">
+          <template #tools>
+            <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
+          </template>
+        </BusinessToolbar>
         <form @submit.prevent="loadTarget">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据范围</legend>
-            <label for="whisper-evidence-id">证据范围 ID</label
+            <label for="whisper-evidence-id">证据范围标识</label
             ><input
               id="whisper-evidence-id"
               v-model="evidenceId"
+              type="password"
               autocomplete="off"
               spellcheck="false"
             />
             <button type="submit" :disabled="!validWhisperId(evidenceId)">读取证据范围</button>
           </fieldset>
         </form>
-        <template v-if="target"
-          ><p>证据范围：{{ target.id }} · 范围版本 {{ target.version }}</p>
-          <p>{{ target.state === 'retained' ? '证据保留中' : '证据范围正在删除' }}</p>
-          <button v-if="canDelete" :disabled="busy || editorOpen" @click="startProcessing">
-            处理证据删除
-          </button>
-          <p v-else>当前不能受理删除，请按已有删除任务查询或重新读取范围。</p>
-        </template>
+        <div v-if="target" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">证据类型</th>
+                <th scope="col">保留状态</th>
+                <th scope="col">范围版本</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>树洞限定证据</td>
+                <td>{{ target.state === 'retained' ? '证据保留中' : '证据范围正在删除' }}</td>
+                <td>范围版本 {{ target.version }}</td>
+                <td>
+                  <button v-if="canDelete" :disabled="busy || editorOpen" @click="startProcessing">
+                    处理证据删除
+                  </button>
+                  <span v-else>请按已有删除任务查询或重新读取范围。</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
-      <section class="workflow-box" aria-label="树洞证据删除进度">
+      <section class="business-card" aria-label="树洞证据删除进度">
         <h2>查询删除任务</h2>
-        <p v-if="acceptedId" role="status">
-          已受理任务：{{ acceptedId }}；请查询后核对是否清理完成。
-        </p>
+        <div v-if="acceptedId" class="workflow-actions">
+          <p role="status">删除任务已受理，待核对清理进度。</p>
+          <button :disabled="busy || editorOpen" @click="queryAccepted">查询刚受理的任务</button>
+        </div>
         <form @submit.prevent="query">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知删除任务</legend>
-            <label for="whisper-job-id">删除任务 ID（不是证据范围 ID）</label
-            ><input id="whisper-job-id" v-model="jobId" autocomplete="off" spellcheck="false" />
+            <label for="whisper-job-id">删除任务标识</label
+            ><input
+              id="whisper-job-id"
+              v-model="jobId"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+            />
             <button type="submit" :disabled="!validWhisperId(jobId)">查询删除进度</button>
           </fieldset>
         </form>
         <section v-if="progress" aria-label="树洞证据清理结果" role="status">
-          <p>任务：{{ progress.id }}</p>
-          <p v-if="progress.status === 'completed'">证据范围清理已完成（后端确认）。</p>
-          <p v-else>证据范围正在清理，尚未全部完成；请稍后手动查询。</p>
+          <h3>清理结果</h3>
+          <div class="business-table">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">任务类型</th>
+                  <th scope="col">清理状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>树洞证据清理</td>
+                  <td>
+                    {{
+                      progress.status === 'completed'
+                        ? '证据范围清理已完成（后端确认）。'
+                        : '证据范围正在清理，尚未全部完成；请稍后手动查询。'
+                    }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
       </section>
-      <ElDrawer
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         title="处理树洞证据删除"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :before-close="closeProcessing"
         :show-close="!busy && !uncertain"
       >
         <template v-if="target"
-          ><p>{{ target.id }} · 范围版本 {{ target.version }}</p>
+          ><p>树洞限定证据 · 范围版本 {{ target.version }}</p>
           <p v-if="error" role="alert">{{ error }}</p>
           <form @submit.prevent="check">
             <fieldset :disabled="busy || confirming || uncertain">
@@ -121,7 +182,7 @@ const {
           </form>
           <section v-if="confirming" class="workflow-box" aria-label="树洞证据最终确认">
             <h3>确认删除整个证据范围</h3>
-            <p>{{ target.id }} · 范围版本 {{ target.version }}</p>
+            <p>树洞限定证据 · 范围版本 {{ target.version }}</p>
             <p class="workflow-body">理由：{{ reason }}</p>
             <p>将停止该范围读取并进入异步清理，不能撤回，不会解除危机或隐私屏障。</p>
             <button :disabled="busy || !canDelete" @click="submit">
@@ -131,7 +192,7 @@ const {
           </section>
           <button :disabled="busy || uncertain" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>
