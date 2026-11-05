@@ -47,5 +47,26 @@ watch(
       <div class="public-tools"><ThemeSwitcher /></div>
       <RouterView />
     </div>
+    <footer class="site-footer">
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
+        粤ICP备2025460136号-1
+      </a>
+    </footer>
   </ElConfigProvider>
 </template>
+
+<style scoped>
+.site-footer {
+  padding: 16px 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.site-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+</style>
