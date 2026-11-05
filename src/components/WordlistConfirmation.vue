@@ -23,9 +23,11 @@ defineEmits<{ submit: []; cancel: [] }>()
       <p>创建后尚未发布，不改变当前生效版本。</p>
     </template>
     <p v-else>
-      {{ confirmation.item.id }} · 草稿资源版本 {{ confirmation.input.expected_version }} · 分类基准
+      草稿资源版本 {{ confirmation.input.expected_version }} · 分类基准
       {{ confirmation.input.expected_head_version }} · 创建时生效版
-      {{ confirmation.item.base_effective_id ?? '无' }}；发布后归档旧生效版，不自动全量重扫历史。
+      {{
+        confirmation.item.base_effective_id ? '已有版本' : '无'
+      }}；发布后归档旧生效版，不自动全量重扫历史。
     </p>
     <button :disabled="writing" @click="$emit('submit')">
       {{ writing ? '正在提交…' : '确认提交' }}

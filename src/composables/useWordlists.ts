@@ -14,7 +14,7 @@ import type {
 } from '@/types/wordlists'
 
 /** 每个路由独立持有状态；离页取消读取和写入，不跨页保留词条。 */
-export function useWordlists(detailId?: string) {
+export function useWordlists(detailId?: string, autoLoad = true) {
   const items = ref<Wordlist[]>([])
   const heads = ref<WordlistHead[]>([])
   const detail = ref<WordlistDetail | null>(null)
@@ -135,6 +135,8 @@ export function useWordlists(detailId?: string) {
     const key = attempt.key
     writing.value = true
     error.value = ''
+    resultId.value = null
+    notice.value = ''
     await workspace.run(
       (signal) =>
         'entries' in current
@@ -145,7 +147,7 @@ export function useWordlists(detailId?: string) {
         await load()
         if (generation === expected && workspace.allowed()) {
           resultId.value = value.id
-          notice.value = `${'entries' in current ? '草稿已创建，尚未发布' : '版本已发布，旧生效版已归档'}：${value.id} · 资源版本 ${value.version}；已有审核任务继续使用原词库快照`
+          notice.value = `${'entries' in current ? '草稿已创建，尚未发布' : '版本已发布，旧生效版已归档'}：资源版本 ${value.version}；已有审核任务继续使用原词库快照`
         }
       },
       async (cause) => {
@@ -163,10 +165,12 @@ export function useWordlists(detailId?: string) {
       },
     )
   }
-  async function openDetail(id: string) {
+  async function openDetail(id: string | null) {
     if (busy.value || writing.value) return
     workspace.cancel()
     detail.value = null
+    detailBusy.value = false
+    if (!id) return
     detailBusy.value = true
     error.value = ''
     await workspace.run(
@@ -192,7 +196,7 @@ export function useWordlists(detailId?: string) {
     )
   }
   onMounted(() => {
-    void load()
+    if (autoLoad) void load()
   })
 
   return {
@@ -214,6 +218,7 @@ export function useWordlists(detailId?: string) {
     base,
     status,
     load,
+    openDetail,
     prepare,
     publish,
     submit,

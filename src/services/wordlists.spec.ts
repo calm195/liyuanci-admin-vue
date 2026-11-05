@@ -26,6 +26,14 @@ describe('T017 词库完整快照与基准解析', () => {
       entries: ['词条'],
     })
   })
+  it('词条状态是完整快照中不重复的停用子集', () => {
+    const data = { ...item, entries: ['启用词', '停用词'] }
+    expect(parseWordlistDetail({ ...data, disabled_entries: ['停用词'] }).disabled_entries).toEqual(
+      ['停用词'],
+    )
+    expect(() => parseWordlistDetail({ ...data, disabled_entries: ['陌生词'] })).toThrow()
+    expect(() => parseWordlistDetail({ ...data, disabled_entries: ['停用词', '停用词'] })).toThrow()
+  })
   it('空快照合法，空白词条拒绝', () => {
     expect(parseWordlistDetail({ ...item, entries: [] }).entries).toEqual([])
     expect(() => parseWordlistDetail({ ...item, entries: [' '] })).toThrow()

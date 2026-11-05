@@ -22,10 +22,9 @@ const {
 } = useWordlists(props.id)
 </script>
 <template>
-  <main class="panel workflow">
-    <h1>词单详情</h1>
+  <main class="panel workflow" aria-label="词单详情">
     <nav class="workflow-actions" aria-label="词库页面导航">
-      <RouterLink to="/wordlists">词单列表</RouterLink>
+      <RouterLink to="/wordlists">词库管理</RouterLink>
       <RouterLink to="/wordlists/drafts/new">创建草稿</RouterLink>
     </nav>
     <template v-if="workspace.allowed()">
@@ -42,23 +41,39 @@ const {
       <section v-if="detail" class="workflow-box" aria-label="词库只读详情">
         <h2>完整快照（只读）</h2>
         <p>
-          {{ labels[detail.kind] }} · {{ detail.id }} · 资源版本 {{ detail.version }} ·
+          {{ labels[detail.kind] }} · 资源版本 {{ detail.version }} ·
           {{ status(detail.status) }}
         </p>
-        <p>创建时生效版 {{ detail.base_effective_id ?? '无' }}；归档不等于物理删除或无限期保留。</p>
-        <p v-for="head in heads.filter((item) => item.kind === detail?.kind)" :key="head.kind">
-          分类基准 {{ head.version }} · 当前生效版 {{ head.effective_id ?? '无' }}
+        <p>
+          创建时生效版
+          {{ detail.base_effective_id ? '已有版本' : '无' }}；归档不等于物理删除或无限期保留。
         </p>
-        <ul>
-          <li v-for="(entry, index) in detail.entries" :key="index">{{ entry }}</li>
-        </ul>
+        <p v-for="head in heads.filter((item) => item.kind === detail?.kind)" :key="head.kind">
+          分类基准 {{ head.version }} · 当前生效版 {{ head.effective_id ? '已发布' : '无' }}
+        </p>
+        <div class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">词条</th>
+                <th scope="col">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="entry in detail.entries" :key="entry">
+                <th scope="row">{{ entry }}</th>
+                <td>{{ detail.disabled_entries?.includes(entry) ? '停用' : '启用' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <p v-if="!detail.entries.length">空词条快照</p>
         <button
           v-if="loaded && canPublish(detail)"
           :disabled="writing || !!confirmation"
           @click="publish(detail)"
         >
-          发布 {{ detail.id }}
+          发布草稿
         </button>
         <p v-else-if="loaded && detail.status === 'draft'">
           创建基准已被替代，请基于当前生效版创建新快照。

@@ -97,7 +97,18 @@ beforeEach(async () => {
   await router.isReady()
   wrapper = mount(
     { components: { RouterView, AppBreadcrumb }, template: '<AppBreadcrumb /><RouterView />' },
-    { global: { plugins: [pinia, router] } },
+    {
+      global: {
+        plugins: [pinia, router],
+        stubs: {
+          ElDialog: {
+            props: ['modelValue', 'title'],
+            template:
+              '<section v-if="modelValue" role="dialog" :aria-label="title"><slot /><slot name="footer" /></section>',
+          },
+        },
+      },
+    },
   )
   await flushPromises()
 })
@@ -110,13 +121,13 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     await go('/wordlists')
     expect(wrapper?.find('form').exists()).toBe(false)
     expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
-    await wrapper?.get('a[href="/wordlists/drafts/new"]').trigger('click')
+    await go('/wordlists/drafts/new')
     await vi.waitFor(() => expect(wrapper?.find('form').exists()).toBe(true))
     await wrapper?.get('#wordlist-entries').setValue('未提交词条')
     await wrapper?.get('[aria-label="面包屑导航"] a[href="/wordlists"]').trigger('click')
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/wordlists'))
     await flushPromises()
-    await wrapper?.get(`a[href="/wordlists/${draft.id}"]`).trigger('click')
+    await detail()
     await vi.waitFor(() => expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(true))
     expect(wrapper?.find('form').exists()).toBe(false)
     expect(wrapper?.text()).not.toContain('未提交词条')
@@ -131,7 +142,9 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     await detail()
     expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
     expect(wrapper?.text()).not.toContain('不匹配词条')
-    expect(wrapper?.findAll('button').some((item) => item.text().startsWith('发布 '))).toBe(false)
+    expect(wrapper?.findAll('button').some((item) => item.text().startsWith('发布草稿'))).toBe(
+      false,
+    )
     await button('刷新词库').trigger('click')
     await flushPromises()
     expect(wrapper?.text()).toContain('合成只读词')
@@ -170,7 +183,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
   it('发布单独确认精确资源与head版本，归档只读', async () => {
     await flushPromises()
     await detail()
-    await button('发布 school-draft').trigger('click')
+    await button('发布草稿').trigger('click')
     expect(mocks.publish).not.toHaveBeenCalled()
     await submit()
     expect(mocks.publish).toHaveBeenCalledWith(
@@ -188,8 +201,11 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     })
     await button('刷新词库').trigger('click')
     await flushPromises()
+    await button('版本记录').trigger('click')
     expect(wrapper?.text()).toContain('已归档')
-    expect(wrapper?.findAll('button').some((value) => value.text().startsWith('发布 '))).toBe(false)
+    expect(wrapper?.findAll('button').some((value) => value.text().startsWith('发布草稿'))).toBe(
+      false,
+    )
   })
   it('重复提交只发送一次；不确定失败沿用幂等键，修改输入换键', async () => {
     await flushPromises()
@@ -272,7 +288,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
   it('旧生效基准草稿不可发布；发布409后清空确认并显示新生效指针', async () => {
     await flushPromises()
     await detail()
-    await button('发布 school-draft').trigger('click')
+    await button('发布草稿').trigger('click')
     expect(wrapper?.text()).toContain('草稿资源版本 1')
     expect(wrapper?.text()).toContain('分类基准 7')
     mocks.publish.mockRejectedValueOnce(new ApiError(409))
@@ -284,10 +300,12 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       ),
     })
     await submit()
-    expect(wrapper?.text()).toContain('new-effective')
+    expect(wrapper?.text()).not.toContain('new-effective')
     expect(wrapper?.text()).toContain('创建基准已被替代')
     expect(wrapper?.find('[aria-label="词库操作确认"]').exists()).toBe(false)
-    expect(wrapper?.findAll('button').some((item) => item.text().startsWith('发布 '))).toBe(false)
+    expect(wrapper?.findAll('button').some((item) => item.text().startsWith('发布草稿'))).toBe(
+      false,
+    )
     expect(mocks.publish).toHaveBeenCalledTimes(1)
   })
   it('归档完整快照授权只读，切换/关闭详情拒绝旧响应，权限撤销清空词条', async () => {
@@ -354,7 +372,9 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null, heads })
     await button('刷新词库').trigger('click')
     await flushPromises()
-    expect(wrapper?.text()).toContain('暂无词库版本')
+    await button('版本记录').trigger('click')
+    expect(wrapper?.text()).toContain('暂无历史版本')
+    await button('关闭').trigger('click')
     const pending = deferred<WordlistPage>()
     mocks.list.mockReturnValueOnce(pending.promise)
     await button('刷新词库').trigger('click')
@@ -365,5 +385,98 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     await flushPromises()
     expect(signal).toBeInstanceOf(AbortSignal)
     if (signal instanceof AbortSignal) expect(signal.aborted).toBe(true)
+  })
+})
+
+describe('词条工作区', () => {
+  it('筛选、查看、编辑、删除和启停单条词条，保存后再单独发布', async () => {
+    mocks.detail.mockResolvedValueOnce({
+      ...published,
+      entries: ['校园合成词', '停用示例', '待删除词'],
+      disabled_entries: ['停用示例'],
+    })
+    await go('/wordlists')
+    expect(wrapper?.text()).not.toContain(published.id)
+    const search = wrapper?.get('input[type="search"]')
+    await search?.setValue('停用')
+    expect(wrapper?.findAll('tbody tr')).toHaveLength(4)
+    await button('查看').trigger('click')
+    expect(wrapper?.get('[role="dialog"]').text()).toContain('停用示例')
+    await button('关闭').trigger('click')
+    const disabledEntry = wrapper?.get('[role="switch"][aria-label="启用词条 停用示例"]')
+    expect(disabledEntry?.attributes('aria-checked')).toBe('false')
+    await disabledEntry?.trigger('click')
+    expect(disabledEntry?.attributes('aria-checked')).toBe('true')
+    await search?.setValue('校园')
+    await button('编辑').trigger('click')
+    await wrapper?.get('#wordlist-entry-text').setValue('修改后的词')
+    await wrapper?.get('form').trigger('submit')
+    await search?.setValue('修改')
+    const editedEntry = wrapper?.get('[role="switch"][aria-label="启用词条 修改后的词"]')
+    expect(editedEntry?.attributes('aria-checked')).toBe('true')
+    await editedEntry?.trigger('click')
+    expect(editedEntry?.attributes('aria-checked')).toBe('false')
+    await search?.setValue('待删除')
+    await button('删除').trigger('click')
+    await button('确认删除').trigger('click')
+    expect(wrapper?.text()).not.toContain('待删除词')
+    await button('新增词条').trigger('click')
+    await wrapper?.get('#wordlist-entry-text').setValue('新增词条示例')
+    await wrapper?.get('form').trigger('submit')
+    await button('保存草稿').trigger('click')
+    expect(mocks.create).not.toHaveBeenCalled()
+    mocks.detail.mockResolvedValueOnce({
+      ...draft,
+      id: 'new-draft',
+      version: 3,
+      entries: ['修改后的词', '停用示例', '新增词条示例'],
+      disabled_entries: ['修改后的词'],
+    })
+    await submit()
+    expect(mocks.create).toHaveBeenCalledWith(
+      {
+        kind: 'school',
+        entries: ['修改后的词', '停用示例', '新增词条示例'],
+        disabled_entries: ['修改后的词'],
+        expected_version: 7,
+      },
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+    expect(mocks.publish).not.toHaveBeenCalled()
+    await button('发布草稿').trigger('click')
+    await submit()
+    expect(mocks.publish).toHaveBeenCalledWith(
+      'new-draft',
+      { expected_version: 3, expected_head_version: 7 },
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('切换词库前确认未保存修改，冲突时保留编辑并禁止再次提交', async () => {
+    await go('/wordlists')
+    await button('新增词条').trigger('click')
+    await wrapper?.get('#wordlist-entry-text').setValue('未发布的新词')
+    await wrapper?.get('form').trigger('submit')
+    await button('危机').trigger('click')
+    expect(wrapper?.get('[role="dialog"]').text()).toContain('放弃尚未保存')
+    await button('关闭').trigger('click')
+    expect(wrapper?.text()).toContain('未发布的新词')
+    await button('保存草稿').trigger('click')
+    mocks.create.mockRejectedValueOnce(new ApiError(409))
+    mocks.list.mockResolvedValue({
+      items: [published],
+      next_cursor: null,
+      heads: heads.map((head) => (head.kind === 'school' ? { ...head, version: 8 } : head)),
+    })
+    await submit()
+    expect(wrapper?.text()).toContain('未发布的新词')
+    expect(wrapper?.text()).toContain('词库基准已变化')
+    expect(button('保存草稿').attributes('disabled')).toBeDefined()
+    await button('危机').trigger('click')
+    await button('放弃并继续').trigger('click')
+    expect(wrapper?.text()).toContain('危机词库详情')
+    expect(wrapper?.text()).not.toContain('未发布的新词')
   })
 })

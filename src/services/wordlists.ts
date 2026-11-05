@@ -22,10 +22,25 @@ export function parseWordlist(value: unknown): Wordlist {
     base_effective_id: nullableId(data['base_effective_id']),
   }
 }
+export function parseDisabledEntries(value: unknown, entries: readonly string[]): string[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('停用词条格式异常')
+  const disabled = value.map(reviewText)
+  const words = new Set(entries)
+  if (new Set(disabled).size !== disabled.length || disabled.some((entry) => !words.has(entry)))
+    throw new Error('停用词条必须是完整快照内不重复的词条')
+  return disabled
+}
 export function parseWordlistDetail(value: unknown): WordlistDetail {
   const data = reviewRecord(value)
   if (!Array.isArray(data['entries'])) throw new Error('词条快照格式异常')
-  return { ...parseWordlist(value), entries: data['entries'].map(reviewText) }
+  const entries = data['entries'].map(reviewText)
+  const disabled = parseDisabledEntries(data['disabled_entries'], entries)
+  return {
+    ...parseWordlist(value),
+    entries,
+    ...(disabled.length ? { disabled_entries: disabled } : {}),
+  }
 }
 export function parseWordlistPage(value: unknown): WordlistPage {
   const data = reviewRecord(value)

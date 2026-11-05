@@ -21,10 +21,9 @@ const {
 } = useWordlists()
 </script>
 <template>
-  <main class="panel workflow">
-    <h1>创建词单草稿</h1>
+  <main class="panel workflow" aria-label="创建词单草稿">
     <nav class="workflow-actions" aria-label="词库页面导航">
-      <RouterLink to="/wordlists">词单列表</RouterLink>
+      <RouterLink to="/wordlists">词库管理</RouterLink>
       <RouterLink to="/wordlists/drafts/new">创建草稿</RouterLink>
     </nav>
     <template v-if="workspace.allowed()">
@@ -35,7 +34,7 @@ const {
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <RouterLink v-if="resultId" :to="{ name: 'wordlist-detail', params: { id: resultId } }"
-        >查看新草稿 {{ resultId }}</RouterLink
+        >查看新草稿</RouterLink
       >
 
       <button :disabled="busy || writing" @click="load">刷新词库</button>
@@ -52,7 +51,7 @@ const {
             </select>
             <p>
               分类创建基准：{{ base?.version ?? '未读取' }} · 当前生效版
-              {{ base?.effective_id ?? '无' }}
+              {{ base?.effective_id ? '已发布' : '无' }}
             </p>
             <label for="wordlist-entries">完整词条，每行一条；空输入表示空版本</label>
             <textarea id="wordlist-entries" v-model="text" rows="5"></textarea>

@@ -1,7 +1,12 @@
 import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { parseModerationCase, parseModerationOutcome, parseModerationPage } from './moderation'
-import { parseWordlist, parseWordlistDetail, parseWordlistPage } from './wordlists'
+import {
+  parseDisabledEntries,
+  parseWordlist,
+  parseWordlistDetail,
+  parseWordlistPage,
+} from './wordlists'
 import { reviewText, reviewVersion } from './review-boundary'
 import { wordlistKinds } from '@/types/wordlists'
 import type { ModerationClient } from '@/types/moderation'
@@ -122,6 +127,7 @@ export function createWordlistTransport(
       if (!wordlistKinds.includes(input.kind) || !Array.isArray(input.entries))
         throw new Error('词库分类或完整快照格式异常')
       const entries = input.entries.map(reviewText)
+      const disabled = parseDisabledEntries(input.disabled_entries, entries)
       if (
         new Set(entries).size !== entries.length ||
         entries.some((entry) => [...entry].length > 1000)
@@ -135,6 +141,7 @@ export function createWordlistTransport(
             {
               kind: input.kind,
               entries,
+              ...(disabled.length ? { disabled_entries: disabled } : {}),
               expected_version: input.expected_version,
             },
             key,

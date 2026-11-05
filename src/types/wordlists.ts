@@ -11,6 +11,7 @@ export interface Wordlist {
 }
 export interface WordlistDetail extends Wordlist {
   entries: string[]
+  disabled_entries?: string[]
 }
 export interface WordlistHead {
   kind: WordlistKind
@@ -23,6 +24,7 @@ export interface WordlistPage extends CursorPage<Wordlist> {
 export interface WordlistInput {
   kind: WordlistKind
   entries: string[]
+  disabled_entries?: string[]
   expected_version: number
 }
 export interface WordlistPublish {
