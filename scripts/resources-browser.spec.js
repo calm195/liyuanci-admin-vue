@@ -177,7 +177,12 @@ try {
     await page.getByRole('button', { name: '登录后台', exact: true }).click()
     await page.waitForURL(`${base}/`)
     if (role === 'crisis_operator') {
-      assert.equal(await page.getByRole('link', { name: '资料管理', exact: true }).count(), 0)
+      assert.equal(
+        await page
+          .getByRole('link', { name: '资料管理', exact: true, includeHidden: true })
+          .count(),
+        0,
+      )
       await page.evaluate(() => {
         globalThis.history.pushState({}, '', '/resources')
         globalThis.dispatchEvent(new globalThis.PopStateEvent('popstate'))
@@ -188,6 +193,7 @@ try {
       await context.close()
       continue
     }
+    await page.getByRole('button', { name: '内容管理', exact: true }).click()
     await page.getByRole('link', { name: '资料管理', exact: true }).click()
     await page.locator('tbody tr').waitFor()
     assert.equal(await page.locator('tbody img').count(), 0)
@@ -205,7 +211,7 @@ try {
       }
     }
     await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.getByRole('button', { name: `查看资料 ${resource.id}`, exact: true }).click()
+    await page.getByRole('button', { name: `查看资料 ${resource.title}`, exact: true }).click()
     await page.getByRole('button', { name: '下架后编辑', exact: true }).click()
     await page.getByLabel('下架理由（1–500字）').fill('更新合成资料')
     await page.getByRole('button', { name: '确认下架', exact: true }).click()
@@ -226,7 +232,7 @@ try {
     await page.getByRole('alert').filter({ hasText: '服务暂不可用' }).waitFor()
     assert.equal(await page.getByText('暂无符合条件的资料', { exact: true }).count(), 0)
     await page.getByRole('link', { name: '资料分类', exact: true }).click()
-    await page.getByRole('button', { name: `编辑分类 ${category.id}`, exact: true }).click()
+    await page.getByRole('button', { name: `编辑分类 ${category.name}`, exact: true }).click()
     await page.getByLabel('启用此分类').uncheck()
     await page.getByRole('button', { name: '确认保存', exact: true }).click()
     await page.getByRole('alert').filter({ hasText: '分类仍被资料引用' }).waitFor()

@@ -122,7 +122,7 @@ async function start(
     global: {
       plugins: [pinia, router],
       stubs: {
-        ElDrawer: {
+        ElDialog: {
           props: ['modelValue'],
           template: '<section v-if="modelValue"><slot /></section>',
         },

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useResourceCategories } from '@/composables/useResourceCategories'
 const {
@@ -32,11 +33,9 @@ const {
 } = useResourceCategories()
 </script>
 <template>
-  <main class="panel workflow">
-    <p class="eyebrow">内容管理</p>
-    <h1>资料分类</h1>
+  <main class="panel workflow" aria-label="资料分类">
     <template v-if="workspace.allowed()"
-      ><form class="workflow-actions" @submit.prevent="search">
+      ><form id="category-filters" class="business-filters" @submit.prevent="search">
         <label
           >启用状态
           <select v-model="enabled">
@@ -44,31 +43,63 @@ const {
             <option value="true">启用</option>
             <option value="false">停用</option>
           </select></label
-        ><button type="submit">查询 / 从首页刷新</button
-        ><button type="button" :disabled="writing" @click="create">新建分类</button>
+        >
       </form>
+      <BusinessToolbar label="资料分类操作栏">
+        <button class="business-primary" type="button" :disabled="writing" @click="create">
+          新建分类
+        </button>
+        <template #tools>
+          <button type="submit" form="category-filters">查询 / 从首页刷新</button>
+        </template>
+      </BusinessToolbar>
       <p>排序数字越小越靠前；分类为单级结构。</p>
       <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="busy" role="status">正在读取分类…</p>
       <p v-else-if="!error && !items.length">暂无符合条件的分类</p>
-      <ul class="workflow-list">
-        <li v-for="item in items" :key="item.id">
-          <p>{{ item.name }} · 排序 {{ item.sort_order }} · {{ item.enabled ? '启用' : '停用' }}</p>
-          <button :disabled="writing" :aria-label="`编辑分类 ${item.id}`" @click="open(item.id)">
-            编辑分类
-          </button>
-        </li>
-      </ul>
-      <div class="workflow-actions">
+      <div v-if="items.length" class="business-table">
+        <table>
+          <caption>
+            资料分类查询结果
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">分类名称</th>
+              <th scope="col">排序</th>
+              <th scope="col">状态</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in items" :key="item.id">
+              <th scope="row">{{ item.name }}</th>
+              <td>{{ item.sort_order }}</td>
+              <td>{{ item.enabled ? '启用' : '停用' }}</td>
+              <td>
+                <button
+                  :disabled="writing"
+                  :aria-label="`编辑分类 ${item.name}`"
+                  @click="open(item.id)"
+                >
+                  编辑分类
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="business-pagination" role="group" aria-label="分页操作">
         <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
         ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
       </div>
-      <ElDrawer
+      <ElDialog
         :model-value="!!selected"
         :title="selected === 'new' ? '新建分类' : '编辑分类'"
-        size="min(38rem, 100vw)"
+        class="business-dialog"
+        width="min(38rem, calc(100vw - 2rem))"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :show-close="false"
@@ -112,7 +143,7 @@ const {
           :to="{ path: '/resources', query: { category_id: detail.id } }"
           >查看此分类资料</RouterLink
         >
-      </ElDrawer></template
+      </ElDialog></template
     >
     <p v-else role="alert">当前会话无权管理分类，请重新登录或联系管理员。</p>
   </main>

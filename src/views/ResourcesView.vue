@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useResources } from '@/composables/useResources'
 import { feedbackLabels, resourceStatuses, resourceStatusLabels } from '@/types/resources'
@@ -52,11 +53,9 @@ function time(value: string) {
 }
 </script>
 <template>
-  <main class="panel workflow resource-workspace">
-    <p class="eyebrow">内容管理</p>
-    <h1>资料管理</h1>
+  <main class="panel workflow resource-workspace" aria-label="资料管理">
     <template v-if="workspace.allowed()">
-      <form class="resource-filters" @submit.prevent="search">
+      <form id="resource-filters" class="business-filters" @submit.prevent="search">
         <label
           >关键词<input v-model="filters.q" autocomplete="off" placeholder="搜索标题或简介"
         /></label>
@@ -76,9 +75,15 @@ function time(value: string) {
             </option>
           </select></label
         >
-        <button type="submit">查询 / 从首页刷新</button
-        ><button type="button" :disabled="writing" @click="create">新建资料</button>
       </form>
+      <BusinessToolbar label="资料操作栏">
+        <button class="business-primary" type="button" :disabled="writing" @click="create">
+          新建资料
+        </button>
+        <template #tools>
+          <button type="submit" form="resource-filters">查询 / 从首页刷新</button>
+        </template>
+      </BusinessToolbar>
       <p v-if="categoryError" role="alert">
         {{ categoryError }} <button @click="loadCategories">重新读取分类</button>
       </p>
@@ -88,7 +93,7 @@ function time(value: string) {
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="busy" role="status">正在读取资料…</p>
       <p v-else-if="!error && !items.length">暂无符合条件的资料</p>
-      <div v-if="items.length" class="resource-table">
+      <div v-if="items.length" class="business-table">
         <table>
           <caption>
             按创建时间倒序；时间为北京时间
@@ -117,7 +122,7 @@ function time(value: string) {
               <td>{{ time(item.updated_at) }}</td>
               <td>
                 <button
-                  :aria-label="`查看资料 ${item.id}`"
+                  :aria-label="`查看资料 ${item.title}`"
                   :disabled="writing"
                   @click="open(item.id)"
                 >
@@ -128,11 +133,11 @@ function time(value: string) {
           </tbody>
         </table>
       </div>
-      <div class="workflow-actions">
+      <div class="business-pagination" role="group" aria-label="分页操作">
         <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
         ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
       </div>
-      <ElDrawer
+      <ElDialog
         :model-value="!!selected"
         :title="
           mode === 'create'
@@ -143,7 +148,9 @@ function time(value: string) {
                 ? '确认下架'
                 : '资料详情'
         "
-        size="min(46rem, 100vw)"
+        class="business-dialog"
+        width="min(46rem, calc(100vw - 2rem))"
+        top="2rem"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :show-close="false"
@@ -257,18 +264,12 @@ function time(value: string) {
             </button>
           </fieldset>
         </form>
-      </ElDrawer>
+      </ElDialog>
     </template>
     <p v-else role="alert">当前会话无权管理资料，请重新登录或联系管理员。</p>
   </main>
 </template>
 <style scoped>
-.resource-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: end;
-}
 label {
   display: grid;
   gap: 0.4rem;
@@ -279,20 +280,6 @@ textarea {
   padding: 0.65rem;
   font: inherit;
   max-width: 100%;
-}
-.resource-table {
-  overflow-x: auto;
-}
-table {
-  min-width: 48rem;
-  width: 100%;
-  border-collapse: collapse;
-}
-th,
-td {
-  padding: 0.8rem;
-  text-align: left;
-  border-bottom: 1px solid var(--control-border);
 }
 .resource-text {
   white-space: pre-wrap;
