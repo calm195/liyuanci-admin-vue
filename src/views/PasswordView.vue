@@ -63,8 +63,7 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main class="panel workflow">
-    <h1>本人修改口令</h1>
+  <main class="panel workflow" aria-label="本人修改口令">
     <p>当前账号：{{ admin.session?.account.login_name }}</p>
     <p>核验当前口令后修改；成功后全部旧会话撤销并重新登录，不自动续期。</p>
     <form @submit.prevent="submit">

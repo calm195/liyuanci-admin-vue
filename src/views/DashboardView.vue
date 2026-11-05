@@ -1,7 +1,5 @@
 <template>
-  <main class="panel">
-    <p class="eyebrow">管理工作台</p>
-    <h1>欢迎使用鲤源池</h1>
+  <main class="panel" aria-label="工作台">
     <p>
       后台账号、身份审核、内容审核、词库、举报／处罚／申诉管理及危机工作台连接同源后台服务，暂无运营统计接口。
     </p>

@@ -22,7 +22,9 @@ describe('T010 REQ-018/019 登录入口', () => {
     const wrapper = await mountLogin()
     expect(wrapper.find('select').exists()).toBe(false)
     expect(wrapper.get('fieldset').attributes('disabled')).toBeUndefined()
-    expect(wrapper.text()).toContain('使用后台账号登录')
+    expect(wrapper.get('form').attributes('aria-labelledby')).toBe('admin-login-title')
+    expect(wrapper.get('#admin-login-title').text()).toBe('后台登录')
+    expect(wrapper.text()).not.toContain('使用后台账号登录')
     wrapper.unmount()
   })
   it('旧演示环境变量不再提供角色选择或本地凭据入口', async () => {

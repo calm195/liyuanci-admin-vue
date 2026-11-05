@@ -48,7 +48,7 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   const view = render()
   const breadcrumb = view.get('[aria-label="面包屑导航"]')
   expect(breadcrumb.text()).toContain('工作台')
-  expect(breadcrumb.text()).toContain('认证管理')
+  expect(breadcrumb.text()).toContain('用户管理')
   expect(breadcrumb.get('[aria-current="page"] .el-breadcrumb__inner').text()).toBe('身份审核')
   expect(document.title).toBe('身份审核 · 鲤源池')
   const navigation = view.get('nav[aria-label="管理菜单"]')
@@ -57,7 +57,9 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   expect(navigation.get('a[href="/resources"]').text()).toBe('资料管理')
   expect(navigation.get('a[href="/resource-categories"]').text()).toBe('资料分类')
   expect(navigation.find('a[href="/crisis"]').exists()).toBe(false)
-  expect(navigation.find('a[href="/identity"]').attributes('aria-current')).toBe('page')
+  const identity = navigation.get('a[href="/identity"]')
+  expect(identity.element.closest('.navigation-group')?.textContent).toContain('用户管理')
+  expect(identity.attributes('aria-current')).toBe('page')
   await breadcrumb.get('a[href="/"]').trigger('click')
   await flushPromises()
   await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
@@ -131,7 +133,7 @@ it('REQ-019 安全治理三个入口各自高亮，面包屑和页面标题随�
   }
 })
 
-it('登录建立会话并切换布局后仍自动进入工作台', async () => {
+it('登录后默认进入顶层工作台，业务分组均默认收起', async () => {
   vi.spyOn(useAdminStore(), 'login').mockImplementation(() => {
     login()
     return Promise.resolve()
@@ -145,5 +147,36 @@ it('登录建立会话并切换布局后仍自动进入工作台', async () => {
   expect(useAdminStore().authenticated).toBe(true)
   expect(router.currentRoute.value.path).toBe('/')
   expect(wrapper.find('#login-password').exists()).toBe(false)
-  expect(wrapper.get('h1').text()).toBe('欢迎使用鲤源池')
+  expect(wrapper.get('main').attributes('aria-label')).toBe('工作台')
+  const navigation = wrapper.get('nav[aria-label="管理菜单"]')
+  const workbench = navigation.get('a[href="/"]')
+  expect(workbench.element.parentElement).toBe(navigation.element)
+  expect(workbench.attributes('aria-current')).toBe('page')
+  for (const toggle of navigation.findAll('.navigation-group-toggle')) {
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+  }
+})
+
+it('可收起分组，进入该分组的子页面时重新展开', async () => {
+  login()
+  await router.push('/identity')
+  const view = render()
+  const toggle = view
+    .findAll('.navigation-group-toggle')
+    .find((button) => button.text().includes('内容管理'))
+  if (!toggle) throw new Error('缺少内容管理分组')
+  const link = view.get('a[href="/resources"]')
+  const identity = view.get('a[href="/identity"]')
+  expect(toggle.attributes('aria-expanded')).toBe('false')
+  expect(link.isVisible()).toBe(false)
+  expect(identity.isVisible()).toBe(true)
+  await toggle.trigger('click')
+  expect(toggle.attributes('aria-expanded')).toBe('true')
+  expect(identity.isVisible()).toBe(false)
+  await toggle.trigger('click')
+  expect(link.isVisible()).toBe(false)
+  await router.push('/resources')
+  expect(toggle.attributes('aria-expanded')).toBe('true')
+  expect(link.isVisible()).toBe(true)
+  expect(link.attributes('aria-current')).toBe('page')
 })

@@ -11,30 +11,30 @@ const admin = useAdminStore()
 const route = useRoute()
 const router = useRouter()
 const menuOpen = ref(false)
+const expandedGroup = ref<string | null>(null)
 const error = ref('')
 const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
-  return [
-    '总览',
-    '用户管理',
-    '认证管理',
-    '内容管理',
-    '内容治理',
-    '安全治理',
-    '隐私管理',
-    '系统管理',
-  ]
+  return ['用户管理', '内容管理', '内容治理', '安全治理', '隐私管理', '系统管理']
     .filter((title) => visible.some((item) => item.group === title))
     .map((title) => ({
       title,
       items: visible.filter((item) => item.group === title),
     }))
 })
+function toggleGroup(title: string) {
+  expandedGroup.value = expandedGroup.value === title ? null : title
+}
 watch(
   () => route.path,
   () => {
     menuOpen.value = false
+    const current = visibleGroups.value.find((group) =>
+      group.items.some(({ path }) => route.path === path || route.path.startsWith(path + '/')),
+    )
+    expandedGroup.value = current?.title ?? null
   },
+  { immediate: true },
 )
 async function logout() {
   try {
@@ -55,11 +55,29 @@ async function logout() {
         <span>鲤源池<strong>管理工作台</strong></span>
       </RouterLink>
       <nav class="workspace-navigation" aria-label="管理菜单">
-        <section v-for="group in visibleGroups" :key="group.title" class="navigation-group">
-          <h2>{{ group.title }}</h2>
-          <RouterLink v-for="item in group.items" :key="item.path" :to="item.path">
-            {{ item.title }}
-          </RouterLink>
+        <RouterLink class="navigation-root-link" to="/">工作台</RouterLink>
+        <section
+          v-for="(group, index) in visibleGroups"
+          :key="group.title"
+          class="navigation-group"
+        >
+          <h2>
+            <button
+              class="navigation-group-toggle"
+              type="button"
+              :aria-controls="`navigation-group-${index}`"
+              :aria-expanded="expandedGroup === group.title"
+              @click="toggleGroup(group.title)"
+            >
+              {{ group.title }}
+              <span aria-hidden="true">{{ expandedGroup === group.title ? '▾' : '▸' }}</span>
+            </button>
+          </h2>
+          <div :id="`navigation-group-${index}`" :hidden="expandedGroup !== group.title">
+            <RouterLink v-for="item in group.items" :key="item.path" :to="item.path">
+              {{ item.title }}
+            </RouterLink>
+          </div>
         </section>
       </nav>
       <p class="sidebar-caption">鲤源池 · WEB 管理端</p>

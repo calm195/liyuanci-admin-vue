@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
@@ -193,66 +194,77 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="panel workflow">
-    <h1>后台账号管理</h1>
+  <main class="panel workflow" aria-label="后台账号管理">
     <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
     <template v-if="workspace.allowed()">
       <p class="banner">每次请求由服务端核验当前超管权限。</p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <p v-if="error" role="alert">{{ error }}</p>
       <section aria-labelledby="accounts-title" :aria-busy="busy">
-        <h2 id="accounts-title">后台账号列表</h2>
-        <button :disabled="busy || editorOpen" @click="load()">从首页刷新</button>
-        <button :disabled="busy || editorOpen" @click="create">创建后台账号</button>
+        <BusinessToolbar label="账号操作栏">
+          <h2 id="accounts-title">后台账号列表</h2>
+          <button class="business-primary" :disabled="busy || editorOpen" @click="create">
+            创建后台账号
+          </button>
+          <template #tools>
+            <button :disabled="busy || editorOpen" @click="load()">从首页刷新</button>
+          </template>
+        </BusinessToolbar>
         <p v-if="busy" role="status">正在处理…</p>
         <p v-else-if="!items.length">暂无后台账号</p>
-        <table v-if="items.length">
-          <caption>
-            账号、角色与当前版本
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">账号</th>
-              <th scope="col">状态</th>
-              <th scope="col">角色</th>
-              <th scope="col">版本</th>
-              <th scope="col">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="account in items" :key="account.id">
-              <th scope="row">
-                {{ account.login_name
-                }}<span v-if="account.id === owner?.account.id">（本人）</span>
-              </th>
-              <td>{{ account.active ? '启用' : '停用' }}</td>
-              <td>{{ account.roles.map((role) => roleLabels[role]).join('、') || '无角色' }}</td>
-              <td>{{ account.version }}</td>
-              <td>
-                <button
-                  :disabled="busy || editorOpen"
-                  :aria-label="`修改 ${account.login_name} 的角色`"
-                  @click="edit(account)"
-                >
-                  修改角色
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <button :disabled="busy || editorOpen || !history.length" @click="previousPage">
-          上一页
-        </button>
-        <button :disabled="busy || editorOpen || nextCursor === null" @click="nextPage">
-          下一页
-        </button>
+        <div v-if="items.length" class="business-table">
+          <table>
+            <caption>
+              账号、角色与当前版本
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">账号</th>
+                <th scope="col">状态</th>
+                <th scope="col">角色</th>
+                <th scope="col">版本</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="account in items" :key="account.id">
+                <th scope="row">
+                  {{ account.login_name
+                  }}<span v-if="account.id === owner?.account.id">（本人）</span>
+                </th>
+                <td>{{ account.active ? '启用' : '停用' }}</td>
+                <td>{{ account.roles.map((role) => roleLabels[role]).join('、') || '无角色' }}</td>
+                <td>{{ account.version }}</td>
+                <td>
+                  <button
+                    :disabled="busy || editorOpen"
+                    :aria-label="`修改 ${account.login_name} 的角色`"
+                    @click="edit(account)"
+                  >
+                    修改角色
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
+          <button :disabled="busy || editorOpen || !history.length" @click="previousPage">
+            上一页
+          </button>
+          <button :disabled="busy || editorOpen || nextCursor === null" @click="nextPage">
+            下一页
+          </button>
+        </div>
         <p>列表随账号变化更新；新建后从首页重新读取，不视为冻结快照。</p>
       </section>
-      <ElDrawer
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         :title="selected ? '修改账号角色' : '创建后台账号'"
-        size="min(36rem, 100vw)"
+        class="business-dialog"
+        width="min(36rem, calc(100vw - 2rem))"
+        top="2rem"
         :before-close="closeEditor"
         :close-on-click-modal="false"
         :show-close="!busy"
@@ -296,7 +308,7 @@ onMounted(() => {
             <button :disabled="busy" @click="confirming = false">返回修改</button>
           </section>
         </section>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>

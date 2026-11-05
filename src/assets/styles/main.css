@@ -1,32 +1,32 @@
 @import 'element-plus/theme-chalk/base.css';
 
 :root {
-  --page-background: #f4f6f9;
+  --page-background: #f6f7fb;
   --surface: #ffffff;
-  --surface-muted: #f7f9fb;
-  --text-primary: #253444;
-  --text-secondary: #607286;
+  --surface-muted: #fafbfe;
+  --text-primary: #111827;
+  --text-secondary: #545d70;
   --border-color: #dce3eb;
   --control-border: #a0aebc;
-  --accent-color: #176957;
+  --accent-color: #6d28d9;
   --on-accent: #ffffff;
-  --selected-surface: #e5f2ed;
+  --selected-surface: #f0e8ff;
   --warning-surface: #fff3ce;
   --warning-text: #715000;
   --danger-color: #b32b29;
   --focus-color: #aa6d00;
 }
 html.dark {
-  --page-background: #111827;
-  --surface: #192334;
-  --surface-muted: #202d40;
+  --page-background: #0f1117;
+  --surface: #171a24;
+  --surface-muted: #202432;
   --text-primary: #e4ebf4;
   --text-secondary: #a5b5c9;
   --border-color: #34445b;
   --control-border: #647891;
-  --accent-color: #67cbb0;
-  --on-accent: #102a24;
-  --selected-surface: #203e3b;
+  --accent-color: #c4a7ff;
+  --on-accent: #21143d;
+  --selected-surface: #30244b;
   --warning-surface: #44381d;
   --warning-text: #f4d47e;
   --danger-color: #ffa59e;
@@ -96,19 +96,19 @@ h1 {
   color: var(--warning-text);
   padding: 0.8rem 1.2rem;
 }
-button:not(.el-button, .el-drawer__close-btn, .el-radio-button__original),
+button:not(.el-button, .el-dialog__headerbtn, .el-radio-button__original),
 select {
   font: inherit;
   padding: 0.65rem 1rem;
   border-radius: 8px;
   border: 1px solid var(--control-border);
 }
-button:not(.el-button, .el-drawer__close-btn) {
+button:not(.el-button, .el-dialog__headerbtn) {
   cursor: pointer;
   background: var(--accent-color);
   color: var(--on-accent);
 }
-button:not(.el-button, .el-drawer__close-btn):disabled {
+button:not(.el-button, .el-dialog__headerbtn):disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -136,8 +136,8 @@ select {
 .workflow-grid {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr);
-  gap: 2rem;
-  margin-top: 2rem;
+  gap: 12px;
+  margin-top: 14px;
 }
 .workflow-grid > section {
   min-width: 0;
@@ -225,4 +225,157 @@ fieldset {
 
 .el-radio-button {
   --el-radio-button-checked-text-color: var(--on-accent);
+}
+
+.business-card {
+  min-width: 0;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.business-card > h2,
+.business-toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.business-card > h2 {
+  margin-bottom: 12px;
+}
+.business-toolbar,
+.business-toolbar-actions,
+.business-toolbar-tools,
+.business-filters,
+.business-pagination,
+.business-row-actions,
+.business-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.business-toolbar {
+  margin: 10px 0;
+}
+.business-toolbar-tools,
+.business-dialog-actions {
+  margin-inline-start: auto;
+}
+.business-filters {
+  align-items: end;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+.business-filters label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.business-filters :is(input, select) {
+  margin: 0;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.business-pagination {
+  margin: 12px 0;
+}
+.business-pagination:empty {
+  display: none;
+}
+.business-table {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.business-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.business-table caption {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+}
+.business-table th,
+.business-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  overflow-wrap: anywhere;
+}
+.business-table thead {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+.business-table thead th {
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.business-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.business-table tbody tr:hover {
+  background: var(--surface-muted);
+}
+.business-table :is(td, th) > p {
+  margin: 2px 0;
+}
+:is(.business-toolbar, .business-pagination, .business-dialog-actions) button:not(.el-button),
+.business-table button:not(.el-button) {
+  padding: 4px 10px;
+  min-height: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+:is(.business-toolbar, .business-pagination, .business-dialog-actions, .business-table)
+  button:not(.el-button, :disabled):hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+:is(.business-toolbar, .business-dialog-actions) button.business-primary {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: var(--on-accent);
+}
+:is(.business-toolbar, .business-dialog-actions) button.business-primary:not(:disabled):hover {
+  background: var(--el-color-primary-dark-2);
+  color: var(--on-accent);
+}
+.business-table td button:not([role='switch'], .business-danger) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-color);
+}
+:is(.business-table, .business-dialog-actions) button.business-danger {
+  color: var(--danger-color);
+}
+:is(.business-table, .business-dialog-actions) button.business-danger:not(:disabled):hover {
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+}
+.business-dialog {
+  --el-dialog-padding-primary: 20px;
+  --el-dialog-border-radius: 8px;
+  max-height: calc(100dvh - 4rem);
+  overflow: auto;
+}
+.business-dialog .el-dialog__header {
+  border-bottom: 1px solid var(--border-color);
+}
+.business-dialog .el-dialog__body {
+  padding-top: 14px;
+}
+.business-dialog-actions {
+  justify-content: flex-end;
 }

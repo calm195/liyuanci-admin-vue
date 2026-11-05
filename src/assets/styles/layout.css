@@ -3,18 +3,18 @@
   display: flex;
 }
 .workspace-sidebar {
-  width: 232px;
-  flex: 0 0 232px;
+  width: 216px;
+  flex: 0 0 216px;
   background: var(--surface);
   border-right: 1px solid var(--border-color);
-  padding: 24px 16px;
+  padding: 16px 12px;
 }
 .workspace-brand {
   display: flex;
   align-items: center;
   gap: 12px;
   text-decoration: none;
-  padding: 0 12px 24px;
+  padding: 0 10px 16px;
   color: var(--text-primary);
 }
 .workspace-brand strong {
@@ -34,29 +34,44 @@
   font-size: 22px;
 }
 .navigation-group {
-  margin: 12px 0 20px;
+  margin: 6px 0;
 }
 .navigation-group h2 {
-  margin: 0 12px 6px;
+  margin: 0 0 2px;
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
 }
-.navigation-group a {
+.navigation-group button.navigation-group-toggle {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.navigation-group button.navigation-group-toggle:hover {
+  background: var(--surface-muted);
+}
+.workspace-navigation a {
   display: block;
-  border-radius: 8px;
-  padding: 9px 12px;
-  margin: 3px 0;
+  border-radius: 5px;
+  padding: 6px 10px 6px 22px;
+  margin: 2px 0;
   text-decoration: none;
   color: var(--text-primary);
   font-size: 14px;
 }
-.navigation-group a:hover {
+.workspace-navigation a:hover {
   background: var(--surface-muted);
 }
-.navigation-group a.router-link-active {
+.workspace-navigation a.router-link-active {
   background: var(--selected-surface);
   color: var(--accent-color);
+}
+.workspace-navigation .navigation-root-link {
+  padding-inline-start: 10px;
 }
 .sidebar-caption {
   padding: 12px;
@@ -71,8 +86,8 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 76px;
-  padding: 16px 28px;
+  min-height: 56px;
+  padding: 8px 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
@@ -94,18 +109,23 @@
   font-size: 13px;
 }
 .workspace-content {
-  padding: 28px;
+  padding: 20px;
 }
 .workspace-content > .panel {
   width: 100%;
   max-width: none;
   margin: 0;
-  border-radius: 12px;
-  padding: clamp(20px, 3vw, 36px);
+  border-radius: 8px;
+  padding: 20px;
+}
+.workspace-content > .panel.workflow {
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 .workspace-content h1 {
-  margin-top: 0;
-  font-size: 26px;
+  margin: 0 0 10px;
+  font-size: 22px;
 }
 .workspace-header .mobile-menu-toggle {
   display: none;
@@ -132,6 +152,15 @@
 .public-shell .login {
   margin: 8vh auto;
 }
+.login h1 {
+  margin-top: 0;
+}
+.login fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
 .login input {
   display: block;
   width: 100%;
@@ -149,7 +178,7 @@
     padding: 20px;
   }
   .workspace-header {
-    padding: 16px 20px;
+    padding: 8px 16px;
   }
 }
 @media (max-width: 760px) {
