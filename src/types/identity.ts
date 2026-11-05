@@ -3,8 +3,16 @@ export interface IdentitySummary {
   version: number
   status: string
 }
+export type IdentityListView = 'pending' | 'history'
+export interface IdentityListItem {
+  id: string
+  name: string
+  student_number: string
+  status: 'pending' | 'approved' | 'rejected'
+  reviewed_at: string | null
+}
 export interface IdentityPage {
-  items: IdentitySummary[]
+  items: IdentityListItem[]
   next_cursor: string | null
 }
 export interface IdentityCase extends IdentitySummary {
@@ -28,7 +36,7 @@ export interface IdentityReceipt {
   revision_suggestion?: string
 }
 export interface IdentityReviewClient {
-  list(cursor: string | null, signal: AbortSignal): Promise<IdentityPage>
+  list(cursor: string | null, signal: AbortSignal, view: IdentityListView): Promise<IdentityPage>
   detail(id: string, signal: AbortSignal): Promise<IdentityCase>
   card(id: string, signal: AbortSignal): Promise<Blob>
   decide(

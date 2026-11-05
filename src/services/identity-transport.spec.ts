@@ -5,20 +5,38 @@ const signal = new AbortController().signal
 const envelope = (data: unknown) =>
   Response.json({ code: 0, message: '合成', request_id: 'trace', data })
 describe('T012 REQ-002/018/019 最新人工认证协议', () => {
-  it('列表透传不透明游标并仅保留脱敏字段', async () => {
+  it('历史列表透传视图、游标和业务字段', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(
       envelope({
-        items: [{ id, version: 3, status: 'pending', name: '不应进入列表' }],
+        items: [
+          {
+            id,
+            version: 3,
+            status: 'approved',
+            name: '合成姓名',
+            student_number: '合成学号',
+            reviewed_at: '2026-11-05T01:00:00Z',
+          },
+        ],
         next_cursor: null,
       }),
     )
     const result = await createIdentityTransport('admin-token', () => true, transport).list(
       'a+/=&',
       signal,
+      'history',
     )
-    expect(result.items).toEqual([{ id, version: 3, status: 'pending' }])
+    expect(result.items).toEqual([
+      {
+        id,
+        status: 'approved',
+        name: '合成姓名',
+        student_number: '合成学号',
+        reviewed_at: '2026-11-05T01:00:00Z',
+      },
+    ])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/identity-reviews?limit=20&cursor=a%2B%2F%3D%26')
+    expect(url).toBe('/api/v1/admin/identity-reviews?limit=20&view=history&cursor=a%2B%2F%3D%26')
     expect(init).toMatchObject({
       signal,
       cache: 'no-store',
@@ -75,7 +93,7 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
       .fn<typeof fetch>()
       .mockResolvedValue(Response.json({ items: [], next_cursor: null }))
     const client = createIdentityTransport('token', () => true, transport)
-    await expect(client.list(null, signal)).rejects.toThrow('封装')
+    await expect(client.list(null, signal, 'pending')).rejects.toThrow('封装')
     transport.mockResolvedValue(
       envelope({
         id: 'other',
@@ -98,7 +116,7 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
     const controller = new AbortController()
     controller.abort()
     transport.mockClear()
-    await expect(client.list(null, controller.signal)).rejects.toThrow()
+    await expect(client.list(null, controller.signal, 'pending')).rejects.toThrow()
     expect(transport).not.toHaveBeenCalled()
   })
 })

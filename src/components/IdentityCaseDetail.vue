@@ -3,7 +3,6 @@ import type { IdentityCase } from '@/types/identity'
 defineProps<{
   detail: IdentityCase | null
   selected: string
-  status: string
   caseBusy: boolean
   cardBusy: boolean
   cardUrl: string
@@ -27,7 +26,6 @@ defineEmits<{
     <button v-if="selected && !detail && !caseBusy" @click="$emit('retry')">重试案件</button>
     <template v-if="detail">
       <div class="review-actions">
-        <p>{{ detail.id }}</p>
         <button :disabled="locked" @click="$emit('close')">关闭案件</button>
       </div>
       <dl class="identity-fields">
@@ -35,8 +33,6 @@ defineEmits<{
         <dd>{{ detail.name }}</dd>
         <dt>学号</dt>
         <dd>{{ detail.student_number }}</dd>
-        <dt>状态</dt>
-        <dd>{{ status }} · 版本 {{ detail.version }}</dd>
       </dl>
       <p class="muted">身份资料仅供当前授权案件使用，离开页面即清除。</p>
       <div class="review-actions">

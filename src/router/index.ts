@@ -30,6 +30,7 @@ export const menu: MenuItem[] = [
   { path: '/password', group: '系统管理', title: '本人改密' },
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
   { path: '/identity', group: '用户管理', title: '身份审核', role: 'review_operator' },
+  { path: '/identity/history', group: '用户管理', title: '身份审核历史', role: 'review_operator' },
   { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
   { path: '/whispers/reviews', group: '内容治理', title: '树洞审核', role: 'review_operator' },
   { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
@@ -71,6 +72,11 @@ export const router = createRouter({
     {
       path: '/identity',
       component: () => import('@/views/IdentityView.vue'),
+      meta: { role: 'review_operator' },
+    },
+    {
+      path: '/identity/history',
+      component: () => import('@/views/IdentityHistoryView.vue'),
       meta: { role: 'review_operator' },
     },
     {

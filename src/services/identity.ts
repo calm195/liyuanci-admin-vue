@@ -1,5 +1,12 @@
 import { record } from '@/types/admin'
-import type { IdentityCase, IdentityPage, IdentityReceipt, IdentitySummary } from '@/types/identity'
+import type {
+  IdentityCase,
+  IdentityListItem,
+  IdentityListView,
+  IdentityPage,
+  IdentityReceipt,
+  IdentitySummary,
+} from '@/types/identity'
 
 /** 与人工认证契约的意见资源上限一致，按 UTF-8 字节计数。 */
 export function validIdentityFeedback(value: string): boolean {
@@ -25,12 +32,27 @@ function summary(value: unknown): IdentitySummary {
     status: text(value['status']),
   }
 }
-/** 仅提取脱敏列表字段，额外身份字段不会进入页面状态。 */
-export function parseIdentityPage(value: unknown): IdentityPage {
+/** 只保留当前列表所需的业务字段，学生卡和内部版本由详情单独读取。 */
+export function parseIdentityPage(value: unknown, view: IdentityListView): IdentityPage {
   if (!record(value) || !Array.isArray(value['items'])) return invalid()
   const cursor = value['next_cursor']
   if (cursor !== null && typeof cursor !== 'string') return invalid()
-  return { items: value['items'].map(summary), next_cursor: cursor }
+  const items = value['items'].map((item: unknown): IdentityListItem => {
+    if (!record(item)) return invalid()
+    const status = item['status']
+    const reviewedAt = item['reviewed_at']
+    if (status !== 'pending' && status !== 'approved' && status !== 'rejected') return invalid()
+    if ((view === 'pending') !== (status === 'pending')) return invalid()
+    if (reviewedAt !== undefined && typeof reviewedAt !== 'string') return invalid()
+    return {
+      id: text(item['id']),
+      name: text(item['name']),
+      student_number: text(item['student_number']),
+      status,
+      reviewed_at: reviewedAt ?? null,
+    }
+  })
+  return { items, next_cursor: cursor }
 }
 export function parseIdentityCase(value: unknown): IdentityCase {
   if (!record(value)) return invalid()

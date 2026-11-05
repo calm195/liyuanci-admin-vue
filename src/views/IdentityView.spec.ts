@@ -4,6 +4,7 @@ import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import IdentityView from './IdentityView.vue'
+import IdentityHistoryView from './IdentityHistoryView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { IdentityCase, IdentityReviewClient } from '@/types/identity'
@@ -41,13 +42,21 @@ function deferred<T>() {
     },
   }
 }
+function dialogText() {
+  return (
+    wrapper
+      ?.findAll('.el-dialog')
+      .map((dialog) => dialog.text())
+      .join(' ') ?? ''
+  )
+}
 function button(text: string) {
   const found = wrapper?.findAll('button').find((entry) => entry.text() === text)
   if (!found) throw new Error(`未找到按钮：${text}`)
   return found
 }
 async function open(id = 'case-a') {
-  const found = wrapper?.findAll('.case-list button').find((entry) => entry.text().includes(id))
+  const found = wrapper?.findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('未找到案件')
   await found.trigger('click')
   await flushPromises()
@@ -82,7 +91,7 @@ beforeEach(() => {
     },
   }
   mocks.list.mockResolvedValue({
-    items: [first, second].map(({ id, version, status }) => ({ id, version, status })),
+    items: [first, second],
     next_cursor: null,
   })
   mocks.detail.mockImplementation((id: string) =>
@@ -105,7 +114,7 @@ describe('T012 身份审核页面业务', () => {
     mocks.card.mockRejectedValueOnce(new ApiError(404))
     await button('查看学生卡').trigger('click')
     await flushPromises()
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(dialogText()).not.toContain('合成甲')
     expect(wrapper?.text()).toContain('案件不存在或已不可访问')
     expect(wrapper?.find('form').exists()).toBe(false)
   })
@@ -126,17 +135,19 @@ describe('T012 身份审核页面业务', () => {
     await open('case-b')
     pending.resolve({ request_id: first.id, status: 'approved', version: 2 })
     await flushPromises()
-    expect(wrapper?.text()).toContain('合成乙')
+    expect(dialogText()).toContain('合成乙')
     expect(wrapper?.text()).not.toContain('审核提交已确认')
     expect(wrapper?.find('[aria-label="审核回执"]').exists()).toBe(false)
   })
-  it('列表不展示身份，详情与学生卡按需读取', async () => {
+  it('待审核列表展示姓名学号，详情与学生卡按需读取', async () => {
     await flushPromises()
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(wrapper?.get('tbody').text()).toContain('合成甲')
+    expect(wrapper?.get('tbody').text()).toContain('合成学号甲')
+    expect(wrapper?.get('thead').text()).not.toMatch(/状态|案件版本/)
     expect(mocks.detail).not.toHaveBeenCalled()
     expect(mocks.card).not.toHaveBeenCalled()
     await open()
-    expect(wrapper?.text()).toContain('合成甲')
+    expect(dialogText()).toContain('合成甲')
     await button('查看学生卡').trigger('click')
     await flushPromises()
     expect(wrapper?.get('img').attributes('src')).toBe('blob:synthetic-card')
@@ -152,12 +163,12 @@ describe('T012 身份审核页面业务', () => {
     mocks.detail.mockReturnValueOnce(old.promise)
     await open()
     expect(revokeUrl).toHaveBeenCalledWith('blob:synthetic-card')
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(dialogText()).not.toContain('合成甲')
     await open('case-b')
     old.resolve(first)
     await flushPromises()
-    expect(wrapper?.text()).toContain('合成乙')
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(dialogText()).toContain('合成乙')
+    expect(dialogText()).not.toContain('合成甲')
   })
   it('驳回必须填写原因和建议，二次确认后按版本提交并展示回执', async () => {
     await flushPromises()
@@ -188,7 +199,7 @@ describe('T012 身份审核页面业务', () => {
     )
     expect(wrapper?.text()).toContain('审核提交已确认：已驳回')
     expect(wrapper?.text()).toContain('修改建议：请上传清晰图片')
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(dialogText()).not.toContain('合成甲')
     expect(wrapper?.find('form').exists()).toBe(false)
   })
   it('版本冲突重新读取并清空旧决定，不自动重复提交', async () => {
@@ -199,7 +210,8 @@ describe('T012 身份审核页面业务', () => {
     await confirm()
     expect(mocks.decide).toHaveBeenCalledTimes(1)
     expect(wrapper?.text()).toContain('旧决定不会自动重试')
-    expect(wrapper?.text()).toContain('版本 2')
+    expect(dialogText()).not.toContain('版本 2')
+    expect(mocks.detail).toHaveBeenCalledTimes(2)
     expect(wrapper?.find('[aria-label="提交确认"]').exists()).toBe(false)
   })
   it('提交期间重复点击只发送一次，失败重试沿用同一幂等键', async () => {
@@ -246,7 +258,7 @@ describe('T012 身份审核页面业务', () => {
     await flushPromises()
     expect(wrapper?.text()).not.toContain('合成甲')
     expect(createUrl).not.toHaveBeenCalled()
-    expect(wrapper?.find('.case-list').exists()).toBe(false)
+    expect(wrapper?.find('.business-table').exists()).toBe(false)
   })
   it('离开页面取消在途请求并释放图片', async () => {
     await flushPromises()
@@ -266,13 +278,13 @@ describe('T012 身份审核页面业务', () => {
     mocks.list.mockRejectedValueOnce(new Error('offline'))
     await button('刷新列表').trigger('click')
     await flushPromises()
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(dialogText()).not.toContain('合成甲')
     mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null })
     await button('重试列表').trigger('click')
     await flushPromises()
-    expect(wrapper?.text()).toContain('暂无审核案件')
+    expect(wrapper?.text()).toContain('暂无待审核案件')
     mocks.list.mockResolvedValueOnce({
-      items: [{ id: first.id, version: 1, status: 'pending' }],
+      items: [first],
       next_cursor: 'page-two',
     })
     await button('刷新列表').trigger('click')
@@ -281,11 +293,11 @@ describe('T012 身份审核页面业务', () => {
     mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null })
     await button('下一页').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith('page-two', expect.any(AbortSignal))
-    expect(wrapper?.text()).not.toContain('合成甲')
+    expect(mocks.list).toHaveBeenLastCalledWith('page-two', expect.any(AbortSignal), 'pending')
+    expect(dialogText()).not.toContain('合成甲')
     await button('上一页').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal))
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'pending')
   })
   it('已处理或未知状态案件只读，不允许再次审核', async () => {
     await flushPromises()
@@ -327,8 +339,8 @@ it('T012 读卡冲突时清除旧图片和决定，重读新版本后人工复�
   const failed = Promise.reject(new ApiError(409))
   pending.resolve(failed)
   await flushPromises()
-  expect(wrapper?.text()).not.toContain('合成甲')
-  expect(wrapper?.text()).toContain('合成新版')
+  expect(dialogText()).not.toContain('合成甲')
+  expect(dialogText()).toContain('合成新版')
   expect(wrapper?.text()).toContain('旧决定不会自动重试')
   expect(wrapper?.find('img').exists()).toBe(false)
   expect(wrapper?.find('[aria-label="提交确认"]').exists()).toBe(false)
@@ -343,10 +355,10 @@ it('T012 刷新回到待审队列首页，避免沿用旧游标遗漏新增案�
   mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null })
   await button('下一页').trigger('click')
   await flushPromises()
-  expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal))
+  expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal), 'pending')
   await button('刷新列表').trigger('click')
   await flushPromises()
-  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal))
+  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'pending')
   expect(button('上一页').attributes('disabled')).toBeDefined()
 })
 it('T012 超长中文意见不能进入二次确认，修正后可继续', async () => {
@@ -375,7 +387,7 @@ it('查询与详情只读，显式处理后取消清空表单但保留当前案�
   await wrapper?.get('form').trigger('submit')
   await button('取消处理').trigger('click')
   await flushPromises()
-  expect(wrapper?.text()).toContain('合成甲')
+  expect(dialogText()).toContain('合成甲')
   expect(wrapper?.find('form').exists()).toBe(false)
   expect(mocks.list).toHaveBeenCalledTimes(1)
   expect(mocks.decide).not.toHaveBeenCalled()
@@ -393,11 +405,29 @@ it('提交期间不能关闭处理或切换案件，404后关闭失效案件', a
   await button('确认提交').trigger('click')
   await button('取消处理').trigger('click')
   await open('case-b')
-  expect(wrapper?.text()).toContain('合成甲')
-  expect(wrapper?.text()).not.toContain('合成乙')
+  expect(dialogText()).toContain('合成甲')
+  expect(dialogText()).not.toContain('合成乙')
   expect(wrapper?.find('form').exists()).toBe(true)
   pending.resolve(Promise.reject(new ApiError(404)))
   await flushPromises()
-  expect(wrapper?.text()).not.toContain('合成甲')
+  expect(dialogText()).not.toContain('合成甲')
   expect(wrapper?.find('form').exists()).toBe(false)
+})
+
+it('审核历史独立查询已处理案件并仅展示结果和时间', async () => {
+  wrapper?.unmount()
+  const pinia = getActivePinia()
+  if (!pinia) throw new Error('缺少会话')
+  mocks.list.mockResolvedValue({
+    items: [{ ...first, status: 'rejected', reviewed_at: '2026-11-05T01:30:00Z' }],
+    next_cursor: null,
+  })
+  wrapper = mount(IdentityHistoryView, { global: { plugins: [pinia] } })
+  await flushPromises()
+  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'history')
+  expect(wrapper.get('tbody').text()).toContain('合成学号甲')
+  expect(wrapper.get('tbody').text()).toContain('已驳回')
+  expect(wrapper.get('tbody').text()).toContain('09:30:00')
+  expect(wrapper.find('tbody button').exists()).toBe(false)
+  expect(mocks.detail).not.toHaveBeenCalled()
 })

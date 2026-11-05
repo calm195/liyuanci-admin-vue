@@ -59,10 +59,10 @@ export function createIdentityTransport(
     return data(value)
   }
   return {
-    async list(cursor, signal) {
-      const query = new URLSearchParams({ limit: '20' })
+    async list(cursor, signal, view) {
+      const query = new URLSearchParams({ limit: '20', view })
       if (cursor !== null) query.set('cursor', cursor)
-      return parseIdentityPage(await json(`/api/v1/admin/identity-reviews?${query}`, signal))
+      return parseIdentityPage(await json(`/api/v1/admin/identity-reviews?${query}`, signal), view)
     },
     async detail(id, signal) {
       const result = parseIdentityCase(await json(path(id), signal))

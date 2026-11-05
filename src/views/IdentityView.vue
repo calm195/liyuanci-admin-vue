@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import IdentityCaseDetail from '@/components/IdentityCaseDetail.vue'
-import { ElDrawer } from 'element-plus'
-import 'element-plus/theme-chalk/el-drawer.css'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useIdentityReview } from '@/composables/useIdentityReview'
+import { displayBeijingTime } from '@/utils/admin-time'
+
+const props = defineProps<{ history?: boolean }>()
+const pageTitle = props.history ? '身份审核历史' : '身份审核'
 const {
   editorOpen,
   allowed,
@@ -41,64 +46,92 @@ const {
   startProcessing,
   cancelProcessing,
   closeProcessing,
-} = useIdentityReview()
+} = useIdentityReview(props.history ? 'history' : 'pending')
 </script>
 
 <template>
-  <main class="panel identity-review">
-    <p class="eyebrow">认证管理 / 身份审核</p>
-    <h1>身份审核</h1>
-    <p>按案件核对身份资料，不设置审核倒计时。</p>
+  <main class="panel workflow" :aria-label="pageTitle">
     <template v-if="allowed()">
-      <p class="banner">身份材料由同源后台按案件授权返回。</p>
       <p v-if="notice" role="status">{{ notice }}</p>
+      <p v-if="caseError && !selected && !editorOpen" role="alert">{{ caseError }}</p>
       <section v-if="receipt" class="receipt" aria-label="审核回执">
         <h2>审核回执</h2>
-        <p>
-          案件 {{ receipt.request_id }} · {{ statusLabel(receipt.status) }} · 版本
-          {{ receipt.version }}
-        </p>
+        <p>{{ statusLabel(receipt.status) }}</p>
         <p v-if="receipt.reason">驳回原因：{{ receipt.reason }}</p>
         <p v-if="receipt.revision_suggestion">修改建议：{{ receipt.revision_suggestion }}</p>
       </section>
-      <div class="review-grid">
-        <section aria-labelledby="case-list-title" :aria-busy="listBusy">
-          <div class="review-actions">
-            <h2 id="case-list-title">审核案件</h2>
+
+      <section aria-labelledby="case-list-title" :aria-busy="listBusy">
+        <BusinessToolbar :label="`${pageTitle}操作栏`">
+          <h2 id="case-list-title">{{ history ? '已处理案件' : '待审核案件' }}</h2>
+          <template #tools>
             <button :disabled="listBusy || editorOpen" @click="refreshList">刷新列表</button>
-          </div>
-          <p v-if="listBusy" role="status">正在加载案件…</p>
-          <div v-else-if="listError" role="alert">
-            <p>{{ listError }}</p>
-            <button :disabled="editorOpen" @click="loadList()">重试列表</button>
-          </div>
-          <p v-else-if="!items.length">暂无审核案件</p>
-          <ul v-else class="case-list">
-            <li v-for="item in items" :key="item.id">
-              <button
-                :disabled="editorOpen"
-                :aria-pressed="selected === item.id"
-                @click="openCase(item.id)"
-              >
-                <span>{{ item.id }}</span>
-                <span>{{ statusLabel(item.status) }} · 版本 {{ item.version }}</span>
-              </button>
-            </li>
-          </ul>
-          <div class="review-actions">
-            <button :disabled="listBusy || editorOpen || !cursors.length" @click="previousPage">
-              上一页
-            </button>
-            <button :disabled="listBusy || editorOpen || !nextCursor" @click="nextPage">
-              下一页
-            </button>
-          </div>
-          <p class="muted">列表仅展示案件编号、状态与版本。</p>
-        </section>
+          </template>
+        </BusinessToolbar>
+        <p v-if="listBusy" role="status">正在加载案件…</p>
+        <div v-else-if="listError" role="alert">
+          <p>{{ listError }}</p>
+          <button :disabled="editorOpen" @click="loadList()">重试列表</button>
+        </div>
+        <p v-else-if="!items.length">{{ history ? '暂无审核历史' : '暂无待审核案件' }}</p>
+        <div v-else class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">本页序号</th>
+                <th scope="col">姓名</th>
+                <th scope="col">学号</th>
+                <template v-if="history">
+                  <th scope="col">审核结果</th>
+                  <th scope="col">审核时间</th>
+                </template>
+                <th v-else scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in items" :key="item.id">
+                <th scope="row">{{ index + 1 }}</th>
+                <td>{{ item.name }}</td>
+                <td>{{ item.student_number }}</td>
+                <template v-if="history">
+                  <td>{{ statusLabel(item.status) }}</td>
+                  <td>{{ item.reviewed_at ? displayBeijingTime(item.reviewed_at) : '—' }}</td>
+                </template>
+                <td v-else>
+                  <button
+                    :disabled="editorOpen"
+                    :aria-label="`查看第 ${index + 1} 条案件`"
+                    @click="openCase(item.id)"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
+          <button :disabled="listBusy || editorOpen || !cursors.length" @click="previousPage">
+            上一页
+          </button>
+          <button :disabled="listBusy || editorOpen || !nextCursor" @click="nextPage">
+            下一页
+          </button>
+        </div>
+      </section>
+      <ElDialog
+        v-if="selected && !editorOpen"
+        :model-value="true"
+        title="身份审核案件详情"
+        width="min(56rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
+        :close-on-click-modal="false"
+        @update:model-value="!$event && clearCase()"
+      >
         <IdentityCaseDetail
           :detail="detail"
           :selected="selected"
-          :status="detail ? statusLabel(detail.status) : ''"
           :case-busy="caseBusy"
           :card-busy="cardBusy"
           :card-url="cardUrl"
@@ -111,18 +144,20 @@ const {
           @card-failed="cardFailed"
           @process="startProcessing"
         />
-      </div>
-      <ElDrawer
+      </ElDialog>
+      <ElDialog
         v-if="editorOpen"
         v-model="editorOpen"
         title="处理身份审核"
-        size="min(40rem, 100vw)"
+        width="min(40rem, calc(100vw - 2rem))"
+        class="business-dialog workflow"
+        top="2rem"
         :close-on-click-modal="false"
         :before-close="closeProcessing"
         :show-close="!submitting"
       >
         <template v-if="detail">
-          <p>{{ detail.id }} · 案件版本 {{ detail.version }}</p>
+          <p>{{ detail.name }} · {{ detail.student_number }}</p>
           <p v-if="caseError" role="alert">{{ caseError }}</p>
           <form v-if="detail.status === 'pending'" @submit.prevent="confirmDecision">
             <fieldset :disabled="submitting || confirming">
@@ -161,14 +196,12 @@ const {
           <section v-if="confirming" class="receipt" aria-label="提交确认">
             <h3>确认审核决定</h3>
             <p>
-              {{ detail.id }} · 当前版本 {{ detail.version }} ·
               {{ decision === 'approved' ? '通过认证' : '驳回认证' }}
             </p>
             <p v-if="decision === 'rejected'">
               原因：{{ reason.trim() }}；建议：{{ suggestion.trim() }}
             </p>
-            <p>提交后以服务返回状态为准；版本变化需重新核对。</p>
-            <div class="review-actions">
+            <div class="workflow-actions">
               <button :disabled="submitting" @click="submit">
                 {{ submitting ? '正在提交…' : '确认提交' }}
               </button>
@@ -177,50 +210,12 @@ const {
           </section>
           <button :disabled="submitting" @click="cancelProcessing">取消处理</button>
         </template>
-      </ElDrawer>
+      </ElDialog>
     </template>
   </main>
 </template>
 
 <style scoped>
-.identity-review {
-  max-width: 1200px;
-}
-.review-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr);
-  gap: 2rem;
-  margin-top: 2rem;
-}
-.review-grid > section {
-  min-width: 0;
-}
-.review-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 1rem 0;
-}
-.case-list {
-  list-style: none;
-  padding: 0;
-}
-.case-list button {
-  width: 100%;
-  display: grid;
-  text-align: left;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
-  overflow-wrap: anywhere;
-  background: var(--surface-muted);
-  color: var(--text-primary);
-}
-.case-list button[aria-pressed='true'] {
-  border: 2px solid var(--accent-color);
-  background: var(--selected-surface);
-}
-
 .muted {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -250,10 +245,5 @@ textarea {
   padding: 1rem;
   margin: 1rem 0;
   overflow-wrap: anywhere;
-}
-@media (max-width: 760px) {
-  .review-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

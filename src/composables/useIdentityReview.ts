@@ -7,16 +7,17 @@ import type {
   IdentityCase,
   IdentityDecision,
   IdentityReceipt,
-  IdentitySummary,
+  IdentityListItem,
+  IdentityListView,
 } from '@/types/identity'
 
-export function useIdentityReview() {
+export function useIdentityReview(view: IdentityListView) {
   const editorOpen = ref(false)
   const admin = useAdminStore()
   const owner = admin.session
   const allowed = () => admin.session === owner && admin.can('review_operator')
   const client = createIdentityTransport(owner?.token ?? '', allowed)
-  const items = ref<IdentitySummary[]>([])
+  const items = ref<IdentityListItem[]>([])
   const nextCursor = ref<string | null>(null)
   const currentCursor = ref<string | null>(null)
   const cursors = ref<(string | null)[]>([])
@@ -141,7 +142,7 @@ export function useIdentityReview() {
     items.value = []
     nextCursor.value = null
     try {
-      const result = await client.list(cursor, controller.signal)
+      const result = await client.list(cursor, controller.signal, view)
       if (!active || controller.signal.aborted || generation !== listGeneration || !allowed())
         return
       items.value = result.items
@@ -173,10 +174,13 @@ export function useIdentityReview() {
     currentCursor.value = cursors.value.pop() ?? null
     await loadList()
   }
+  function removeMissingCase(id: string) {
+    items.value = items.value.filter((item) => item.id !== id)
+  }
   async function openCase(id: string) {
     clearCase()
     notice.value = ''
-    if (!allowed()) return
+    if (view !== 'pending' || !allowed()) return
     selected.value = id
     const controller = new AbortController()
     caseController = controller
@@ -190,6 +194,7 @@ export function useIdentityReview() {
       detail.value = result
     } catch (error) {
       if (!active || controller.signal.aborted || generation !== caseGeneration) return
+      if (error instanceof ApiError && error.status === 404) removeMissingCase(id)
       caseError.value = message(error)
     } finally {
       if (generation === caseGeneration) caseBusy.value = false
@@ -213,7 +218,10 @@ export function useIdentityReview() {
       if (error instanceof ApiError && error.status === 409) {
         await reloadConflictedCase(current.id)
       } else {
-        if (error instanceof ApiError && error.status === 404) clearCase()
+        if (error instanceof ApiError && error.status === 404) {
+          removeMissingCase(current.id)
+          clearCase()
+        }
         caseError.value = message(error)
       }
     } finally {
@@ -270,14 +278,17 @@ export function useIdentityReview() {
       if (result.request_id !== current.id) throw new Error('案件回执不匹配')
       clearCase()
       receipt.value = result
-      notice.value = `审核提交已确认：${statusLabel(result.status)}，版本 ${result.version}`
+      notice.value = `审核提交已确认：${statusLabel(result.status)}`
       await loadList()
     } catch (error) {
       if (!active || controller.signal.aborted || generation !== caseGeneration) return
       if (error instanceof ApiError && error.status === 409) {
         await reloadConflictedCase(current.id)
       } else {
-        if (error instanceof ApiError && error.status === 404) clearCase()
+        if (error instanceof ApiError && error.status === 404) {
+          removeMissingCase(current.id)
+          clearCase()
+        }
         caseError.value = message(error)
       }
     } finally {

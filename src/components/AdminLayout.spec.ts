@@ -65,6 +65,24 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
   expect(view.get('[aria-label="面包屑导航"] .el-breadcrumb__inner').text()).toBe('工作台')
 })
+it('身份审核历史位于用户管理并沿用审核岗位权限', async () => {
+  login()
+  await router.push('/identity/history')
+  const view = render()
+  const link = view.get('nav a[href="/identity/history"]')
+  expect(link.element.closest('.navigation-group')?.textContent).toContain('用户管理')
+  expect(link.attributes('aria-current')).toBe('page')
+  expect(view.get('[aria-label="面包屑导航"]').text()).toContain('身份审核历史')
+
+  const session = useAdminStore().session
+  if (!session) throw new Error('缺少会话')
+  session.account.roles = ['crisis_operator']
+  await router.push('/users')
+  await router.push('/identity/history')
+  await flushPromises()
+  expect(router.currentRoute.value.path).toBe('/403')
+  expect(view.find('nav a[href="/identity/history"]').exists()).toBe(false)
+})
 it('REQ-019 移动端菜单切换，页面变化后收起，拒绝页也有明确面包屑', async () => {
   login()
   await router.push('/')
