@@ -40,6 +40,7 @@ type Confirmation =
     }
 /** 路由分别持有查询与处理状态，离页清除正文、确认及回执。 */
 export function useSafety(mode: SafetyMode, initialReport?: string, initialAppeal?: string) {
+  const pageSize = ref(10)
   const editorOpen = ref(false)
   const editorTask = ref<'case' | 'crisis'>('case')
   const escalating = ref(false)
@@ -76,7 +77,12 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     }
   }
   const workspace = useAdminWorkspace(clearAll, safetyRoles)
-  const client = createSafetyClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const client = createSafetyClient(
+    useAdminStore().session?.token ?? '',
+    workspace.allowed,
+    fetch,
+    () => pageSize.value,
+  )
   const users = createUsersClient(useAdminStore().session?.token ?? '', workspace.allowed)
   const navigation = useUserNavigation()
   const target = navigation.target
@@ -498,6 +504,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
       await open(initialAppeal)
   })
   return {
+    pageSize,
     editorOpen,
     editorTask,
     escalating,

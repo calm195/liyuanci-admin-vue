@@ -8,7 +8,7 @@ const cases = [
   {
     name: 'whisperAdminReviewsList',
     scope: 'admin-review',
-    url: '/api/v1/admin/whispers/reviews?limit=20',
+    url: '/api/v1/admin/whispers/reviews?limit=10',
     method: 'GET',
     status: 200,
     run: (client: Client, abort: AbortSignal) => client.whisperAdminReviewsList(null, abort),
@@ -102,7 +102,7 @@ const cases = [
   {
     name: 'whisperAdminReportsList',
     scope: 'admin-safety',
-    url: '/api/v1/admin/whispers/reports?limit=20',
+    url: '/api/v1/admin/whispers/reports?limit=10',
     method: 'GET',
     status: 200,
     run: (client: Client, abort: AbortSignal) => client.whisperAdminReportsList(null, abort),
@@ -147,7 +147,7 @@ const cases = [
   {
     name: 'whisperAdminCrisesList',
     scope: 'admin-crisis',
-    url: '/api/v1/admin/whispers/crises?limit=20',
+    url: '/api/v1/admin/whispers/crises?limit=10',
     method: 'GET',
     status: 200,
     run: (client: Client, abort: AbortSignal) => client.whisperAdminCrisesList(null, abort),

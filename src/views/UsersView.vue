@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import UserRestrictionActions from '@/components/UserRestrictionActions.vue'
 import { useUsers } from '@/composables/useUsers'
@@ -51,7 +52,7 @@ const restrictionLabels = { normal: '正常', muted: '禁言', banned: '封禁' 
           </select></label
         >
         <label
-          >每页数量<select v-model.number="draft.limit">
+          >每页数量<select v-model.number="draft.limit" :disabled="busy" @change="search">
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
@@ -65,8 +66,8 @@ const restrictionLabels = { normal: '正常', muted: '禁言', banned: '封禁' 
       </BusinessToolbar>
       <p>昵称按当前普通资料包含匹配，最多50个字符；时间均为北京时间。</p>
       <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在查询用户…</p>
       <p v-else-if="!error && !items.length">未找到符合条件的用户</p>
       <div v-else-if="items.length" class="business-table">

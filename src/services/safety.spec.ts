@@ -54,7 +54,7 @@ describe('T028 REQ-014/016/018/019 安全治理协议', () => {
     )
     expect(result.items).toEqual([{ id: 'report', version: 7, status: 'resolved', kind: 'wish' }])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/reports?limit=20&cursor=opaque%2B%2F%3D')
+    expect(url).toBe('/api/v1/admin/reports?limit=10&cursor=opaque%2B%2F%3D')
     expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token')
   })

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from './PageSizeSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
@@ -15,7 +17,7 @@ import { builtinWordlistLabel } from '@/utils/builtin-wordlist-label'
 const props = defineProps<{ id: string; headVersion?: number | undefined; locked: boolean }>()
 const emit = defineEmits<{ save: [draft: BuiltinDraftInput] }>()
 type EntryOverride = BuiltinDraftInput['overrides'][number]
-const pageSize = 50
+const pageSize = ref(10)
 const page = ref<BuiltinEntries | null>(null)
 const filters = ref({ q: '', label: '', disposition: '', enabled: '' })
 const applied = ref({ ...filters.value })
@@ -54,7 +56,7 @@ function entryQuery(start: number, limit: number, currentFilters: typeof applied
 async function load(start: number, search = false) {
   if (loading.value || selecting.value || props.locked) return
   const nextFilters = search ? { ...filters.value } : applied.value
-  const query = entryQuery(start, pageSize, nextFilters)
+  const query = entryQuery(start, pageSize.value, nextFilters)
   loading.value = true
   error.value = ''
   await workspace.run(
@@ -217,7 +219,7 @@ onMounted(() => void load(0))
         </div>
       </fieldset>
     </form>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <p v-if="loading" role="status">正在读取内置词条…</p>
     <p v-if="selecting" role="status">正在全选当前筛选结果…</p>
     <template v-if="page">
@@ -291,7 +293,12 @@ onMounted(() => void load(0))
           </tbody>
         </table>
       </div>
-      <nav v-if="page.total > pageSize" aria-label="内置词条分页">
+      <nav aria-label="内置词条分页">
+        <PageSizeSelect
+          v-model="pageSize"
+          :disabled="loading || selecting || locked"
+          @change="load(0)"
+        />
         <button
           type="button"
           :disabled="!offset || loading || selecting || locked"

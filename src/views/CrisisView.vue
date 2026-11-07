@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
@@ -12,6 +14,7 @@ import { useAdminStore } from '@/stores/admin'
 const { open: openPrivacy, pending: privacyPending, error: privacyError } = usePrivacyHandoff()
 const admin = useAdminStore()
 const {
+  pageSize,
   editorOpen,
   startProcessing,
   cancelProcessing,
@@ -68,8 +71,10 @@ const {
       时为人工窗口，夜间案件按服务端接手时刻交接，不承诺首次响应时限。
     </p>
     <template v-if="workspace.allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selected && !editorOpen" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selected && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
       <section v-if="receipt" class="workflow-box" aria-label="危机处理回执">
         <h2>处理回执</h2>
         <p>{{ status(receipt.status) }} · 案件版本 {{ receipt.version }}</p>
@@ -83,10 +88,10 @@ const {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取危机案件…</p>
-        <div v-else-if="listError" role="alert">
+        <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
           <button :disabled="editorOpen" @click="loadList">重试列表</button>
-        </div>
+        </FloatingNotice>
         <p v-else-if="!items.length">暂无危机案件</p>
         <div v-else class="business-table">
           <table>
@@ -117,6 +122,11 @@ const {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || editorOpen"
+            @change="refresh()"
+          />
           <button :disabled="listBusy || editorOpen || !history.length" @click="page(false)">
             上一页</button
           ><button :disabled="listBusy || editorOpen || !nextCursor" @click="page(true)">
@@ -138,7 +148,7 @@ const {
         <section aria-label="危机案件详情" :aria-busy="loading || writing">
           <h2>案件详情</h2>
           <p v-if="loading" role="status">正在读取授权案件…</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <button v-if="selected && !detail && !loading" @click="open(selected)">重试案件</button>
           <template v-if="detail">
             <button :disabled="editorOpen" @click="close">关闭案件并清除材料</button>
@@ -155,7 +165,9 @@ const {
               <h3>关怀与人员通知待办</h3>
               <button :disabled="workBusy || editorOpen" @click="loadWork">刷新待办</button>
               <p v-if="workBusy" role="status">正在读取待办…</p>
-              <p v-if="workError" role="alert">{{ workError }}</p>
+              <FloatingNotice v-if="workError" :message="workError" tone="error">{{
+                workError
+              }}</FloatingNotice>
               <template v-if="work"
                 ><p>
                   服务端接手窗口：{{
@@ -185,7 +197,9 @@ const {
                 刷新时间线
               </button>
               <p v-if="timelineBusy" role="status">正在读取时间线…</p>
-              <p v-if="timelineError" role="alert">{{ timelineError }}</p>
+              <FloatingNotice v-if="timelineError" :message="timelineError" tone="error">{{
+                timelineError
+              }}</FloatingNotice>
               <ol>
                 <li v-for="item in timeline" :key="item.id">
                   <p>
@@ -210,7 +224,9 @@ const {
               </button>
               <p v-if="!evidenceRefs.length">当前案件未提供证据项引用</p>
               <p v-if="evidenceBusy" role="status">正在读取限定证据…</p>
-              <p v-if="evidenceError" role="alert">{{ evidenceError }}</p>
+              <FloatingNotice v-if="evidenceError" :message="evidenceError" tone="error">{{
+                evidenceError
+              }}</FloatingNotice>
               <template v-if="evidence"
                 ><p>
                   限定证据 · {{ status(evidence.status) }} · 版本
@@ -232,7 +248,9 @@ const {
               >
                 管理当前证据范围
               </button>
-              <p v-if="privacyError" role="alert">{{ privacyError }}</p>
+              <FloatingNotice v-if="privacyError" :message="privacyError" tone="error">{{
+                privacyError
+              }}</FloatingNotice>
               <p>仅包含本案授权文字证据，不读取无关学生卡。</p>
             </section>
             <button v-if="canAct" :disabled="editorOpen || loading" @click="startProcessing">
@@ -256,7 +274,7 @@ const {
       >
         <template v-if="detail">
           <p>案件版本 {{ detail.version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form v-if="canAct" @submit.prevent="confirm">
             <fieldset :disabled="writing || confirming || loading">
               <legend>危机处置</legend>

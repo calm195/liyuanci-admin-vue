@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import ModerationCaseDetail from '@/components/ModerationCaseDetail.vue'
 import { ElDialog } from 'element-plus'
@@ -7,6 +9,7 @@ import 'element-plus/theme-chalk/el-overlay.css'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useModerationReview } from '@/composables/useModerationReview'
 const {
+  pageSize,
   editorOpen,
   editorTask,
   escalating,
@@ -59,8 +62,10 @@ function moderationKindLabel(kind?: string) {
     <p>仅查看授权案件命中正文，不提供全站私聊或上下文会话搜索。</p>
     <template v-if="workspace.allowed()">
       <p class="banner">仅展示当前授权的审核案件，决定提交后以服务端业务结果为准。</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
       <section v-if="outcome" class="workflow-box" aria-label="审核回执">
         <h2>审核回执</h2>
         <p>内容判定：{{ outcome.content_decision === 'approved' ? '通过' : '驳回' }}</p>
@@ -77,10 +82,10 @@ function moderationKindLabel(kind?: string) {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
-        <div v-else-if="listError" role="alert">
+        <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
           <button :disabled="editorOpen" @click="loadList">重试列表</button>
-        </div>
+        </FloatingNotice>
         <p v-else-if="!items.length">暂无审核案件</p>
         <div v-else class="business-table">
           <table>
@@ -115,6 +120,11 @@ function moderationKindLabel(kind?: string) {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || writing || editorOpen"
+            @change="refresh()"
+          />
           <button :disabled="listBusy || editorOpen || !history.length" @click="page('previous')">
             上一页
           </button>
@@ -159,7 +169,7 @@ function moderationKindLabel(kind?: string) {
       >
         <template v-if="detail">
           <p>案件版本 {{ detail.version }} · 正文版本 {{ detail.content_version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <CrisisEscalation
             v-if="editorTask === 'crisis'"
             :key="`${detail.id}:${detail.version}`"

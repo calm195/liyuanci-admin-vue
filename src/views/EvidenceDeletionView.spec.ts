@@ -327,7 +327,9 @@ describe('T032 REQ-018 只读查询反馈回归', () => {
       .findAll('form')
       [kind === 'job' ? 0 : 1]?.trigger('submit')
     await flushPromises()
-    expect(wrapper.get('[role="alert"]').text()).toBe('查询未完成，请稍后重试')
+    expect(wrapper.get('[role="alert"] .floating-notice-content').text()).toBe(
+      '查询未完成，请稍后重试',
+    )
     expect(wrapper.text()).not.toContain('写入结果不明确')
     expect(wrapper.text()).not.toContain('测试网络中断')
     expect(mocks.remove).not.toHaveBeenCalled()

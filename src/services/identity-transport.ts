@@ -26,6 +26,7 @@ export function createIdentityTransport(
   token: string,
   allowed: () => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ): IdentityReviewClient {
   function guard(signal: AbortSignal) {
     signal.throwIfAborted()
@@ -60,7 +61,7 @@ export function createIdentityTransport(
   }
   return {
     async list(cursor, signal, view) {
-      const query = new URLSearchParams({ limit: '20', view })
+      const query = new URLSearchParams({ limit: String(pageSize()), view })
       if (cursor !== null) query.set('cursor', cursor)
       return parseIdentityPage(await json(`/api/v1/admin/identity-reviews?${query}`, signal), view)
     },

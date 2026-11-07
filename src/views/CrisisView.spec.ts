@@ -275,7 +275,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     mocks.timeline.mockRejectedValueOnce(new ApiError(503))
     mocks.work.mockRejectedValueOnce(new ApiError(503))
     await open()
-    expect(wrapper?.get('[aria-label="危机投递待办"]').text()).toContain('服务暂不可用')
+    expect(wrapper?.get('.floating-notice').text()).toContain('服务暂不可用')
     await button('刷新待办').trigger('click')
     await flushPromises()
     expect(wrapper?.get('[aria-label="危机投递待办"]').text()).toContain('本人关怀投递')

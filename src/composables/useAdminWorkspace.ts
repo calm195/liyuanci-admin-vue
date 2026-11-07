@@ -15,12 +15,16 @@ export function reviewErrorMessage(error: unknown): string {
 /** 将工作区请求绑定到进入页面时的会话，退出、换页或取消后拒绝旧响应。 */
 export function useAdminWorkspace(
   clear: () => void,
-  role: Role | readonly Role[] = 'review_operator',
+  role: Role | readonly Role[] | null = 'review_operator',
 ) {
   const admin = useAdminStore()
   const owner = admin.session
   const hasRole = () =>
-    typeof role === 'string' ? admin.can(role) : role.some((value) => admin.can(value))
+    role === null
+      ? admin.authenticated
+      : typeof role === 'string'
+        ? admin.can(role)
+        : role.some((value) => admin.can(value))
   let active = true
   const allowed = () => active && admin.session === owner && hasRole()
   let controller = new AbortController()

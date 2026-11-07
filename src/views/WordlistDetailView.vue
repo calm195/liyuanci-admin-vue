@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import { computed } from 'vue'
+import LocalPagination from '@/components/LocalPagination.vue'
+import { useLocalPagination } from '@/composables/useLocalPagination'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BuiltinWordlistEntries from '@/components/BuiltinWordlistEntries.vue'
@@ -29,6 +33,9 @@ const {
 watch(resultId, (id) => {
   if (id && id !== props.id) void router.push({ name: 'wordlist-detail', params: { id } })
 })
+const { pageSize, page, pages, pageRows } = useLocalPagination(
+  computed(() => detail.value?.entries ?? []),
+)
 </script>
 <template>
   <main class="panel workflow" aria-label="词单详情">
@@ -41,8 +48,8 @@ watch(resultId, (id) => {
       <p>
         创建使用分类基准，首次也须读取；词条为完整不可变快照。发布核对草稿资源版本、分类基准和创建时生效版，归档版可恢复为新草稿。仅用于后续新扫描及正常重提，不自动全量重扫历史。
       </p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
 
       <button :disabled="busy || writing" @click="load">刷新词库</button>
       <p v-if="busy" role="status">正在读取词库版本…</p>
@@ -76,13 +83,20 @@ watch(resultId, (id) => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="entry in detail.entries" :key="entry">
+              <tr v-for="entry in pageRows" :key="entry">
                 <th scope="row">{{ entry }}</th>
                 <td>{{ detail.disabled_entries?.includes(entry) ? '停用' : '启用' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <LocalPagination
+          v-if="detail.kind !== 'builtin'"
+          v-model:page="page"
+          v-model:size="pageSize"
+          :pages="pages"
+          :disabled="busy || writing"
+        />
         <p v-if="detail.kind !== 'builtin' && !detail.entries.length">空词条快照</p>
         <button
           v-if="loaded && canPublish(detail)"

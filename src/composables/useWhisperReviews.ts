@@ -40,6 +40,7 @@ export const whisperOutcomeLabels: Record<ReviewOutcome['business_outcome'], str
 }
 
 export function useWhisperReviews() {
+  const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<ReviewSummary[]>([])
   const nextCursor = ref<string | null>(null)
@@ -69,6 +70,8 @@ export function useWhisperReviews() {
       workspace.allowed() &&
       (scope === 'admin-review' ||
         (scope === 'admin-review-and-crisis' && admin.can('super_admin'))),
+    fetch,
+    () => pageSize.value,
   )
   const canDecide = computed(
     () =>
@@ -344,6 +347,7 @@ export function useWhisperReviews() {
   )
   onMounted(refresh)
   return {
+    pageSize,
     items,
     nextCursor,
     listBusy,

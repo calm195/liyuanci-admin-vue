@@ -11,7 +11,7 @@ const defaults = (): UserFilters => ({
   nickname: '',
   verification: '',
   restriction: '',
-  limit: 20,
+  limit: 10,
 })
 export function useUsers() {
   const draft = reactive(defaults())

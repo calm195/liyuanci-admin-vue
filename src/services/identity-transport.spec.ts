@@ -36,7 +36,7 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
       },
     ])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/identity-reviews?limit=20&view=history&cursor=a%2B%2F%3D%26')
+    expect(url).toBe('/api/v1/admin/identity-reviews?limit=10&view=history&cursor=a%2B%2F%3D%26')
     expect(init).toMatchObject({
       signal,
       cache: 'no-store',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
@@ -19,7 +20,7 @@ onMounted(() => {
   <main class="panel workflow" aria-label="回执查询">
     <p>查询刚受理的证据清理任务，也可输入已知待办标识或完整匿名回执。查询不会触发删除。</p>
     <template v-if="workspace.allowed()">
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在查询清理进度…</p>
       <section class="business-card" aria-label="删除进度查询">
         <h2>查询清理进度</h2>

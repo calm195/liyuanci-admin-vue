@@ -24,7 +24,7 @@ describe('T030 REQ-017/018/019 危机后台协议', () => {
     const result = await createCrisisClient('token', () => true, transport).list('a+/=&', signal())
     expect(result.items).toEqual([summary])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/crisis-cases?limit=20&cursor=a%2B%2F%3D%26')
+    expect(url).toBe('/api/v1/admin/crisis-cases?limit=10&cursor=a%2B%2F%3D%26')
     expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token')
   })

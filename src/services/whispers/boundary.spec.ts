@@ -147,7 +147,7 @@ describe('WA-01 传输与会话保护', () => {
     const client = createWhispersClient('token', () => true, transport)
     await client.whisperAdminReviewsList('a+/=&', signal())
     expect(transport.mock.calls[0]?.[0]).toBe(
-      '/api/v1/admin/whispers/reviews?limit=20&cursor=a%2B%2F%3D%26',
+      '/api/v1/admin/whispers/reviews?limit=10&cursor=a%2B%2F%3D%26',
     )
     await expect(client.whisperAdminReviewDecide(id, command, id, signal())).rejects.toThrow(
       '不匹配',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import type { ModerationCase } from '@/types/moderation'
 defineProps<{
@@ -15,7 +16,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
 <template>
   <section aria-label="案件详情" :aria-busy="loading">
     <h2>案件详情</h2>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <p v-if="loading" role="status">正在读取案件…</p>
     <button v-if="selectedId && !detail && !loading" @click="$emit('retry')">重试案件</button>
     <template v-if="detail">

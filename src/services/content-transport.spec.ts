@@ -11,7 +11,7 @@ describe('T017 内容审核与词库真实传输', () => {
       .mockResolvedValue(envelope({ items: [], next_cursor: null }))
     await createModerationTransport('token', () => true, transport).list('a+/=&', signal())
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/moderation-tasks?limit=20&cursor=a%2B%2F%3D%26')
+    expect(url).toBe('/api/v1/admin/moderation-tasks?limit=10&cursor=a%2B%2F%3D%26')
     expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token')
   })

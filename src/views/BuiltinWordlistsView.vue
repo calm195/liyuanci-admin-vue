@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import BuiltinWordlistEntries from '@/components/BuiltinWordlistEntries.vue'
@@ -39,8 +40,8 @@ onBeforeRouteLeave(() => !writing.value)
     <template v-if="workspace.allowed()">
       <h2>go-swd 内置词库</h2>
       <p>与自定义词库同时扫描。词条调整保存为草稿，发布后生效。</p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取词库版本…</p>
       <template v-if="selected">
         <p>

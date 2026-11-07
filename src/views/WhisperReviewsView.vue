@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
 import { ElDialog } from 'element-plus'
@@ -12,6 +14,7 @@ import {
   whisperOutcomeLabels,
 } from '@/composables/useWhisperReviews'
 const {
+  pageSize,
   items,
   nextCursor,
   listBusy,
@@ -52,8 +55,10 @@ const {
   <main class="panel workflow" aria-label="树洞审核">
     <p>仅按当前授权案件读取命中版本，不提供匿名作者查询或私密胶囊全量浏览。</p>
     <template v-if="workspace.allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
       <section v-if="outcome" class="workflow-box" aria-label="树洞审核回执">
         <h2>审核回执</h2>
         <p>内容判定：{{ outcome.content_decision === 'approved' ? '通过' : '驳回' }}</p>
@@ -70,8 +75,12 @@ const {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
-        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <FloatingNotice v-if="listError" :message="listError" tone="error"
+          >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
+        >
+        <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
+          listNotice
+        }}</FloatingNotice>
         <p v-if="!listBusy && !listError && !items.length">当前页暂无审核案件</p>
         <div v-if="items.length" class="business-table">
           <table>
@@ -108,6 +117,11 @@ const {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || writing || editorOpen"
+            @change="refresh"
+          />
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多案件' }}
           </button>
@@ -156,7 +170,7 @@ const {
           <p v-if="detail.source.kind === 'whisper_capsule'" class="banner">
             私密胶囊仅供当前命中案件复核；通过不等于立即解锁。
           </p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form @submit.prevent="check">
             <fieldset :disabled="writing || confirming || uncertain">
               <legend>{{ task === 'crisis' ? '危机升级理由' : '审核决定' }}</legend>

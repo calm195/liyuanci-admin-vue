@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElDialog } from 'element-plus'
@@ -11,6 +13,7 @@ import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWor
 import { roles } from '@/types/admin'
 import type { AdminAccount, Role } from '@/types/admin'
 
+const pageSize = ref(10)
 const admin = useAdminStore()
 const owner = admin.session
 const items = ref<AdminAccount[]>([])
@@ -52,7 +55,12 @@ function clear() {
   busy.value = false
 }
 const workspace = useAdminWorkspace(clear, 'super_admin')
-const client = createAccountsClient(owner?.token ?? '', workspace.allowed)
+const client = createAccountsClient(
+  owner?.token ?? '',
+  workspace.allowed,
+  globalThis.fetch,
+  () => pageSize.value,
+)
 const valid = computed(
   () => (selected.value !== null || !!loginName.value.trim()) && !!reason.value.trim(),
 )
@@ -198,8 +206,8 @@ onMounted(() => {
     <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
     <template v-if="workspace.allowed()">
       <p class="banner">每次请求由服务端核验当前超管权限。</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <section aria-labelledby="accounts-title" :aria-busy="busy">
         <BusinessToolbar label="账号操作栏">
           <h2 id="accounts-title">后台账号列表</h2>
@@ -249,6 +257,7 @@ onMounted(() => {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect v-model="pageSize" :disabled="busy || editorOpen" @change="load()" />
           <button :disabled="busy || editorOpen || !history.length" @click="previousPage">
             上一页
           </button>
@@ -270,7 +279,7 @@ onMounted(() => {
         :show-close="!busy"
       >
         <section aria-labelledby="account-form-title">
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <h2 id="account-form-title">{{ selected ? '修改账号角色' : '创建后台账号' }}</h2>
           <button :disabled="busy" @click="resetForm">取消并关闭</button>
           <p v-if="selected">

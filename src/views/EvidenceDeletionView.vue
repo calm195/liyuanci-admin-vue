@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
@@ -48,7 +49,7 @@ onMounted(() => {
     <template v-if="workspace.allowed()">
       <p class="banner">删除作用于该证据所属的整个保留范围，无法撤回。受理不代表物理清理完成。</p>
       <p>可从授权危机案件进入，或输入已知证据条目标识查询元信息。信息仅保留在当前页面内存中。</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理请求…</p>
       <section class="business-card" aria-label="证据删除">
         <h2>读取并核对证据</h2>
@@ -127,7 +128,9 @@ onMounted(() => {
           </table>
         </div>
       </section>
-      <p v-if="privacyError" role="alert">{{ privacyError }}</p>
+      <FloatingNotice v-if="privacyError" :message="privacyError" tone="error">{{
+        privacyError
+      }}</FloatingNotice>
       <RouterLink v-if="!accepted" to="/deletion-receipts">前往回执查询</RouterLink>
       <ElDialog
         v-if="editorOpen"
@@ -142,7 +145,7 @@ onMounted(() => {
       >
         <template v-if="target">
           <p>危机限定证据 · 证据范围版本 {{ target.version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form @submit.prevent="prepare">
             <fieldset :disabled="busy || confirmation">
               <legend>删除理由</legend>

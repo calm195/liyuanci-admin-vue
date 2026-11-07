@@ -12,11 +12,12 @@ import type {
 } from '@/types/identity'
 
 export function useIdentityReview(view: IdentityListView) {
+  const pageSize = ref(10)
   const editorOpen = ref(false)
   const admin = useAdminStore()
   const owner = admin.session
   const allowed = () => admin.session === owner && admin.can('review_operator')
-  const client = createIdentityTransport(owner?.token ?? '', allowed)
+  const client = createIdentityTransport(owner?.token ?? '', allowed, fetch, () => pageSize.value)
   const items = ref<IdentityListItem[]>([])
   const nextCursor = ref<string | null>(null)
   const currentCursor = ref<string | null>(null)
@@ -311,6 +312,7 @@ export function useIdentityReview(view: IdentityListView) {
   })
 
   return {
+    pageSize,
     editorOpen,
     allowed,
     items,

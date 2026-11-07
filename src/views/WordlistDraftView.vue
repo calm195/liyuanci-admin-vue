@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { useWordlists } from '@/composables/useWordlists'
 import { wordlistKinds } from '@/types/wordlists'
 import WordlistConfirmation from '@/components/WordlistConfirmation.vue'
@@ -31,8 +32,8 @@ const {
       <p>
         创建使用分类基准，首次也须读取；词条为完整不可变快照。发布核对草稿资源版本、分类基准和创建时生效版，替代版本授权只读，不可直接重发。仅用于后续新扫描及正常重提，不自动全量重扫历史。
       </p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <RouterLink v-if="resultId" :to="{ name: 'wordlist-detail', params: { id: resultId } }"
         >查看新草稿</RouterLink
       >

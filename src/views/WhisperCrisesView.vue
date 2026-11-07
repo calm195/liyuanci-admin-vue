@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
@@ -14,6 +16,7 @@ import {
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
 const {
+  pageSize,
   items,
   nextCursor,
   listBusy,
@@ -59,12 +62,15 @@ function timelineActionLabel(action: string) {
   <main class="panel workflow" aria-label="树洞危机">
     <p>仅供危机岗位及超级管理员按授权案件读取限定正文；不提供学生卡或身份反查。</p>
     <template v-if="workspace.allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
-      <p v-if="outcome" role="status">
-        危机回执：{{ whisperCrisisStatuses[outcome.status] }} · 案件版本
-        {{ outcome.version }}
-      </p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
+      <FloatingNotice
+        v-if="outcome"
+        :message="`危机回执：${whisperCrisisStatuses[outcome.status]} · 案件版本 ${outcome.version}`"
+        tone="info"
+      />
 
       <section aria-label="树洞危机列表" :aria-busy="listBusy">
         <BusinessToolbar label="树洞危机操作栏">
@@ -74,8 +80,12 @@ function timelineActionLabel(action: string) {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取危机…</p>
-        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <FloatingNotice v-if="listError" :message="listError" tone="error"
+          >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
+        >
+        <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
+          listNotice
+        }}</FloatingNotice>
         <p v-if="!listBusy && !listError && !items.length">当前页暂无危机</p>
         <div v-if="items.length" class="business-table">
           <table>
@@ -112,6 +122,11 @@ function timelineActionLabel(action: string) {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || writing || editorOpen"
+            @change="refresh"
+          />
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多危机' }}
           </button>
@@ -129,7 +144,7 @@ function timelineActionLabel(action: string) {
       >
         <section aria-label="树洞危机详情" :aria-busy="loading">
           <h2>危机详情（只读）</h2>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <p v-if="loading" role="status">正在读取限定正文…</p>
           <button
             v-if="selectedId && !loading"
@@ -202,7 +217,9 @@ function timelineActionLabel(action: string) {
               >
                 前往树洞证据删除与进度查询
               </button>
-              <p v-if="privacyError" role="alert">{{ privacyError }}</p>
+              <FloatingNotice v-if="privacyError" :message="privacyError" tone="error">{{
+                privacyError
+              }}</FloatingNotice>
             </section>
           </template>
           <p v-else-if="!selectedId && !loading">选择危机，按需读取授权限定正文。</p>
@@ -222,7 +239,7 @@ function timelineActionLabel(action: string) {
       >
         <template v-if="detail">
           <p>案件版本 {{ detail.version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form @submit.prevent="check">
             <fieldset :disabled="writing || confirming || uncertain">
               <legend>{{ whisperCrisisActions[task] }}</legend>

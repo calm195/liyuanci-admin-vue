@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import LocalPagination from '@/components/LocalPagination.vue'
+import { useLocalPagination } from '@/composables/useLocalPagination'
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElDialog } from 'element-plus'
@@ -56,6 +59,13 @@ const visibleRows = computed(() => {
   return rows.value.filter((entry) => entry.text.toLocaleLowerCase().includes(query))
 })
 const history = computed(() => items.value.filter((item) => item.kind === kind.value))
+const { pageSize, page, pages, pageRows } = useLocalPagination(visibleRows)
+const {
+  pageSize: historySize,
+  page: historyPage,
+  pages: historyPages,
+  pageRows: historyRows,
+} = useLocalPagination(history)
 const conflicted = computed(
   () =>
     staged.value !== null &&
@@ -259,8 +269,8 @@ onMounted(() => {
   <main class="panel workflow" aria-label="词库管理">
     <template v-if="workspace.allowed()">
       <p>词条修改保存为草稿，发布后用于新扫描和正常重提。</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取词库版本…</p>
       <div class="workflow-grid wordlist-grid">
         <section class="business-card" aria-labelledby="wordlist-choices">
@@ -366,7 +376,7 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="entry in visibleRows" :key="entry.text">
+                <tr v-for="entry in pageRows" :key="entry.text">
                   <th scope="row">{{ entry.text }}</th>
                   <td>
                     <div class="wordlist-state">
@@ -408,6 +418,12 @@ onMounted(() => {
               </tbody>
             </table>
           </div>
+          <LocalPagination
+            v-model:page="page"
+            v-model:size="pageSize"
+            :pages="pages"
+            :disabled="locked"
+          />
         </section>
       </div>
       <ElDialog
@@ -426,7 +442,7 @@ onMounted(() => {
         "
       >
         <template v-if="confirmation">
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <p v-if="'entries' in confirmation">
             共 {{ confirmation.entries.length }} 条词条，{{
               confirmation.disabled_entries?.length ?? 0
@@ -496,8 +512,11 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in history" :key="item.id">
-                  <td>{{ status(item.status) }} · 记录 {{ index + 1 }}</td>
+                <tr v-for="(item, index) in historyRows" :key="item.id">
+                  <td>
+                    {{ status(item.status) }} · 记录
+                    {{ (historyPage - 1) * historySize + index + 1 }}
+                  </td>
                   <td>{{ item.version }}</td>
                   <td>
                     <button type="button" @click="changeContext(() => readVersion(item.id))">
@@ -508,6 +527,12 @@ onMounted(() => {
               </tbody>
             </table>
           </div>
+          <LocalPagination
+            v-model:page="historyPage"
+            v-model:size="historySize"
+            :pages="historyPages"
+            :disabled="locked"
+          />
         </template>
         <template v-else-if="dialog?.mode === 'discard'">
           <p>继续操作将放弃尚未保存的词条修改。</p>

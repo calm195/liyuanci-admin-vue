@@ -41,7 +41,7 @@ it('T012 默认真实身份审核进入页面即读取后台队列，按需读�
   }
   const wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
   await flushPromises()
-  expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/identity-reviews?limit=20&view=pending')
+  expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/identity-reviews?limit=10&view=pending')
   expect(wrapper.text()).not.toContain('待接口验收后开放')
   transport.mockResolvedValue(
     Response.json({

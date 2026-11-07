@@ -21,8 +21,8 @@ export class WhisperApiError extends ApiError {
 function contentKind(value: T.ContentRef['kind']) {
   return choice(value, ['whisper_post', 'whisper_comment', 'whisper_nickname', 'whisper_capsule'])
 }
-function pageQuery(cursor: string | null): string {
-  const query = new URLSearchParams({ limit: '20' })
+function pageQuery(cursor: string | null, pageSize: () => number): string {
+  const query = new URLSearchParams({ limit: String(pageSize()) })
   if (cursor !== null) query.set('cursor', text(cursor, { minLength: 1, maxLength: 4096 }))
   return query.toString()
 }
@@ -42,6 +42,7 @@ export function createWhispersClient(
   token: string,
   allowed: (scope: WhisperScope) => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ) {
   function guard(scope: WhisperScope, signal: AbortSignal) {
     signal.throwIfAborted()
@@ -103,7 +104,7 @@ export function createWhispersClient(
   return {
     async whisperAdminReviewsList(cursor: string | null, signal: AbortSignal) {
       const result = P.parseReviewSummaryPage(
-        await request(`reviews?${pageQuery(cursor)}`, 'admin-review', signal, 200),
+        await request(`reviews?${pageQuery(cursor, pageSize)}`, 'admin-review', signal, 200),
       )
       return result
     },
@@ -206,7 +207,7 @@ export function createWhispersClient(
     },
     async whisperAdminReportsList(cursor: string | null, signal: AbortSignal) {
       const result = P.parseReportSummaryPage(
-        await request(`reports?${pageQuery(cursor)}`, 'admin-safety', signal, 200),
+        await request(`reports?${pageQuery(cursor, pageSize)}`, 'admin-safety', signal, 200),
       )
       return result
     },
@@ -254,7 +255,7 @@ export function createWhispersClient(
     },
     async whisperAdminCrisesList(cursor: string | null, signal: AbortSignal) {
       const result = P.parseCrisisSummaryPage(
-        await request(`crises?${pageQuery(cursor)}`, 'admin-crisis', signal, 200),
+        await request(`crises?${pageQuery(cursor, pageSize)}`, 'admin-crisis', signal, 200),
       )
       return result
     },

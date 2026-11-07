@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, ref } from 'vue'
 import WordlistMatches from '@/components/WordlistMatches.vue'
 import { createWordlistTransport } from '@/services/content-transport'
@@ -77,7 +78,7 @@ async function run() {
         </button>
       </fieldset>
     </form>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <div v-if="result && differences && text === submitted" aria-live="polite">
       <p v-if="result.effective.truncated || result.draft.truncated">
         命中结果超过展示上限，差异仅基于已返回的命中记录。

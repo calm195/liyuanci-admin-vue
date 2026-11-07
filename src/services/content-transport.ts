@@ -52,8 +52,8 @@ function resource(collection: string, id: string): string {
   if (!id.trim() || id === '.' || id === '..') throw new Error('资源标识不能为空或相对路径')
   return `${collection}/${encodeURIComponent(id)}`
 }
-function query(cursor: string | null): string {
-  const params = new URLSearchParams({ limit: '20' })
+function query(cursor: string | null, pageSize: () => number): string {
+  const params = new URLSearchParams({ limit: String(pageSize()) })
   if (cursor !== null) params.set('cursor', cursor)
   return params.toString()
 }
@@ -74,11 +74,14 @@ export function createModerationTransport(
   token: string,
   allowed: () => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ): ModerationClient {
   const request = createContentRequest(token, allowed, transport)
   return {
     async list(cursor, signal) {
-      return parseModerationPage(await request(`moderation-tasks?${query(cursor)}`, signal))
+      return parseModerationPage(
+        await request(`moderation-tasks?${query(cursor, pageSize)}`, signal),
+      )
     },
     async detail(id, signal) {
       const value = parseModerationCase(await request(resource('moderation-tasks', id), signal))
@@ -113,11 +116,12 @@ export function createWordlistTransport(
   token: string,
   allowed: () => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ): WordlistClient {
   const request = createContentRequest(token, allowed, transport)
   return {
     async list(cursor, signal) {
-      return parseWordlistPage(await request(`wordlists?${query(cursor)}`, signal))
+      return parseWordlistPage(await request(`wordlists?${query(cursor, pageSize)}`, signal))
     },
     async detail(id, signal) {
       const value = parseWordlistDetail(await request(resource('wordlists', id), signal))

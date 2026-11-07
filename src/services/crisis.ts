@@ -113,6 +113,7 @@ export function createCrisisClient(
   token: string,
   allowed: () => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ): CrisisClient {
   function guard(signal: AbortSignal) {
     signal.throwIfAborted()
@@ -156,7 +157,7 @@ export function createCrisisClient(
   }
   return {
     async list(cursor, signal) {
-      const query = new URLSearchParams({ limit: '20' })
+      const query = new URLSearchParams({ limit: String(pageSize()) })
       if (cursor !== null) query.set('cursor', cursor)
       return reviewPage(await request(`crisis-cases?${query}`, signal), parseCrisisSummary)
     },

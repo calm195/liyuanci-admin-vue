@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from './PageSizeSelect.vue'
 import BusinessToolbar from './BusinessToolbar.vue'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
@@ -18,6 +20,7 @@ const title = { reports: '举报管理', penalties: '处罚管理', appeals: '�
 const processingTitle = { reports: '举报处理', penalties: '账号处罚', appeals: '申诉处理' }[mode]
 const admin = useAdminStore()
 const {
+  pageSize,
   editorOpen,
   editorTask,
   escalating,
@@ -70,8 +73,10 @@ const {
     </p>
     <p>仅处理服务端授权的普通案件；账号角色管理请进入“后台账号管理”。</p>
     <template v-if="workspace.allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selected && !editorOpen" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selected && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
       <section v-if="receipt" class="workflow-box" aria-label="处理回执">
         <h2>处理回执</h2>
         <p>{{ status(receipt.status) }} · 版本 {{ receipt.version }}</p>
@@ -94,10 +99,10 @@ const {
           </template>
         </BusinessToolbar>
         <p v-if="busy" role="status">正在读取案件…</p>
-        <div v-else-if="listError" role="alert">
+        <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
           <button :disabled="busy || editorOpen || writing" @click="loadList">重试列表</button>
-        </div>
+        </FloatingNotice>
         <p v-else-if="!items.length">
           {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}
         </p>
@@ -132,6 +137,11 @@ const {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="busy || editorOpen || writing || escalating"
+            @change="refresh()"
+          />
           <button :disabled="busy || editorOpen || writing || !history.length" @click="page(false)">
             上一页
           </button>
@@ -154,7 +164,7 @@ const {
         <section aria-label="案件详情" :aria-busy="loading || writing">
           <h2>案件详情（只读）</h2>
           <p v-if="loading" role="status">正在读取案件详情…</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <button v-if="selected && !detail && !loading" @click="open(selected)">重试详情</button>
           <template v-if="detail">
             <button :disabled="writing || editorOpen" @click="close">关闭案件</button>
@@ -230,7 +240,7 @@ const {
         :close-on-click-modal="false"
         :show-close="!writing && !escalating"
       >
-        <p v-if="error" role="alert">{{ error }}</p>
+        <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
         <button :disabled="writing || escalating" @click="cancelProcessing">取消并关闭</button>
         <p>案件版本 {{ detail?.version }}</p>
         <CrisisEscalation

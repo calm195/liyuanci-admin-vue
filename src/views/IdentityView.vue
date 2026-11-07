@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import IdentityCaseDetail from '@/components/IdentityCaseDetail.vue'
 import { ElDialog } from 'element-plus'
@@ -10,6 +12,7 @@ import { displayBeijingTime } from '@/utils/admin-time'
 const props = defineProps<{ history?: boolean }>()
 const pageTitle = props.history ? '身份审核历史' : '身份审核'
 const {
+  pageSize,
   editorOpen,
   allowed,
   items,
@@ -52,8 +55,13 @@ const {
 <template>
   <main class="panel workflow" :aria-label="pageTitle">
     <template v-if="allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="caseError && !selected && !editorOpen" role="alert">{{ caseError }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice
+        v-if="caseError && !selected && !editorOpen"
+        :message="caseError"
+        tone="error"
+        >{{ caseError }}</FloatingNotice
+      >
       <section v-if="receipt" class="receipt" aria-label="审核回执">
         <h2>审核回执</h2>
         <p>{{ statusLabel(receipt.status) }}</p>
@@ -69,10 +77,10 @@ const {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
-        <div v-else-if="listError" role="alert">
+        <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
           <button :disabled="editorOpen" @click="loadList()">重试列表</button>
-        </div>
+        </FloatingNotice>
         <p v-else-if="!items.length">{{ history ? '暂无审核历史' : '暂无待审核案件' }}</p>
         <div v-else class="business-table">
           <table>
@@ -111,6 +119,11 @@ const {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || editorOpen"
+            @change="refreshList"
+          />
           <button :disabled="listBusy || editorOpen || !cursors.length" @click="previousPage">
             上一页
           </button>
@@ -158,7 +171,9 @@ const {
       >
         <template v-if="detail">
           <p>{{ detail.name }} · {{ detail.student_number }}</p>
-          <p v-if="caseError" role="alert">{{ caseError }}</p>
+          <FloatingNotice v-if="caseError" :message="caseError" tone="error">{{
+            caseError
+          }}</FloatingNotice>
           <form v-if="detail.status === 'pending'" @submit.prevent="confirmDecision">
             <fieldset :disabled="submitting || confirming">
               <legend>审核决定</legend>

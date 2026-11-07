@@ -31,7 +31,7 @@ describe('T010 REQ-018/019 后台账号接口', () => {
     const client = createAccountsClient('admin-token', () => true, transport)
     expect((await client.list('a+/=&', signal)).items).toEqual([account])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/accounts?limit=20&cursor=a%2B%2F%3D%26')
+    expect(url).toBe('/api/v1/admin/accounts?limit=10&cursor=a%2B%2F%3D%26')
     expect(init).toMatchObject({
       signal,
       cache: 'no-store',

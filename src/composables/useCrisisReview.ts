@@ -30,6 +30,7 @@ export function crisisStatusLabel(value: string) {
 }
 
 export function useCrisisReview() {
+  const pageSize = ref(10)
   const editorOpen = ref(false)
   const route = useRoute()
   let mounted = true
@@ -66,7 +67,12 @@ export function useCrisisReview() {
   let generation = 0
   let evidenceGeneration = 0
   const workspace = useAdminWorkspace(clearAll, 'crisis_operator')
-  const client = createCrisisClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const client = createCrisisClient(
+    useAdminStore().session?.token ?? '',
+    workspace.allowed,
+    fetch,
+    () => pageSize.value,
+  )
   const evidenceRefs = computed(
     () => detail.value?.timeline.filter((item) => item.kind === 'evidence') ?? [],
   )
@@ -360,6 +366,7 @@ export function useCrisisReview() {
   })
 
   return {
+    pageSize,
     editorOpen,
     startProcessing,
     cancelProcessing,

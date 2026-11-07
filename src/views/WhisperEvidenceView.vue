@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
@@ -52,8 +53,8 @@ onMounted(() => {
       <p>
         可从授权树洞危机进入，或输入已知范围及任务标识查询元信息。仅保留当前页面内存中的查询结果。
       </p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理请求…</p>
       <section class="business-card" aria-label="树洞证据范围">
         <h2>读取证据范围</h2>
@@ -105,7 +106,7 @@ onMounted(() => {
       <section class="business-card" aria-label="树洞证据删除进度">
         <h2>查询删除任务</h2>
         <div v-if="acceptedId" class="workflow-actions">
-          <p role="status">删除任务已受理，待核对清理进度。</p>
+          <FloatingNotice message="删除任务已受理，待核对清理进度。" tone="info" />
           <button :disabled="busy || editorOpen" @click="queryAccepted">查询刚受理的任务</button>
         </div>
         <form @submit.prevent="query">
@@ -162,7 +163,7 @@ onMounted(() => {
       >
         <template v-if="target"
           ><p>树洞限定证据 · 范围版本 {{ target.version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form @submit.prevent="check">
             <fieldset :disabled="busy || confirming || uncertain">
               <legend>删除整个限定证据范围</legend>

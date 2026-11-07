@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
 import { ElDialog } from 'element-plus'
@@ -12,6 +14,7 @@ import {
 } from '@/composables/useWhisperReports'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
 const {
+  pageSize,
   items,
   nextCursor,
   listBusy,
@@ -53,8 +56,10 @@ const {
   <main class="panel workflow" aria-label="树洞举报">
     <p>仅处理当前授权举报及其来源，不提供匿名作者身份查询。</p>
     <template v-if="workspace.allowed()">
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error && !selectedId && !editorOpen" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
+        error
+      }}</FloatingNotice>
       <section v-if="penaltyReceipt" class="workflow-box" aria-label="树洞处罚回执">
         <h2>处罚回执</h2>
         <p>
@@ -72,8 +77,12 @@ const {
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取举报…</p>
-        <p v-if="listError" role="alert">{{ listError }} 请刷新列表或重试加载。</p>
-        <p v-if="listNotice" role="status">{{ listNotice }}</p>
+        <FloatingNotice v-if="listError" :message="listError" tone="error"
+          >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
+        >
+        <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
+          listNotice
+        }}</FloatingNotice>
         <p v-if="!listBusy && !listError && !items.length">当前页暂无举报</p>
         <div v-if="items.length" class="business-table">
           <table>
@@ -110,6 +119,11 @@ const {
           </table>
         </div>
         <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect
+            v-model="pageSize"
+            :disabled="listBusy || writing || editorOpen"
+            @change="refresh"
+          />
           <button v-if="nextCursor !== null" :disabled="listBusy || editorOpen" @click="more">
             {{ listError ? '重试加载' : '加载更多举报' }}
           </button>
@@ -127,7 +141,7 @@ const {
       >
         <section aria-label="树洞举报详情" :aria-busy="loading">
           <h2>举报详情（只读）</h2>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <p v-if="loading" role="status">正在读取举报和治理状态…</p>
           <button
             v-if="selectedId && !loading"
@@ -149,7 +163,9 @@ const {
             <p>举报类型：{{ detail.type_code }}</p>
             <p class="workflow-body">举报说明：{{ detail.description ?? '未填写说明' }}</p>
             <blockquote class="workflow-body">{{ detail.body }}</blockquote>
-            <p v-if="controlError" role="alert">{{ controlError }}</p>
+            <FloatingNotice v-if="controlError" :message="controlError" tone="error">{{
+              controlError
+            }}</FloatingNotice>
             <p v-if="control">
               治理版本 {{ control.version }} ·
               {{ control.restricted ? '存在普通限制' : '无普通限制' }}
@@ -197,7 +213,7 @@ const {
             {{ detail.source.content_version }}
           </p>
           <p v-if="task === 'restriction' || task === 'penalty'">治理版本 {{ control?.version }}</p>
-          <p v-if="error" role="alert">{{ error }}</p>
+          <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form @submit.prevent="check">
             <fieldset :disabled="writing || confirming || uncertain">
               <legend>{{ whisperTaskLabels[task] }}</legend>

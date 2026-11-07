@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import type { IdentityCase } from '@/types/identity'
 defineProps<{
   detail: IdentityCase | null
@@ -22,7 +23,9 @@ defineEmits<{
   <section aria-labelledby="case-detail-title" :aria-busy="caseBusy">
     <h2 id="case-detail-title">案件详情</h2>
     <p v-if="caseBusy" role="status">正在读取案件…</p>
-    <p v-if="caseError" role="alert">{{ caseError }}</p>
+    <FloatingNotice v-if="caseError" :message="caseError" tone="error">{{
+      caseError
+    }}</FloatingNotice>
     <button v-if="selected && !detail && !caseBusy" @click="$emit('retry')">重试案件</button>
     <template v-if="detail">
       <div class="review-actions">

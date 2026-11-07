@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, ref, watch } from 'vue'
 import { createCrisisClient, validCrisisReason } from '@/services/crisis'
 import { useAdminStore } from '@/stores/admin'
@@ -93,7 +94,7 @@ async function submit() {
     <h3>判定危机并升级</h3>
     <p>仅使用当前来源案件及其精确内容，升级后由后端隔离；不在这里搜索其他私聊或录入学生身份。</p>
     <template v-if="result"
-      ><p role="status">危机升级已确认</p>
+      ><FloatingNotice message="危机升级已确认" tone="success" />
       <RouterLink :to="{ path: '/crisis', query: { case: result.id } }"
         >进入该危机案件</RouterLink
       ></template
@@ -113,7 +114,7 @@ async function submit() {
         ><button :disabled="!valid" type="submit">核对危机升级</button>
       </fieldset>
     </form>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <section v-if="confirming" aria-label="危机升级确认">
       <p>
         确认将当前来源（版本

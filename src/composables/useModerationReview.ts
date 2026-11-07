@@ -14,6 +14,7 @@ import type {
 } from '@/types/moderation'
 
 export function useModerationReview() {
+  const pageSize = ref(10)
   const editorOpen = ref(false)
   const editorTask = ref<'decision' | 'crisis'>('decision')
   const escalating = ref(false)
@@ -48,7 +49,12 @@ export function useModerationReview() {
     }
   }
   const workspace = useAdminWorkspace(clearAll)
-  const client = createModerationTransport(useAdminStore().session?.token ?? '', workspace.allowed)
+  const client = createModerationTransport(
+    useAdminStore().session?.token ?? '',
+    workspace.allowed,
+    fetch,
+    () => pageSize.value,
+  )
   const valid = computed(
     () =>
       decision.value === 'approved' ||
@@ -257,6 +263,7 @@ export function useModerationReview() {
   })
 
   return {
+    pageSize,
     editorOpen,
     editorTask,
     escalating,

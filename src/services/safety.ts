@@ -98,6 +98,7 @@ export function createSafetyClient(
   token: string,
   allowed: () => boolean,
   transport: typeof fetch = fetch,
+  pageSize: () => number = () => 10,
 ): SafetyClient {
   function guard(signal: AbortSignal) {
     signal.throwIfAborted()
@@ -135,7 +136,7 @@ export function createSafetyClient(
     return value['data']
   }
   async function list(path: string, cursor: string | null, signal: AbortSignal) {
-    const query = new URLSearchParams({ limit: '20' })
+    const query = new URLSearchParams({ limit: String(pageSize()) })
     if (cursor !== null) query.set('cursor', cursor)
     return reviewPage(await request(`${path}?${query}`, signal), parseSafetySummary)
   }
@@ -147,7 +148,7 @@ export function createSafetyClient(
   return {
     reports: (cursor, signal) => list('reports', cursor, signal),
     async appeals(cursor, signal) {
-      const query = new URLSearchParams({ limit: '20' })
+      const query = new URLSearchParams({ limit: String(pageSize()) })
       if (cursor !== null) query.set('cursor', cursor)
       return reviewPage(await request(`appeals?${query}`, signal), parseAppealSummary)
     },

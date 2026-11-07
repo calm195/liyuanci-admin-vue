@@ -46,6 +46,7 @@ export const whisperTaskLabels: Record<Task, string> = {
   crisis: '升级危机',
 }
 export function useWhisperReports() {
+  const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<ReportSummary[]>([])
   const nextCursor = ref<string | null>(null)
@@ -76,6 +77,8 @@ export function useWhisperReports() {
     (scope) =>
       workspace.allowed() &&
       (scope === 'admin-safety' || (scope === 'admin-crisis' && admin.can('crisis_operator'))),
+    fetch,
+    () => pageSize.value,
   )
   const matching = computed(
     () =>
@@ -438,6 +441,7 @@ export function useWhisperReports() {
   )
   onMounted(refresh)
   return {
+    pageSize,
     items,
     nextCursor,
     listBusy,

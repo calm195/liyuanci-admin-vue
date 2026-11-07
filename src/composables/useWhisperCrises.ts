@@ -30,6 +30,7 @@ export const whisperDeliveryLabels: Record<CrisisDetail['care_delivery'], string
 }
 
 export function useWhisperCrises() {
+  const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<CrisisSummary[]>([])
   const nextCursor = ref<string | null>(null)
@@ -54,6 +55,8 @@ export function useWhisperCrises() {
   const client = createWhispersClient(
     admin.session?.token ?? '',
     (scope) => workspace.allowed() && scope === 'admin-crisis',
+    fetch,
+    () => pageSize.value,
   )
   const options = computed(() => {
     const current = detail.value
@@ -287,6 +290,7 @@ export function useWhisperCrises() {
   }
   onMounted(refresh)
   return {
+    pageSize,
     items,
     nextCursor,
     listBusy,

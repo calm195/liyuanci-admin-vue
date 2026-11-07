@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
@@ -178,7 +179,9 @@ onMounted(() => {
       {{ toggle.label }}
       {{ toggle.on === 'mute' && !muteKnown ? '待查询' : toggle.checked.value ? '开' : '关' }}
     </button>
-    <p v-if="error && !action" role="alert">{{ error }}</p>
+    <FloatingNotice v-if="error && !action" :message="error" tone="error">{{
+      error
+    }}</FloatingNotice>
     <button v-if="!muteKnown && !busy" type="button" @click="load">重试禁言状态</button>
     <ElDialog
       v-if="action"
@@ -192,7 +195,7 @@ onMounted(() => {
       :show-close="!busy"
     >
       <p>用户 {{ displayName }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在核对或提交操作…</p>
       <form v-if="!confirmation" @submit.prevent="prepare">
         <fieldset :disabled="busy">

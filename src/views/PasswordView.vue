@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
@@ -87,7 +88,7 @@ onBeforeUnmount(() => {
         />
         <button :disabled="!valid">{{ busy ? '正在提交…' : '确认改密并重新登录' }}</button>
       </fieldset>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     </form>
   </main>
 </template>
