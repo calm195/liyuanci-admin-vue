@@ -28,6 +28,7 @@ export const menu: MenuItem[] = [
   { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
   { path: '/', group: '总览', title: '工作台' },
   { path: '/password', group: '系统管理', title: '本人改密' },
+  { path: '/module-guide', group: '系统管理', title: '模块使用说明', role: 'super_admin' },
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
   { path: '/identity', group: '用户管理', title: '身份审核', role: 'review_operator' },
   { path: '/identity/history', group: '用户管理', title: '身份审核历史', role: 'review_operator' },
@@ -109,6 +110,11 @@ export const router = createRouter({
           meta: { title: '词单详情', parentTitle: '词库管理', parentPath: '/wordlists' },
         },
       ],
+    },
+    {
+      path: '/module-guide',
+      component: () => import('@/views/ModuleGuideView.vue'),
+      meta: { role: 'super_admin' },
     },
     {
       path: '/accounts',

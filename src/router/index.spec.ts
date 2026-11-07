@@ -13,6 +13,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/whispers/reviews',
     '/wordlists',
     '/accounts',
+    '/module-guide',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('未登录访问%s回登录', async (path) => {
@@ -25,6 +26,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/whispers/reviews',
     '/wordlists',
     '/accounts',
+    '/module-guide',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('危机角色不能进入%s且审核菜单不可见', async (path) => {
@@ -59,6 +61,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/whispers/reviews',
     '/wordlists',
     '/accounts',
+    '/module-guide',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('超管可进入%s', async (path) => {
