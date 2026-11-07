@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElButton } from 'element-plus'
@@ -15,7 +16,7 @@ const expandedGroup = ref<string | null>(null)
 const error = ref('')
 const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
-  return ['用户管理', '内容管理', '内容治理', '安全治理', '隐私管理', '系统管理']
+  return ['用户管理', '资料管理', '内容治理', '安全治理', '隐私管理', '系统管理']
     .filter((title) => visible.some((item) => item.group === title))
     .map((title) => ({
       title,
@@ -50,12 +51,12 @@ async function logout() {
   <div class="admin-shell">
     <a class="skip-link" href="#workspace-content">跳到页面内容</a>
     <aside id="workspace-sidebar" class="workspace-sidebar" :class="{ 'is-open': menuOpen }">
-      <RouterLink class="workspace-brand" to="/" aria-label="鲤源池管理端工作台">
+      <RouterLink class="workspace-brand" to="/" aria-label="鲤源池管理端首页">
         <span class="brand-mark" aria-hidden="true">鲤</span>
-        <span>鲤源池<strong>管理工作台</strong></span>
+        <span>鲤源池<strong>管理端</strong></span>
       </RouterLink>
       <nav class="workspace-navigation" aria-label="管理菜单">
-        <RouterLink class="navigation-root-link" to="/">工作台</RouterLink>
+        <RouterLink class="navigation-root-link" to="/">首页</RouterLink>
         <section
           v-for="(group, index) in visibleGroups"
           :key="group.title"
@@ -99,7 +100,7 @@ async function logout() {
           <ElButton @click="logout">退出登录</ElButton>
         </div>
       </header>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <div id="workspace-content" class="workspace-content" tabindex="-1"><slot /></div>
     </div>
   </div>

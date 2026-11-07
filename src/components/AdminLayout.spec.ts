@@ -4,6 +4,11 @@ import { mount, flushPromises } from '@vue/test-utils'
 import App from '@/App.vue'
 import { router } from '@/router'
 import { useAdminStore } from '@/stores/admin'
+import type * as AdminServices from '@/services/admin'
+vi.mock('@/services/admin', async (original) => {
+  const services = await original<typeof AdminServices>()
+  return { ...services, restoreAdmin: vi.fn(() => Promise.reject(new services.ApiError(401))) }
+})
 
 let pinia: ReturnType<typeof createPinia>
 let wrapper: ReturnType<typeof mount> | undefined
@@ -47,14 +52,14 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   await router.push('/identity')
   const view = render()
   const breadcrumb = view.get('[aria-label="面包屑导航"]')
-  expect(breadcrumb.text()).toContain('工作台')
+  expect(breadcrumb.text()).toContain('首页')
   expect(breadcrumb.text()).toContain('用户管理')
   expect(breadcrumb.get('[aria-current="page"] .el-breadcrumb__inner').text()).toBe('身份审核')
   expect(document.title).toBe('身份审核 · 鲤源池')
   const navigation = view.get('nav[aria-label="管理菜单"]')
   expect(navigation.find('a[href="/accounts"]').exists()).toBe(false)
   expect(navigation.get('a[href="/users"]').text()).toBe('平台用户')
-  expect(navigation.get('a[href="/resources"]').text()).toBe('资料管理')
+  expect(navigation.get('a[href="/resources"]').text()).toBe('资料列表')
   expect(navigation.get('a[href="/resource-categories"]').text()).toBe('资料分类')
   expect(navigation.find('a[href="/crisis"]').exists()).toBe(false)
   const identity = navigation.get('a[href="/identity"]')
@@ -63,7 +68,7 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   await breadcrumb.get('a[href="/"]').trigger('click')
   await flushPromises()
   await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
-  expect(view.get('[aria-label="面包屑导航"] .el-breadcrumb__inner').text()).toBe('工作台')
+  expect(view.get('[aria-label="面包屑导航"] .el-breadcrumb__inner').text()).toBe('首页')
 })
 it('身份审核历史位于用户管理并沿用审核岗位权限', async () => {
   login()
@@ -151,7 +156,7 @@ it('REQ-019 安全治理三个入口各自高亮，面包屑和页面标题随�
   }
 })
 
-it('登录后默认进入顶层工作台，业务分组均默认收起', async () => {
+it('登录后默认进入顶层首页，业务分组均默认收起', async () => {
   vi.spyOn(useAdminStore(), 'login').mockImplementation(() => {
     login()
     return Promise.resolve()
@@ -165,7 +170,7 @@ it('登录后默认进入顶层工作台，业务分组均默认收起', async (
   expect(useAdminStore().authenticated).toBe(true)
   expect(router.currentRoute.value.path).toBe('/')
   expect(wrapper.find('#login-password').exists()).toBe(false)
-  expect(wrapper.get('main').attributes('aria-label')).toBe('工作台')
+  expect(wrapper.get('main').attributes('aria-label')).toBe('首页')
   const navigation = wrapper.get('nav[aria-label="管理菜单"]')
   const workbench = navigation.get('a[href="/"]')
   expect(workbench.element.parentElement).toBe(navigation.element)
@@ -181,8 +186,8 @@ it('可收起分组，进入该分组的子页面时重新展开', async () => {
   const view = render()
   const toggle = view
     .findAll('.navigation-group-toggle')
-    .find((button) => button.text().includes('内容管理'))
-  if (!toggle) throw new Error('缺少内容管理分组')
+    .find((button) => button.text().includes('资料管理'))
+  if (!toggle) throw new Error('缺少资料管理分组')
   const link = view.get('a[href="/resources"]')
   const identity = view.get('a[href="/identity"]')
   expect(toggle.attributes('aria-expanded')).toBe('false')

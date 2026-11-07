@@ -13,7 +13,7 @@ const group = computed(() => (typeof route.meta['group'] === 'string' ? route.me
 <template>
   <ElBreadcrumb separator="/" aria-label="面包屑导航">
     <ElBreadcrumbItem v-if="route.path !== '/'"
-      ><RouterLink to="/">工作台</RouterLink></ElBreadcrumbItem
+      ><RouterLink to="/">首页</RouterLink></ElBreadcrumbItem
     >
     <ElBreadcrumbItem v-if="group && group !== '总览'">{{ group }}</ElBreadcrumbItem>
     <ElBreadcrumbItem

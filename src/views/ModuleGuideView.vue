@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import { readModuleGuide, saveModuleGuide, publishModuleGuide } from '@/services/moduleGuide'
@@ -10,6 +12,18 @@ const token = admin.session?.token ?? ''
 const guide = ref<ModuleGuide | null>(null)
 const form = ref<GuideModule[]>([])
 const busy = ref(false)
+const selectedIndex = ref(0)
+const moduleNames: Record<string, string> = {
+  wishes: '心愿',
+  whispers: '树洞',
+  capsules: '时光胶囊',
+  resources: '资料广场',
+  chat: '聊天',
+}
+function moduleName(item: GuideModule) {
+  return moduleNames[item.module] ?? (item.title || '新模块')
+}
+
 const error = ref('')
 const notice = ref('')
 const pending = ref<{
@@ -44,6 +58,7 @@ const valid = computed(
 )
 
 function accept(value: ModuleGuide) {
+  selectedIndex.value = Math.min(selectedIndex.value, Math.max(0, value.modules.length - 1))
   guide.value = value
   form.value = value.modules.map((item) => ({ ...item }))
 }
@@ -66,9 +81,14 @@ async function load() {
     },
   )
 }
+function remove(index: number) {
+  form.value.splice(index, 1)
+  selectedIndex.value = Math.max(0, Math.min(selectedIndex.value, form.value.length - 1))
+}
 function add() {
   if (busy.value || pending.value || form.value.length >= 12) return
   form.value.push({ module: '', title: '', body: '' })
+  selectedIndex.value = form.value.length - 1
 }
 async function submit(kind: 'save' | 'publish') {
   if (
@@ -119,14 +139,17 @@ async function retry() {
     },
   )
 }
+onBeforeRouteLeave(
+  () => !busy.value && (!dirty.value || globalThis.confirm('说明尚未保存，确认离开？')),
+)
 onMounted(load)
 </script>
 <template>
   <main class="panel workflow" aria-label="模块使用说明">
     <template v-if="workspace.allowed()">
       <p>认证通过后，小程序展示已发布说明；用户也可以在个人中心重新阅读。</p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理说明…</p>
       <div class="workflow-actions">
         <button :disabled="busy" @click="load">重新读取草稿与发布内容</button>
@@ -141,28 +164,50 @@ onMounted(load)
         <form @submit.prevent="submit('save')">
           <fieldset :disabled="busy || !!pending">
             <legend>说明草稿</legend>
-            <section v-for="(item, index) in form" :key="index" class="guide-module">
-              <h2>第 {{ index + 1 }} 项说明</h2>
-              <label
-                >模块标识<input
-                  v-model="item.module"
-                  required
-                  pattern="[a-z_]{1,40}"
-                  autocomplete="off"
-                  placeholder="例如 wishes"
-              /></label>
-              <label
-                >标题（最多40字）<input v-model="item.title" required autocomplete="off"
-              /></label>
-              <label
-                >使用说明（最多2000字）<textarea v-model="item.body" required rows="5" />
-              </label>
-              <button type="button" @click="form.splice(index, 1)">移除此项说明</button>
-            </section>
+            <div class="guide-columns">
+              <nav class="guide-navigation" aria-label="说明模块">
+                <button
+                  v-for="(item, index) in form"
+                  :key="index"
+                  type="button"
+                  :aria-current="selectedIndex === index ? 'true' : undefined"
+                  @click="selectedIndex = index"
+                >
+                  {{ moduleName(item) }}
+                </button>
+              </nav>
+              <div>
+                <section
+                  v-for="(item, index) in form"
+                  v-show="index === selectedIndex"
+                  :key="index"
+                  class="guide-module"
+                >
+                  <h2>{{ moduleName(item) }}</h2>
+                  <label
+                    >模块<select v-model="item.module" required>
+                      <option value="" disabled>请选择模块</option>
+                      <option v-for="(name, key) in moduleNames" :key="key" :value="key">
+                        {{ name }}
+                      </option>
+                      <option v-if="item.module && !moduleNames[item.module]" :value="item.module">
+                        {{ item.title || '其他模块' }}
+                      </option>
+                    </select></label
+                  >
+                  <label
+                    >标题（最多40字）<input v-model="item.title" required autocomplete="off"
+                  /></label>
+                  <label
+                    >使用说明（最多2000字）<textarea v-model="item.body" required rows="5" />
+                  </label>
+                  <button type="button" @click="remove(index)">移除此项说明</button>
+                </section>
+              </div>
+            </div>
             <p v-if="!form.length">尚未填写模块说明，请添加后保存。</p>
             <p>
-              推荐模块标识为
-              wishes、whispers、capsules、resources、chat。每个标识只能使用一次，最多12项。
+              点击左侧模块编辑说明。切换模块会保留当前未保存的输入，保存将提交所有修改。每个模块只能使用一次，最多12项。
             </p>
             <div class="workflow-actions">
               <button type="button" :disabled="form.length >= 12" @click="add">添加模块说明</button>
@@ -207,6 +252,7 @@ label {
   gap: 0.4rem;
 }
 input,
+select,
 textarea {
   font: inherit;
   padding: 0.65rem;
@@ -216,5 +262,37 @@ textarea {
 .guide-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+</style>
+
+<style scoped>
+.guide-columns {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+.guide-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.guide-navigation button {
+  text-align: left;
+  padding: 0.8rem;
+}
+.guide-navigation button[aria-current='true'] {
+  color: var(--text-primary);
+  background: var(--surface-muted);
+  font-weight: 700;
+  border-color: var(--text-primary);
+}
+@media (max-width: 640px) {
+  .guide-columns {
+    grid-template-columns: 1fr;
+  }
+  .guide-navigation {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 </style>
