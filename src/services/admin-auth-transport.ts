@@ -5,6 +5,17 @@ import type { AdminLoginInput, AdminPasswordInput } from '@/types/admin'
 /** 显式注入传输用于后台身份协议；运行时默认连接同源后台。 */
 export function createAdminAuthTransport(transport: typeof fetch) {
   return {
+    async restore(signal?: AbortSignal) {
+      const response = await transport('/api/v1/admin/session', {
+        headers: { 'X-Session-Restore': '1' },
+        signal: signal ?? null,
+        cache: 'no-store',
+        credentials: 'same-origin',
+        redirect: 'error',
+      })
+      if (response.status !== 200) throw new ApiError(response.status)
+      return parseAdminSession(await response.json())
+    },
     async login(input: AdminLoginInput, signal?: AbortSignal) {
       const response = await transport('/api/v1/admin/sessions', {
         method: 'POST',
@@ -12,7 +23,7 @@ export function createAdminAuthTransport(transport: typeof fetch) {
         body: JSON.stringify(adminLoginInput(input)),
         signal: signal ?? null,
         cache: 'no-store',
-        credentials: 'omit',
+        credentials: 'same-origin',
         redirect: 'error',
       })
       if (response.status !== 200) throw new ApiError(response.status)
@@ -30,7 +41,7 @@ export function createAdminAuthTransport(transport: typeof fetch) {
         body: JSON.stringify(adminPasswordInput(input)),
         signal: signal ?? null,
         cache: 'no-store',
-        credentials: 'omit',
+        credentials: 'same-origin',
         redirect: 'error',
       })
       if (response.status !== 204) throw new ApiError(response.status)

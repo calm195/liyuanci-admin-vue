@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElConfigProvider } from 'element-plus'
@@ -12,6 +13,10 @@ const admin = useAdminStore()
 const router = useRouter()
 const route = useRoute()
 const navigationError = ref('')
+async function retryRestore() {
+  await admin.restore()
+  if (!admin.restoreError) await router.replace({ path: route.fullPath, force: true })
+}
 function navigate(path: string) {
   void router.replace(path).catch(() => {
     navigationError.value = '页面跳转未完成，请刷新后重试'
@@ -33,7 +38,7 @@ watch(
 watch(
   () => route.meta['title'],
   (title) => {
-    globalThis.document.title = `${typeof title === 'string' ? title : '管理工作台'} · 鲤源池`
+    globalThis.document.title = `${typeof title === 'string' ? title : '管理端'} · 鲤源池`
   },
   { immediate: true },
 )
@@ -41,8 +46,17 @@ watch(
 
 <template>
   <ElConfigProvider :locale="zhCn">
-    <p v-if="navigationError" role="alert">{{ navigationError }}</p>
-    <AdminLayout v-if="admin.authenticated"><RouterView /></AdminLayout>
+    <FloatingNotice v-if="navigationError" :message="navigationError" tone="error">{{
+      navigationError
+    }}</FloatingNotice>
+    <main v-if="admin.restoreError" class="panel" aria-label="恢复登录">
+      <FloatingNotice :message="admin.restoreError" tone="error">{{
+        admin.restoreError
+      }}</FloatingNotice>
+      <button :disabled="admin.restoring" @click="retryRestore">重试恢复登录</button>
+    </main>
+    <p v-else-if="admin.restoring" role="status">正在恢复登录…</p>
+    <AdminLayout v-else-if="admin.authenticated"><RouterView /></AdminLayout>
     <div v-else class="public-shell">
       <div class="public-tools"><ThemeSwitcher /></div>
       <RouterView />

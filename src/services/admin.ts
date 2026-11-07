@@ -35,7 +35,7 @@ export async function adminRequest(
     ...init,
     headers,
     cache: 'no-store',
-    credentials: 'omit',
+    credentials: path === '/admin/session' ? 'same-origin' : 'omit',
     redirect: 'error',
   })
   if (!response.ok || (path === '/admin/session' && response.status !== 204))
@@ -61,4 +61,10 @@ export async function changeAdminPassword(
 }
 export async function revokeAdmin(token: string): Promise<void> {
   await adminRequest('/admin/session', token, { method: 'DELETE' })
+}
+
+/** 使用同源 HttpOnly Cookie 恢复后台会话，返回的访问令牌只留在内存。 */
+export async function restoreAdmin(signal?: AbortSignal): Promise<AdminSession> {
+  const { createAdminAuthTransport } = await import('./admin-auth-transport')
+  return createAdminAuthTransport(fetch).restore(signal)
 }

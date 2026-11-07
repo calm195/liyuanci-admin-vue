@@ -4,20 +4,55 @@ import {
   ApiError,
   adminRequest,
   loginAdmin,
+  restoreAdmin,
   revokeAdmin,
   changeAdminPassword,
 } from '@/services/admin'
 import type { AdminSession, Role, AdminLoginInput, AdminPasswordInput } from '@/types/admin'
 
-/** 后台会话仅保存在内存中，刷新页面后需重新登录。 */
+/** 访问令牌仅保存在内存中，启动时通过服务端 Cookie 恢复有效会话。 */
 export const useAdminStore = defineStore('admin-session', () => {
   const session = ref<AdminSession | null>(null)
   const notice = ref('')
   const forbidden = ref(0)
+  const initialized = ref(false)
+  const restoring = ref(false)
+  const restoreError = ref('')
+  let restorePending: Promise<void> | null = null
+  function restore() {
+    if (session.value) {
+      restoreError.value = ''
+      initialized.value = true
+      return Promise.resolve()
+    }
+    if (initialized.value) return Promise.resolve()
+    if (restorePending) return restorePending
+    const current = generation
+    restoring.value = true
+    restoreError.value = ''
+    restorePending = (async () => {
+      try {
+        const result = await restoreAdmin()
+        if (generation !== current) return
+        session.value = result
+        initialized.value = true
+      } catch (cause) {
+        if (generation !== current) return
+        if (cause instanceof ApiError && cause.status === 401) initialized.value = true
+        else restoreError.value = '暂时无法恢复登录，请检查网络后重试'
+      } finally {
+        restoring.value = false
+        restorePending = null
+      }
+    })()
+    return restorePending
+  }
   let generation = 0
   const authenticated = computed(() => session.value?.account.active === true)
   function clear(message = '') {
     generation++
+    initialized.value = true
+    restoreError.value = ''
     session.value = null
     notice.value = message
   }
@@ -27,6 +62,8 @@ export const useAdminStore = defineStore('admin-session', () => {
     signal?.throwIfAborted()
     if (current !== generation) throw new Error('登录操作已失效，请重新登录')
     session.value = result
+    initialized.value = true
+    restoreError.value = ''
     notice.value = ''
   }
   let passwordBusy = false
@@ -106,6 +143,10 @@ export const useAdminStore = defineStore('admin-session', () => {
     notice,
     forbidden,
     authenticated,
+    initialized,
+    restoring,
+    restoreError,
+    restore,
     can,
     login,
     changePassword,

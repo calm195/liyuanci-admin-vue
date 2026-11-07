@@ -1,7 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { router, menu, canAccessMenu } from './index'
 import { useAdminStore } from '@/stores/admin'
+import type * as AdminServices from '@/services/admin'
+vi.mock('@/services/admin', async (original) => {
+  const services = await original<typeof AdminServices>()
+  return { ...services, restoreAdmin: vi.fn(() => Promise.reject(new services.ApiError(401))) }
+})
 beforeEach(async () => {
   setActivePinia(createPinia())
   await router.replace('/login')

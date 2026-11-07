@@ -34,7 +34,7 @@ describe('T010 B02/B14 REQ-018/019 账号与本人改密协议', () => {
     expect(init).toMatchObject({
       method: 'POST',
       cache: 'no-store',
-      credentials: 'omit',
+      credentials: 'same-origin',
       redirect: 'error',
     })
     expect(typeof init?.body === 'string' ? JSON.parse(init.body) : undefined).toEqual({
@@ -56,7 +56,7 @@ describe('T010 B02/B14 REQ-018/019 账号与本人改密协议', () => {
     expect(init).toMatchObject({
       signal: controller.signal,
       cache: 'no-store',
-      credentials: 'omit',
+      credentials: 'same-origin',
       redirect: 'error',
     })
     expect(typeof init?.body === 'string' ? JSON.parse(init.body) : undefined).toEqual(input)
@@ -108,4 +108,19 @@ describe('T010 B02/B14 REQ-018/019 账号与本人改密协议', () => {
     await expect(service.changeAdminPassword('token', input, 'same')).resolves.toBeUndefined()
     expect(transport).toHaveBeenCalledTimes(2)
   })
+})
+
+it('恢复使用同源 Cookie 与专用请求头，并验证后台会话投影', async () => {
+  const transport = vi.fn<typeof fetch>().mockResolvedValue(Response.json(envelope))
+  const result = await createAdminAuthTransport(transport).restore()
+  expect(result.token).toBe('synthetic-token')
+  expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/session')
+  expect(transport.mock.calls[0]?.[1]).toMatchObject({
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    headers: { 'X-Session-Restore': '1' },
+  })
+  transport.mockResolvedValue(Response.json({ ...envelope, data: { token: 'student', me: {} } }))
+  await expect(createAdminAuthTransport(transport).restore()).rejects.toThrow()
 })

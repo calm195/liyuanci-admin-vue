@@ -23,10 +23,10 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
-  { path: '/resources', group: '内容管理', title: '资料管理', roles: resourceRoles },
-  { path: '/resource-categories', group: '内容管理', title: '资料分类', roles: resourceRoles },
+  { path: '/resources', group: '资料管理', title: '资料列表', roles: resourceRoles },
+  { path: '/resource-categories', group: '资料管理', title: '资料分类', roles: resourceRoles },
   { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
-  { path: '/', group: '总览', title: '工作台' },
+  { path: '/', group: '总览', title: '首页' },
   { path: '/password', group: '系统管理', title: '本人改密' },
   { path: '/module-guide', group: '系统管理', title: '模块使用说明', role: 'super_admin' },
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
@@ -203,9 +203,11 @@ export const router = createRouter({
       : route
   }),
 })
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.path !== '/users' && !to.path.startsWith('/safety/')) useUserNavigation().target = null
   const admin = useAdminStore()
+  await admin.restore()
+  if (admin.restoreError) return true
   if (to.path === '/login') return admin.authenticated ? '/' : true
   if (!admin.authenticated) return '/login'
   if (to.meta['role'] === 'review_operator' && !admin.can('review_operator')) return '/403'

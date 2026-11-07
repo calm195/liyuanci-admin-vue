@@ -38,12 +38,16 @@ describe('T010 REQ-018/019 请求与会话边界', () => {
       loginAdmin({ login_name: 'synthetic', password: crypto.randomUUID() }),
     ).rejects.toMatchObject({ status: 503 })
   })
-  it('仅发送后台 Bearer，禁用缓存/cookie，DELETE 带幂等键', async () => {
+  it('退出携带后台 Bearer 与同源 Cookie，禁用缓存且 DELETE 带幂等键', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
     await adminRequest('/admin/session', 'admin-only', { method: 'DELETE' }, transport)
     const args = transport.mock.calls[0]
     expect(args?.[0]).toBe('/api/v1/admin/session')
-    expect(args?.[1]).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
+    expect(args?.[1]).toMatchObject({
+      cache: 'no-store',
+      credentials: 'same-origin',
+      redirect: 'error',
+    })
     const headers = new Headers(args?.[1]?.headers)
     expect(headers.get('Authorization')).toBe('Bearer admin-only')
     expect(headers.get('Idempotency-Key')).toBeTruthy()

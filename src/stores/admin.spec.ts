@@ -8,6 +8,7 @@ vi.mock('@/services/admin', async (original) => ({
   adminRequest: vi.fn(),
   revokeAdmin: vi.fn(),
   loginAdmin: vi.fn(),
+  restoreAdmin: vi.fn(),
   changeAdminPassword: vi.fn(),
 }))
 beforeEach(() => {
@@ -205,5 +206,47 @@ describe('B07 revision 1 后台角色快照消费', () => {
     await expect(admin.request('/admin/accounts')).rejects.toMatchObject({ status: 401 })
     expect(admin.session).toBeNull()
     expect(admin.can('crisis_operator')).toBe(false)
+  })
+})
+
+describe('刷新会话恢复', () => {
+  it('并发初始化只恢复一次，使用服务端角色且不写浏览器存储', async () => {
+    vi.mocked(service.restoreAdmin).mockResolvedValue(session)
+    const admin = useAdminStore()
+    const storage = vi.spyOn(Storage.prototype, 'setItem')
+    await Promise.all([admin.restore(), admin.restore()])
+    expect(service.restoreAdmin).toHaveBeenCalledTimes(1)
+    expect(admin.authenticated).toBe(true)
+    expect(admin.can('review_operator')).toBe(true)
+    expect(admin.initialized).toBe(true)
+    expect(storage).not.toHaveBeenCalled()
+    storage.mockRestore()
+  })
+  it('网络失败可以重试，401才确认没有有效会话', async () => {
+    const admin = useAdminStore()
+    vi.mocked(service.restoreAdmin).mockRejectedValueOnce(new TypeError('offline'))
+    await admin.restore()
+    expect(admin.restoreError).toContain('重试')
+    expect(admin.initialized).toBe(false)
+    vi.mocked(service.restoreAdmin).mockRejectedValueOnce(new ApiError(401))
+    await admin.restore()
+    expect(admin.restoreError).toBe('')
+    expect(admin.initialized).toBe(true)
+    expect(admin.authenticated).toBe(false)
+  })
+  it('退出后晚到的恢复回执不能复活会话', async () => {
+    let finish: ((value: typeof session) => void) | undefined
+    vi.mocked(service.restoreAdmin).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const admin = useAdminStore()
+    const pending = admin.restore()
+    await admin.logout()
+    finish?.(session)
+    await pending
+    expect(admin.authenticated).toBe(false)
   })
 })

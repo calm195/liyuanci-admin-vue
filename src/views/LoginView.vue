@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
@@ -40,7 +41,9 @@ onBeforeUnmount(() => {
 <template>
   <main class="login panel">
     <h1 id="admin-login-title">后台登录</h1>
-    <p v-if="admin.notice" role="status">{{ admin.notice }}</p>
+    <FloatingNotice v-if="admin.notice" :message="admin.notice" tone="info">{{
+      admin.notice
+    }}</FloatingNotice>
     <form aria-labelledby="admin-login-title" @submit.prevent="login">
       <fieldset :disabled="busy">
         <label for="login-name">后台账号</label>
@@ -55,7 +58,7 @@ onBeforeUnmount(() => {
         />
         <button :disabled="!valid">{{ busy ? '正在登录…' : '登录后台' }}</button>
       </fieldset>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     </form>
   </main>
 </template>

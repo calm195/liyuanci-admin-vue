@@ -1,3 +1,4 @@
+import { handleSessionAndDashboard } from './browser-session.js'
 import console from 'node:console'
 import assert from 'node:assert/strict'
 import { readFile, mkdir, writeFile, mkdtemp } from 'node:fs/promises'
@@ -43,6 +44,7 @@ try {
     }
     const queries = []
     await page.route('**/api/v1/**', async (route) => {
+      if (await handleSessionAndDashboard(route)) return
       const request = route.request()
       const url = new URL(request.url())
       let data
