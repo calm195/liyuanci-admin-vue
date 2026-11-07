@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
+import WordlistPreview from '@/components/WordlistPreview.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { useWordlists } from '@/composables/useWordlists'
-import type { WordlistKind } from '@/types/wordlists'
+import type { CustomWordlistKind } from '@/types/wordlists'
 
 type Entry = { text: string; enabled: boolean }
 type Dialog =
-  | { mode: 'add' | 'history' }
+  | { mode: 'add' | 'history' | 'import' }
   | { mode: 'view' | 'edit' | 'delete'; entry: Entry }
   | { mode: 'discard'; action: () => Promise<void> }
 
@@ -71,6 +73,7 @@ const dialogTitle = computed(() => {
   if (!dialog.value) return ''
   return {
     add: '新增词条',
+    import: '批量导入词条',
     edit: '编辑词条',
     view: '词条详情',
     delete: '删除词条',
@@ -118,7 +121,7 @@ async function discard() {
   clearEditor()
   await action()
 }
-async function choose(next: WordlistKind) {
+async function choose(next: CustomWordlistKind) {
   if (next === kind.value) return
   await changeContext(async () => {
     kind.value = next
@@ -138,6 +141,41 @@ function stage(entries: Entry[]) {
     headVersion: staged.value?.headVersion ?? base.value.version,
     stale: false,
   }
+}
+function openImport() {
+  editorText.value = ''
+  editorError.value = ''
+  dialog.value = { mode: 'import' }
+}
+const importCheck = computed(() => {
+  if (dialog.value?.mode !== 'import')
+    return { entries: [], invalid: [], duplicate: [], equivalent: [] }
+  const entries: Entry[] = []
+  const invalid: number[] = []
+  const duplicate: number[] = []
+  const equivalent: number[] = []
+  const seen = new Set(rows.value.map((entry) => entry.text))
+  const fold = (value: string) => value.normalize('NFKC').toLowerCase()
+  const folded = new Set(rows.value.map((entry) => fold(entry.text)))
+  editorText.value.split(/\r?\n/u).forEach((line, index) => {
+    const text = line.trim()
+    if (!text) return
+    if ([...text].length > 1000) invalid.push(index + 1)
+    else if (seen.has(text)) duplicate.push(index + 1)
+    else {
+      if (folded.has(fold(text))) equivalent.push(index + 1)
+      entries.push({ text, enabled: true })
+      seen.add(text)
+      folded.add(fold(text))
+    }
+  })
+  return { entries, invalid, duplicate, equivalent }
+})
+function applyImport() {
+  const changes = importCheck.value
+  if (!editable.value || !changes.entries.length || changes.invalid.length) return
+  stage([...rows.value, ...changes.entries])
+  closeDialog()
 }
 function applyEditor() {
   const current = dialog.value
@@ -170,7 +208,7 @@ function toggle(entry: Entry) {
 }
 function prepareSave() {
   const changes = staged.value
-  if (!editable.value || !changes) return
+  if (!editable.value || !changes || kind.value === 'builtin') return
   confirmation.value = {
     kind: kind.value,
     entries: changes.entries.map((entry) => entry.text),
@@ -202,6 +240,16 @@ async function confirmWrite() {
     }
   }
 }
+onBeforeRouteLeave(() => {
+  const current = dialog.value
+  const previous = current?.mode === 'edit' ? current.entry.text : ''
+  const editing = current?.mode === 'add' || current?.mode === 'edit' || current?.mode === 'import'
+  return (
+    !writing.value &&
+    ((!staged.value && (!editing || editorText.value === previous)) ||
+      globalThis.confirm('放弃尚未保存的自定义词库调整？'))
+  )
+})
 onMounted(() => {
   void refresh()
 })
@@ -227,7 +275,7 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr
-                  v-for="head in heads"
+                  v-for="head in heads.filter((head) => head.kind !== 'builtin')"
                   :key="head.kind"
                   :class="{ 'is-current': kind === head.kind }"
                 >
@@ -236,7 +284,7 @@ onMounted(() => {
                       type="button"
                       :aria-pressed="kind === head.kind"
                       :disabled="locked"
-                      @click="choose(head.kind)"
+                      @click="head.kind !== 'builtin' && choose(head.kind)"
                     >
                       {{ labels[head.kind] }}
                     </button>
@@ -278,6 +326,7 @@ onMounted(() => {
             >
               新增词条
             </button>
+            <button type="button" :disabled="!editable" @click="openImport">批量导入</button>
             <button v-if="staged" type="button" :disabled="!editable" @click="prepareSave">
               保存草稿
             </button>
@@ -384,7 +433,14 @@ onMounted(() => {
             }}
             条停用。保存草稿后可另行发布。
           </p>
-          <p v-else>发布将替换{{ labels[kind] }}词库的生效版本，已有审核任务继续使用原词库快照。</p>
+          <template v-else-if="'item' in confirmation">
+            <p>发布将替换{{ labels[kind] }}词库的生效版本，已完成扫描的案件保留原词库快照。</p>
+            <WordlistPreview
+              :id="confirmation.item.id"
+              :key="confirmation.item.id"
+              :disabled="writing"
+            />
+          </template>
         </template>
         <form
           v-else-if="dialog?.mode === 'add' || dialog?.mode === 'edit'"
@@ -394,6 +450,24 @@ onMounted(() => {
           <label for="wordlist-entry-text">词条文本</label>
           <input id="wordlist-entry-text" v-model="editorText" required autocomplete="off" />
           <p v-if="editorError" role="alert">{{ editorError }}</p>
+        </form>
+        <form
+          v-else-if="dialog?.mode === 'import'"
+          id="wordlist-import-form"
+          @submit.prevent="applyImport"
+        >
+          <label for="wordlist-import-text">粘贴词条，每行一条</label>
+          <textarea id="wordlist-import-text" v-model="editorText" rows="8" />
+          <p>可加入 {{ importCheck.entries.length }} 条词条。</p>
+          <p v-if="importCheck.invalid.length" role="alert">
+            以下行超过 1000 个字符，请修正后继续：{{ importCheck.invalid.join('、') }}
+          </p>
+          <p v-if="importCheck.duplicate.length">
+            完全重复的行将跳过：{{ importCheck.duplicate.join('、') }}
+          </p>
+          <p v-if="importCheck.equivalent.length">
+            以下行在全半角或大小写折叠后可能与已有词条重复：{{ importCheck.equivalent.join('、') }}
+          </p>
         </form>
         <template v-else-if="dialog?.mode === 'delete'">
           <p>从待发布版本删除「{{ dialog.entry.text }}」？</p>
@@ -457,6 +531,15 @@ onMounted(() => {
               form="wordlist-entry-form"
             >
               确认词条
+            </button>
+            <button
+              v-else-if="dialog?.mode === 'import'"
+              class="business-primary"
+              type="submit"
+              form="wordlist-import-form"
+              :disabled="!importCheck.entries.length || !!importCheck.invalid.length"
+            >
+              加入草稿
             </button>
             <button
               v-else-if="dialog?.mode === 'delete'"

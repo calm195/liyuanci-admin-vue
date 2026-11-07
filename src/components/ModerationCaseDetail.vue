@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import type { ModerationCase } from '@/types/moderation'
 defineProps<{
   detail: ModerationCase | null
@@ -32,6 +33,13 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       <h3 v-if="detail.title">{{ detail.title }}</h3>
       <p v-if="detail.reward_text">报答方式 {{ detail.reward_text }}</p>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
+      <WordlistEvidence
+        v-if="detail.wordlist_evidence"
+        :evidence="detail.wordlist_evidence"
+        :body="detail.body"
+        :title="detail.title"
+        :reward-text="detail.reward_text"
+      />
       <p>{{ status }}</p>
       <button v-if="canEscalate" :disabled="locked" @click="$emit('process', 'crisis')">
         升级危机

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
 import { ElDialog } from 'element-plus'
@@ -156,6 +157,11 @@ function timelineActionLabel(action: string) {
               私密胶囊限定证据，仅用于危机处置；误报后仍须符合到期及复核条件。
             </p>
             <blockquote class="workflow-body">{{ detail.body }}</blockquote>
+            <WordlistEvidence
+              v-if="detail.wordlist_evidence"
+              :evidence="detail.wordlist_evidence"
+              :body="detail.body"
+            />
             <section aria-label="危机投递状态">
               <h3>投递状态</h3>
               <p>关怀消息：{{ whisperDeliveryLabels[detail.care_delivery] }}</p>

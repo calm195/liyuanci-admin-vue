@@ -1,3 +1,5 @@
+import type { WordlistEvidence } from '../wordlists'
+
 /** 来自 whispers/1.0.0 固定契约的后台独立投影。 */
 
 export interface ContentControl {
@@ -36,6 +38,7 @@ export interface CrisisCommand {
 }
 
 export interface CrisisDetail {
+  wordlist_evidence?: WordlistEvidence
   id: string
   version: number
   source: ContentRef
@@ -178,6 +181,7 @@ export interface ReviewCommand {
 }
 
 export interface ReviewDetail {
+  wordlist_evidence?: WordlistEvidence
   title?: string
   id: string
   version: number

@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
   detail: vi.fn(),
   create: vi.fn(),
   publish: vi.fn(),
+  builtinEntries: vi.fn(),
+  createBuiltin: vi.fn(),
+  preview: vi.fn(),
+  restore: vi.fn(),
 }))
 vi.mock('@/services/content-transport', () => ({ createWordlistTransport: () => mocks }))
 const published: Wordlist = {
@@ -137,6 +141,163 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     expect(mocks.create).not.toHaveBeenCalled()
     expect(mocks.publish).not.toHaveBeenCalled()
   })
+  it('内置词条停用保存为草稿，发布前显示双词库命中差异', async () => {
+    const builtin: Wordlist = { ...published, id: 'builtin-live', kind: 'builtin' }
+    const next: Wordlist = {
+      ...draft,
+      id: 'builtin-draft',
+      kind: 'builtin',
+      base_effective_id: builtin.id,
+    }
+    const builtinHead: WordlistHead = { kind: 'builtin', version: 2, effective_id: builtin.id }
+    mocks.list
+      .mockResolvedValueOnce({
+        items: [builtin],
+        next_cursor: null,
+        heads: [...heads, builtinHead],
+      })
+      .mockResolvedValueOnce({
+        items: [builtin, next],
+        next_cursor: null,
+        heads: [...heads, { ...builtinHead, version: 3 }],
+      })
+    mocks.builtinEntries.mockResolvedValue({
+      items: [
+        { id: 'row', word: '内置词', label: 'example', enabled: true, disposition: 'review' },
+      ],
+      labels: ['example'],
+      upstream_version: 'v0.3.0',
+      total: 1,
+    })
+    mocks.createBuiltin.mockResolvedValue(next)
+    mocks.preview.mockResolvedValue({
+      effective: {
+        routes: ['ordinary_violation'],
+        matches: [
+          {
+            word: '内置词',
+            source: 'builtin',
+            kind: 'builtin',
+            disposition: 'review',
+            start: 2,
+            end: 5,
+          },
+        ],
+      },
+      draft: {
+        routes: ['school'],
+        matches: [
+          {
+            word: '自定义词',
+            source: 'custom',
+            kind: 'school',
+            disposition: 'review',
+            start: 5,
+            end: 9,
+          },
+        ],
+      },
+    })
+    await go('/wordlists/builtin')
+    await wrapper?.get('[role="switch"][aria-label="启用词条 内置词"]').trigger('click')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    try {
+      await go('/wordlists/history')
+      expect(router.currentRoute.value.name).toBe('wordlist-builtin')
+      expect(confirm).toHaveBeenCalledOnce()
+    } finally {
+      confirm.mockRestore()
+    }
+    await button('保存内置词库草稿').trigger('click')
+    await submit()
+    expect(mocks.createBuiltin).toHaveBeenCalledWith(
+      { expected_version: 2, overrides: [{ id: 'row', enabled: false }] },
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+    await button('发布草稿').trigger('click')
+    const preview = wrapper?.get('[aria-label="发布前试跑"]')
+    await preview?.get('textarea').setValue('😀内置词自定义词')
+    await preview?.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.preview).toHaveBeenCalledWith(next.id, '😀内置词自定义词', expect.any(AbortSignal))
+    expect(preview?.text()).toContain('新增 1 条、消失 1 条')
+    expect(preview?.findAll('mark').map((item) => item.text())).toContain('自定义词')
+    expect(mocks.publish).not.toHaveBeenCalled()
+  })
+  it('全选当前筛选结果跨页批量调整，并保存到同一草稿', async () => {
+    const builtin: Wordlist = { ...published, id: 'builtin-live', kind: 'builtin' }
+    mocks.list.mockResolvedValue({
+      items: [builtin],
+      next_cursor: null,
+      heads: [...heads, { kind: 'builtin', version: 2, effective_id: builtin.id }],
+    })
+    const entries = Array.from({ length: 51 }, (_, index) => ({
+      id: String(index),
+      word: `合成词${index}`,
+      label: 'inappropriate_oral',
+      enabled: true,
+      disposition: 'review' as const,
+    }))
+    mocks.builtinEntries.mockImplementation((_id: string, query: URLSearchParams) => {
+      const offset = Number(query.get('offset'))
+      return Promise.resolve({
+        items: entries.slice(offset, offset + Number(query.get('limit'))),
+        labels: ['inappropriate_oral'],
+        upstream_version: 'v0.3.0',
+        total: entries.length,
+      })
+    })
+    mocks.createBuiltin.mockResolvedValue({ ...draft, kind: 'builtin' })
+    await go('/wordlists/builtin')
+    await wrapper?.get('input[type="search"]').setValue('合成词')
+    await wrapper?.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper?.get('input[aria-label^="全选"]').setValue(true)
+    await flushPromises()
+    expect(mocks.builtinEntries).toHaveBeenLastCalledWith(
+      builtin.id,
+      new URLSearchParams({ offset: '0', limit: '51', q: '合成词' }),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper?.text()).toContain('已选 51 条')
+    await button('下一页').trigger('click')
+    await flushPromises()
+    expect(wrapper?.get('input[aria-label^="选择词条"]').element).toHaveProperty('checked', true)
+    await wrapper?.get('select[aria-label="批量调整方式"]').setValue('disable')
+    await button('批量调整').trigger('click')
+    await button('保存内置词库草稿').trigger('click')
+    await submit()
+    expect(mocks.createBuiltin).toHaveBeenCalledWith(
+      { expected_version: 2, overrides: entries.map(({ id }) => ({ id, enabled: false })) },
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+  })
+  it('从发布记录恢复归档版本为草稿，并跳转到新版本', async () => {
+    const archived: Wordlist = { ...published, id: 'archive', status: 'archived' }
+    const restored: Wordlist = { ...draft, id: 'restored' }
+    mocks.list.mockResolvedValue({ items: [archived, restored], next_cursor: null, heads })
+    mocks.detail.mockImplementation((id: string) =>
+      Promise.resolve({ ...(id === archived.id ? archived : restored), entries: ['恢复词'] }),
+    )
+    mocks.restore.mockResolvedValue(restored)
+    await go('/wordlists/history')
+    await wrapper?.get('a[href="/wordlists/archive"]').trigger('click')
+    await flushPromises()
+    await button('恢复为草稿').trigger('click')
+    expect(wrapper?.text()).toContain('当前生效版继续使用')
+    await submit()
+    expect(mocks.restore).toHaveBeenCalledWith(
+      archived.id,
+      7,
+      expect.any(String),
+      expect.any(AbortSignal),
+    )
+    expect(router.currentRoute.value.path).toBe('/wordlists/restored')
+    expect(wrapper?.text()).toContain('恢复词')
+    expect(mocks.publish).not.toHaveBeenCalled()
+  })
   it('详情直达读取完整快照，响应标识不匹配时不展示或允许发布', async () => {
     mocks.detail.mockResolvedValueOnce({ ...draft, id: 'wrong-id', entries: ['不匹配词条'] })
     await detail()
@@ -192,7 +353,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       expect.any(String),
       expect.any(AbortSignal),
     )
-    expect(wrapper?.text()).toContain('已有审核任务继续使用原词库快照')
+    expect(wrapper?.text()).toContain('已完成扫描的案件保留原词库快照')
     await go('/wordlists')
     mocks.list.mockResolvedValue({
       items: [{ ...draft, status: 'archived' }],

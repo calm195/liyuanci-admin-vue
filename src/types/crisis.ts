@@ -1,3 +1,4 @@
+import type { WordlistEvidence } from './wordlists'
 import type { CursorPage } from './moderation'
 export const crisisRoles = ['crisis_operator', 'super_admin'] as const
 export const crisisActions = ['take_over', 'follow_up', 'resolve', 'retry_notification'] as const
@@ -35,6 +36,7 @@ export interface CrisisWork {
   items: CrisisWorkItem[]
 }
 export interface CrisisEvidence extends CrisisSummary {
+  wordlist_evidence?: WordlistEvidence
   case_id: string
   body: string
   student_number: string

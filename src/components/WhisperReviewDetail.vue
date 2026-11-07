@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import type { ReviewDetail } from '@/types/whispers'
 import { whisperKindLabels, whisperStatusLabels } from '@/composables/useWhisperReviews'
 defineProps<{
@@ -39,6 +40,12 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       </p>
       <h3 v-if="detail.title">{{ detail.title }}</h3>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
+      <WordlistEvidence
+        v-if="detail.wordlist_evidence"
+        :evidence="detail.wordlist_evidence"
+        :body="detail.body"
+        :title="detail.title"
+      />
       <div class="workflow-actions">
         <button v-if="canDecide" :disabled="locked" @click="$emit('process', 'decision')">
           处理树洞审核

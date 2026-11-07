@@ -1,3 +1,5 @@
+import type { WordlistEvidence } from './wordlists'
+
 export interface ModerationSummary {
   id: string
   version: number
@@ -14,6 +16,7 @@ export interface ModerationCase {
   body: string
   status: string
   school_related?: boolean
+  wordlist_evidence?: WordlistEvidence
 }
 export interface CursorPage<T> {
   items: T[]

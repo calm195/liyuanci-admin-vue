@@ -2,10 +2,12 @@ import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { parseModerationCase, parseModerationOutcome, parseModerationPage } from './moderation'
 import {
+  parseBuiltinEntries,
   parseDisabledEntries,
   parseWordlist,
   parseWordlistDetail,
   parseWordlistPage,
+  parseWordlistPreview,
 } from './wordlists'
 import { reviewText, reviewVersion } from './review-boundary'
 import { wordlistKinds } from '@/types/wordlists'
@@ -121,6 +123,41 @@ export function createWordlistTransport(
       const value = parseWordlistDetail(await request(resource('wordlists', id), signal))
       if (value.id !== id) throw new Error('词库详情响应不匹配')
       return value
+    },
+    async builtinEntries(id, query, signal) {
+      return parseBuiltinEntries(
+        await request(`${resource('wordlists', id)}/entries?${query}`, signal),
+      )
+    },
+    async createBuiltin(input, key, signal) {
+      reviewVersion(input.expected_version)
+      const value = parseWordlist(
+        await request('wordlists/builtin/versions', signal, command(input, key), 201),
+      )
+      if (value.kind !== 'builtin' || value.status !== 'draft')
+        throw new Error('内置词库草稿响应不匹配')
+      return value
+    },
+    async restore(id, expectedHeadVersion, key, signal) {
+      const value = parseWordlist(
+        await request(
+          `${resource('wordlists', id)}/restore`,
+          signal,
+          command({ expected_head_version: reviewVersion(expectedHeadVersion) }, key),
+          201,
+        ),
+      )
+      if (value.id === id || value.status !== 'draft') throw new Error('恢复草稿响应不匹配')
+      return value
+    },
+    async preview(id, text, signal) {
+      return parseWordlistPreview(
+        await request(`${resource('wordlists', id)}/preview`, signal, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        }),
+      )
     },
     async create(input, key, signal) {
       reviewVersion(input.expected_version)

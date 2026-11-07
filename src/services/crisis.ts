@@ -1,4 +1,5 @@
 import { ApiError } from './admin'
+import { parseWordlistEvidence } from './wordlists'
 import { record } from '@/types/admin'
 import { reviewPage, reviewRecord, reviewText, reviewVersion } from './review-boundary'
 import { crisisActions } from '@/types/crisis'
@@ -82,6 +83,9 @@ export function parseCrisisEvidence(value: unknown): CrisisEvidence {
   const data = reviewRecord(value)
   return {
     ...parseCrisisSummary(value),
+    ...(data['wordlist_evidence'] === undefined
+      ? {}
+      : { wordlist_evidence: parseWordlistEvidence(data['wordlist_evidence']) }),
     case_id: reviewText(data['case_id']),
     body: text(data['body']),
     student_number: text(data['student_number']),

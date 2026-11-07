@@ -1,3 +1,4 @@
+import { parseWordlistEvidence } from '../wordlists'
 import type * as T from '@/types/whispers'
 
 import { object, text, integer, boolean, choice, array, empty, literal } from './boundary'
@@ -74,8 +75,12 @@ export function parseCrisisDetail(value: unknown): T.CrisisDetail {
     'timeline',
     'care_delivery',
     'staff_delivery',
+    'wordlist_evidence',
   ])
   return {
+    ...(data['wordlist_evidence'] === undefined
+      ? {}
+      : { wordlist_evidence: parseWordlistEvidence(data['wordlist_evidence']) }),
     id: text(data['id'], {
       pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
       format: 'uuid',
@@ -381,8 +386,12 @@ export function parseReviewDetail(value: unknown): T.ReviewDetail {
     'title',
     'school_related',
     'privacy_recheck',
+    'wordlist_evidence',
   ])
   return {
+    ...(data['wordlist_evidence'] === undefined
+      ? {}
+      : { wordlist_evidence: parseWordlistEvidence(data['wordlist_evidence']) }),
     id: text(data['id'], {
       pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
       format: 'uuid',

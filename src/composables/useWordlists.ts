@@ -6,11 +6,11 @@ import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWor
 import { wordlistKinds } from '@/types/wordlists'
 import type {
   Wordlist,
-  WordlistInput,
+  BuiltinDraftInput,
+  WordlistConfirmation,
   WordlistKind,
   WordlistHead,
   WordlistDetail,
-  WordlistPublish,
 } from '@/types/wordlists'
 
 /** 每个路由独立持有状态；离页取消读取和写入，不跨页保留词条。 */
@@ -27,7 +27,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
   const resultId = ref<string | null>(null)
   const kind = ref<WordlistKind>('school')
   const text = ref('')
-  const confirmation = ref<WordlistInput | { item: Wordlist; input: WordlistPublish } | null>(null)
+  const confirmation = ref<WordlistConfirmation | null>(null)
   let generation = 0
   let attempt: { fingerprint: string; key: string } | null = null
   const workspace = useAdminWorkspace(clear)
@@ -36,6 +36,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     crisis: '危机',
     school: '涉校',
     ordinary_violation: '普通违规',
+    builtin: '内置词库',
   }
   const base = computed(() => heads.value.find((head) => head.kind === kind.value))
   function status(value: string) {
@@ -73,15 +74,14 @@ export function useWordlists(detailId?: string, autoLoad = true) {
         let cursor: string | null = null
         do {
           const page = await client.list(cursor, signal)
-          const ordered = wordlistKinds.map((kind) => page.heads.find((head) => head.kind === kind))
+          const ordered = page.heads
+            .slice()
+            .sort((left, right) => left.kind.localeCompare(right.kind))
           if (snapshot && JSON.stringify(snapshot) !== JSON.stringify(ordered))
             throw new Error('词库分页基准已变化，请刷新')
-          if (ordered.some((head) => !head)) throw new Error('词库基准缺失')
-          snapshot = page.heads
-            .slice()
-            .sort(
-              (left, right) => wordlistKinds.indexOf(left.kind) - wordlistKinds.indexOf(right.kind),
-            )
+          if (wordlistKinds.some((kind) => !ordered.some((head) => head.kind === kind)))
+            throw new Error('词库基准缺失')
+          snapshot = ordered
           all.push(...page.items)
           cursor = page.next_cursor
           if (cursor) {
@@ -106,7 +106,8 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     if (loaded.value && detailId) await openDetail(detailId)
   }
   function prepare() {
-    if (!loaded.value || busy.value || writing.value || !base.value) return
+    if (!loaded.value || busy.value || writing.value || !base.value || kind.value === 'builtin')
+      return
     const entries = text.value
       .split('\n')
       .map((entry) => entry.trim())
@@ -126,6 +127,15 @@ export function useWordlists(detailId?: string, autoLoad = true) {
       input: { expected_version: item.version, expected_head_version: head.version },
     }
   }
+  function prepareRestore(item: Wordlist) {
+    if (writing.value || busy.value || !loaded.value || item.status !== 'archived') return
+    const head = heads.value.find((head) => head.kind === item.kind)
+    if (head) confirmation.value = { restore: item, expected_head_version: head.version }
+  }
+  function prepareBuiltin(input: BuiltinDraftInput) {
+    if (writing.value || busy.value || !loaded.value) return
+    confirmation.value = { builtin: input }
+  }
   async function submit() {
     const current = confirmation.value
     if (!current || writing.value || busy.value || !loaded.value) return
@@ -138,16 +148,25 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     resultId.value = null
     notice.value = ''
     await workspace.run(
-      (signal) =>
-        'entries' in current
-          ? client.create(current, key, signal)
-          : client.publish(current.item.id, current.input, key, signal),
+      async (signal) => {
+        if ('entries' in current) return client.create(current, key, signal)
+        if ('builtin' in current) return client.createBuiltin(current.builtin, key, signal)
+        if ('item' in current) return client.publish(current.item.id, current.input, key, signal)
+        const restored = await client.restore(
+          current.restore.id,
+          current.expected_head_version,
+          key,
+          signal,
+        )
+        if (restored.kind !== current.restore.kind) throw new Error('恢复草稿分类不匹配')
+        return restored
+      },
       async (value) => {
         const expected = generation + 1
         await load()
         if (generation === expected && workspace.allowed()) {
           resultId.value = value.id
-          notice.value = `${'entries' in current ? '草稿已创建，尚未发布' : '版本已发布，旧生效版已归档'}：资源版本 ${value.version}；已有审核任务继续使用原词库快照`
+          notice.value = `${'item' in current ? '版本已发布，旧生效版已归档' : '草稿已创建，尚未发布'}：资源版本 ${value.version}；已完成扫描的案件保留原词库快照`
         }
       },
       async (cause) => {
@@ -220,6 +239,8 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     load,
     openDetail,
     prepare,
+    prepareRestore,
+    prepareBuiltin,
     publish,
     submit,
     canPublish,

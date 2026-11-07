@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
 import { ElDialog } from 'element-plus'
@@ -216,8 +217,13 @@ const {
                   {{ evidence.version }}
                 </p>
                 <p>学号：{{ showIdentity ? evidence.student_number || '未提供' : '已隐藏' }}</p>
-                <blockquote class="workflow-body">{{ evidence.body }}</blockquote></template
-              >
+                <blockquote class="workflow-body">{{ evidence.body }}</blockquote>
+                <WordlistEvidence
+                  v-if="evidence.wordlist_evidence"
+                  :evidence="evidence.wordlist_evidence"
+                  :body="evidence.body"
+                />
+              </template>
               <button v-if="evidence || evidenceBusy" @click="hideEvidence">收起证据</button>
               <button
                 v-if="evidence && admin.can('super_admin')"
