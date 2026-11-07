@@ -15,18 +15,20 @@ import { resourceRoles } from '@/types/resources'
 import type {
   AdminResourceCategory,
   ResourceDetail,
+  ResourceFile,
   ResourceFilters,
   ResourceInput,
   ResourceSummary,
 } from '@/types/resources'
 
-const defaults = (): ResourceFilters => ({ q: '', category_id: '', status: '', limit: 20 })
+const defaults = (): ResourceFilters => ({ q: '', category_id: '', status: '', limit: 10 })
 const blank = (): ResourceInput => ({
   title: '',
   category_id: '',
   description: '',
   download_url: '',
   extraction_code: null,
+  file_id: '',
 })
 type Pending =
   | { key: string; kind: 'create'; input: ResourceInput }
@@ -54,6 +56,9 @@ export function useResources() {
     detail = ref<ResourceDetail | null>(null)
   const mode = ref<'detail' | 'create' | 'edit' | 'offline'>('detail'),
     afterOfflineEdit = ref(false)
+  const source = ref<'file' | 'link'>('file')
+  const uploadedFile = ref<ResourceFile | null>(null)
+  const uploadPending = ref<{ file: File; key: string } | null>(null)
   const form = reactive(blank()),
     reason = ref(''),
     conflict = ref(false),
@@ -76,6 +81,9 @@ export function useResources() {
     loading.value = false
     writing.value = false
     reason.value = ''
+    source.value = 'file'
+    uploadedFile.value = null
+    uploadPending.value = null
     Object.assign(form, blank())
   }
   function clear() {
@@ -245,9 +253,13 @@ export function useResources() {
       title: detail.value.title,
       category_id: detail.value.category.id,
       description: detail.value.description,
-      download_url: detail.value.download_url,
-      extraction_code: detail.value.extraction_code,
+      download_url: detail.value.file ? '' : detail.value.download_url,
+      extraction_code: detail.value.file ? null : detail.value.extraction_code,
+      file_id: detail.value.file?.id ?? '',
     })
+    source.value = detail.value.file ? 'file' : 'link'
+    uploadedFile.value = detail.value.file ?? null
+    uploadPending.value = null
     mode.value = 'edit'
     conflict.value = false
     detailError.value = ''
@@ -323,6 +335,43 @@ export function useResources() {
       },
     )
   }
+  function selectFile(event: Event) {
+    if (writing.value || pending.value) return
+    const input = event.target
+    if (!(input instanceof HTMLInputElement)) return
+    const file = input.files?.[0]
+    if (!file) return
+    if (!file.size || file.size > 20 * 1024 * 1024) {
+      detailError.value = '请选择不超过 20 MiB 的非空资料文件'
+      input.value = ''
+      return
+    }
+    uploadPending.value = { file, key: crypto.randomUUID() }
+    detailError.value = ''
+  }
+  async function upload() {
+    const command = uploadPending.value
+    if (!command || writing.value || pending.value) return
+    writing.value = true
+    detailError.value = ''
+    await workspace.run(
+      (signal) => client.upload(command.file, command.key, signal),
+      (result) => {
+        uploadedFile.value = result
+        form.file_id = result.id
+        form.download_url = ''
+        form.extraction_code = null
+        uploadPending.value = null
+        notice.value = '文件已上传，请保存资料以完成绑定'
+      },
+      (cause) => {
+        detailError.value = resourceErrorMessage(cause)
+      },
+      () => {
+        writing.value = false
+      },
+    )
+  }
   async function save() {
     if (
       pending.value ||
@@ -332,7 +381,16 @@ export function useResources() {
     )
       return
     try {
-      const input = normalizeResourceInput(form)
+      if (source.value === 'file' && (!form.file_id || uploadPending.value)) {
+        detailError.value = '请先完成资料文件上传，再保存资料'
+        return
+      }
+      const draft = { ...form }
+      if (source.value === 'file') {
+        delete draft.download_url
+        delete draft.extraction_code
+      } else delete draft.file_id
+      const input = normalizeResourceInput(draft)
       pending.value =
         mode.value === 'create'
           ? { kind: 'create', key: crypto.randomUUID(), input }
@@ -415,6 +473,11 @@ export function useResources() {
     detail,
     mode,
     form,
+    source,
+    uploadedFile,
+    uploadPending,
+    selectFile,
+    upload,
     reason,
     conflict,
     pending,

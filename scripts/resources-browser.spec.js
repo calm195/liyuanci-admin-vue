@@ -1,3 +1,4 @@
+import { handleSessionAndDashboard } from './browser-session.js'
 import console from 'node:console'
 import assert from 'node:assert/strict'
 import { readFile, mkdir, writeFile, mkdtemp } from 'node:fs/promises'
@@ -42,6 +43,7 @@ try {
     const category = sample('adminResourceCategoryDetail')
     let failList = false
     await page.route('**/api/v1/**', async (route) => {
+      if (await handleSessionAndDashboard(route)) return
       const req = route.request(),
         url = new URL(req.url()),
         method = req.method()
@@ -179,7 +181,7 @@ try {
     if (role === 'crisis_operator') {
       assert.equal(
         await page
-          .getByRole('link', { name: '资料管理', exact: true, includeHidden: true })
+          .getByRole('link', { name: '资料列表', exact: true, includeHidden: true })
           .count(),
         0,
       )
@@ -193,9 +195,10 @@ try {
       await context.close()
       continue
     }
-    await page.getByRole('button', { name: '内容管理', exact: true }).click()
-    await page.getByRole('link', { name: '资料管理', exact: true }).click()
+    await page.getByRole('button', { name: '资料管理', exact: true }).click()
+    await page.getByRole('link', { name: '资料列表', exact: true }).click()
     await page.locator('tbody tr').waitFor()
+    assert.equal(await page.locator('.admin-shell').count(), 1, '只渲染一个管理工作区')
     assert.equal(await page.locator('tbody img').count(), 0)
     for (const theme of ['light', 'dark']) {
       await page.locator(`input[value="${theme}"]`).check({ force: true })

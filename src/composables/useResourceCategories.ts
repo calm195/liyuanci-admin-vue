@@ -13,6 +13,7 @@ import type { AdminResourceCategory, CategoryInput } from '@/types/resources'
 const blank = (): CategoryInput => ({ name: '', sort_order: 0, enabled: true })
 type Pending = { key: string; id: string | null; input: CategoryInput; version: number }
 export function useResourceCategories() {
+  const pageSize = ref(10)
   const enabled = ref(''),
     submitted = ref(''),
     items = ref<AdminResourceCategory[]>([])
@@ -88,6 +89,7 @@ export function useResourceCategories() {
           submitted.value === '' ? null : submitted.value === 'true',
           cursor.value,
           AbortSignal.any([signal, request.signal]),
+          pageSize.value,
         ),
       (result) => {
         if (!request.signal.aborted) {
@@ -261,6 +263,7 @@ export function useResourceCategories() {
     void search()
   })
   return {
+    pageSize,
     enabled,
     items,
     next,

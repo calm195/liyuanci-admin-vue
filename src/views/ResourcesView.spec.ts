@@ -15,6 +15,7 @@ import type {
   ResourceSummary,
 } from '@/types/resources'
 const mocks = vi.hoisted(() => ({
+  upload: vi.fn<ResourcesClient['upload']>(),
   list: vi.fn<ResourcesClient['list']>(),
   detail: vi.fn<ResourcesClient['detail']>(),
   create: vi.fn<ResourcesClient['create']>(),
@@ -163,6 +164,10 @@ describe('资料管理页面行为', () => {
   it('创建结果未知后同键重放遇privacy404清除表单，不恢复旧链接', async () => {
     await start()
     await button('新建资料').trigger('click')
+    const source = wrapper
+      .findAll('select')
+      .find((select) => select.find('option[value="file"]').exists())
+    await source?.setValue('link')
     const inputs = wrapper.findAll('.resource-form input')
     await inputs[0]?.setValue('待确认资料')
     await wrapper.get('.resource-form select').setValue(categoryId)
@@ -277,6 +282,10 @@ describe('资料管理页面行为', () => {
   it('创建回执返回当前已发布对象时不强制标记为草稿，刷新失败不再重复创建', async () => {
     await start()
     await button('新建资料').trigger('click')
+    const source = wrapper
+      .findAll('select')
+      .find((select) => select.find('option[value="file"]').exists())
+    await source?.setValue('link')
     const inputs = wrapper.findAll('.resource-form input')
     await inputs[0]?.setValue('新资料')
     await wrapper.get('.resource-form select').setValue(categoryId)
@@ -315,4 +324,44 @@ describe('资料管理页面行为', () => {
     expect(wrapper.get<HTMLInputElement>('input[type=checkbox]').element.checked).toBe(false)
     expect(mocks.updateCategory).toHaveBeenCalledTimes(1)
   })
+})
+
+it('上传文件后保存只绑定文件标识，上传重试复用原幂等键', async () => {
+  await start()
+  await button('新建资料').trigger('click')
+  const file = new File(['资料内容'], '学习资料.txt', { type: 'text/plain' })
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+  await input.trigger('change')
+  mocks.upload.mockRejectedValueOnce(new TypeError('network')).mockResolvedValueOnce({
+    id,
+    name: file.name,
+    size: file.size,
+    content_type: file.type,
+  })
+  await button('上传所选文件 / 重试').trigger('click')
+  await flushPromises()
+  const first = mocks.upload.mock.calls[0]
+  await button('上传所选文件 / 重试').trigger('click')
+  await flushPromises()
+  expect(mocks.upload.mock.calls[1]?.slice(0, 2)).toEqual(first?.slice(0, 2))
+  await wrapper.get('.resource-form input').setValue('上传资料')
+  await wrapper.get('.resource-form select').setValue(categoryId)
+  await wrapper.get('.resource-form').trigger('submit')
+  await flushPromises()
+  expect(mocks.create.mock.calls[0]?.[0]).toEqual({
+    title: '上传资料',
+    category_id: categoryId,
+    description: '',
+    file_id: id,
+  })
+})
+
+it('资料分页默认10，修改大小重置游标并发送新限制', async () => {
+  await start()
+  expect(mocks.list.mock.calls[0]?.[0].limit).toBe(10)
+  await wrapper.get('.page-size-select select').setValue(50)
+  await flushPromises()
+  expect(mocks.list.mock.lastCall?.[0].limit).toBe(50)
+  expect(mocks.list.mock.lastCall?.[1]).toBeNull()
 })

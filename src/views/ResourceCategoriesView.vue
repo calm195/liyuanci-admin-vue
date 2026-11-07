@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useResourceCategories } from '@/composables/useResourceCategories'
 const {
+  pageSize,
   enabled,
   items,
   next,
@@ -55,8 +58,8 @@ const {
       </BusinessToolbar>
       <p>排序数字越小越靠前；分类为单级结构。</p>
       <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
-      <p v-if="error" role="alert">{{ error }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取分类…</p>
       <p v-else-if="!error && !items.length">暂无符合条件的分类</p>
       <div v-if="items.length" class="business-table">
@@ -91,6 +94,7 @@ const {
         </table>
       </div>
       <div class="business-pagination" role="group" aria-label="分页操作">
+        <PageSizeSelect v-model="pageSize" :disabled="busy || writing" @change="search" />
         <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
         ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
       </div>
@@ -105,7 +109,9 @@ const {
         :show-close="false"
         ><button :disabled="writing" @click="close">关闭</button>
         <p v-if="loading" role="status">正在读取分类…</p>
-        <p v-if="detailError" role="alert">{{ detailError }}</p>
+        <FloatingNotice v-if="detailError" :message="detailError" tone="error">{{
+          detailError
+        }}</FloatingNotice>
         <p v-if="pending">操作结果尚待确认，输入已锁定，请原样重试。</p>
         <button v-if="pending" :disabled="writing" @click="runPending">原样重试</button
         ><button

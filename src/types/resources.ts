@@ -3,7 +3,7 @@ export const resourceRoles: readonly Role[] = ['review_operator', 'super_admin']
 export const resourceStatuses = ['draft', 'published', 'offline'] as const
 export const resourceStatusLabels = { draft: '草稿', published: '已上架', offline: '已下架' }
 export const feedbackLabels = {
-  valid: '有效',
+  valid: '有用',
   link_invalid: '链接失效',
   outdated: '年代久远',
   incomplete: '不全',
@@ -46,17 +46,25 @@ export interface ResourceBase {
 export interface ResourceSummary extends ResourceBase {
   description_excerpt: string
 }
+export interface ResourceFile {
+  id: string
+  name: string
+  content_type: string
+  size: number
+}
 export interface ResourceDetail extends ResourceBase {
   description: string
   download_url: string
   extraction_code: string | null
+  file?: ResourceFile | null
 }
 export interface ResourceInput {
   title: string
   category_id: string
   description: string
-  download_url: string
-  extraction_code: string | null
+  download_url?: string
+  extraction_code?: string | null
+  file_id?: string
 }
 export interface CategoryInput {
   name: string
@@ -74,6 +82,7 @@ export interface ResourcePage<T> {
   next_cursor: string | null
 }
 export interface ResourcesClient {
+  upload(file: File, key: string, signal: AbortSignal): Promise<ResourceFile>
   list(
     filters: ResourceFilters,
     cursor: string | null,
@@ -99,6 +108,7 @@ export interface ResourcesClient {
     enabled: boolean | null,
     cursor: string | null,
     signal: AbortSignal,
+    limit?: number,
   ): Promise<ResourcePage<AdminResourceCategory>>
   category(id: string, signal: AbortSignal): Promise<AdminResourceCategory>
   createCategory(

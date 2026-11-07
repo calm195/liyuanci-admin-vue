@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
@@ -23,6 +25,11 @@ const {
   detail,
   mode,
   form,
+  source,
+  uploadedFile,
+  uploadPending,
+  selectFile,
+  upload,
   reason,
   conflict,
   pending,
@@ -53,7 +60,7 @@ function time(value: string) {
 }
 </script>
 <template>
-  <main class="panel workflow resource-workspace" aria-label="资料管理">
+  <main class="panel workflow resource-workspace" aria-label="资料列表">
     <template v-if="workspace.allowed()">
       <form id="resource-filters" class="business-filters" @submit.prevent="search">
         <label
@@ -84,13 +91,13 @@ function time(value: string) {
           <button type="submit" form="resource-filters">查询 / 从首页刷新</button>
         </template>
       </BusinessToolbar>
-      <p v-if="categoryError" role="alert">
+      <FloatingNotice v-if="categoryError" :message="categoryError" tone="error">
         {{ categoryError }} <button @click="loadCategories">重新读取分类</button>
-      </p>
+      </FloatingNotice>
       <p v-if="categoriesBusy">正在读取分类…</p>
       <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取资料…</p>
       <p v-else-if="!error && !items.length">暂无符合条件的资料</p>
       <div v-if="items.length" class="business-table">
@@ -115,7 +122,7 @@ function time(value: string) {
               </td>
               <td>{{ item.category.name }} · {{ resourceStatusLabels[item.status] }}</td>
               <td>
-                <span v-for="(label, kind) in feedbackLabels" :key="kind"
+                <span v-for="(label, kind) in feedbackLabels" :key="kind" class="feedback-count"
                   >{{ label }} {{ item.feedback_summary[kind] }}
                 </span>
               </td>
@@ -134,6 +141,7 @@ function time(value: string) {
         </table>
       </div>
       <div class="business-pagination" role="group" aria-label="分页操作">
+        <PageSizeSelect v-model="filters.limit" :disabled="busy || writing" @change="search" />
         <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
         ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
       </div>
@@ -157,7 +165,9 @@ function time(value: string) {
       >
         <button :disabled="writing" @click="close">关闭</button>
         <p v-if="loading" role="status">正在读取详情…</p>
-        <p v-if="detailError" role="alert">{{ detailError }}</p>
+        <FloatingNotice v-if="detailError" :message="detailError" tone="error">{{
+          detailError
+        }}</FloatingNotice>
         <p v-if="pending">操作结果尚待确认，输入已锁定。请保留原操作重试。</p>
         <button v-if="pending" :disabled="writing" @click="runPending">原样重试</button>
         <button
@@ -172,8 +182,13 @@ function time(value: string) {
           <h2>{{ detail.title }}</h2>
           <p>{{ detail.category.name }} · {{ resourceStatusLabels[detail.status] }}</p>
           <p class="resource-text">{{ detail.description || '暂无简介' }}</p>
-          <p class="resource-text">下载链接：{{ detail.download_url }}</p>
-          <p>提取码：{{ detail.extraction_code ?? '无提取码' }}</p>
+          <p v-if="detail.file">
+            文件：{{ detail.file.name }} · {{ (detail.file.size / 1024).toFixed(1) }} KiB
+          </p>
+          <template v-else
+            ><p class="resource-text">下载链接：{{ detail.download_url }}</p>
+            <p>提取码：{{ detail.extraction_code ?? '无提取码' }}</p></template
+          >
           <p>内容版本 {{ detail.content_version }} · 更新于 {{ time(detail.updated_at) }}</p>
           <p>反馈仅针对当前内容版本，不代表下载次数。</p>
           <ul>
@@ -232,15 +247,37 @@ function time(value: string) {
                   {{ item.name }}
                 </option>
               </select></label
-            ><label>简介（最多2000字）<textarea v-model="form.description" rows="5" /></label
-            ><label
-              >下载链接（HTTP/HTTPS）<input
-                v-model="form.download_url"
-                required
-                autocomplete="off" /></label
-            ><label
-              >提取码（可选）<input v-model="form.extraction_code" autocomplete="off"
-            /></label>
+            ><label>简介（最多2000字）<textarea v-model="form.description" rows="5" /></label>
+            <label
+              >资料来源<select v-model="source">
+                <option value="file">上传文件</option>
+                <option value="link">外部下载链接</option>
+              </select></label
+            >
+            <section v-if="source === 'file'" aria-label="资料文件">
+              <p v-if="uploadedFile">
+                当前文件：{{ uploadedFile.name }} · {{ (uploadedFile.size / 1024).toFixed(1) }} KiB
+              </p>
+              <label
+                >{{ uploadedFile ? '选择替换文件' : '选择资料文件' }}（不超过20 MiB）<input
+                  type="file"
+                  @change="selectFile"
+              /></label>
+              <p v-if="uploadPending">待上传：{{ uploadPending.file.name }}</p>
+              <button type="button" :disabled="!uploadPending" @click="upload">
+                上传所选文件 / 重试
+              </button>
+              <p>文件上传成功后保存资料；替换失败时原文件保持可用。</p>
+            </section>
+            <template v-else
+              ><label
+                >下载链接（HTTP/HTTPS）<input
+                  v-model="form.download_url"
+                  required
+                  autocomplete="off" /></label
+              ><label
+                >提取码（可选）<input v-model="form.extraction_code" autocomplete="off" /></label
+            ></template>
             <p v-if="mode === 'edit'">保存实质内容变更后，旧版反馈将清除。保存后仍需显式上架。</p>
             <button
               type="submit"
@@ -280,6 +317,11 @@ textarea {
   padding: 0.65rem;
   font: inherit;
   max-width: 100%;
+}
+.feedback-count {
+  display: inline-block;
+  margin-inline-end: 0.75rem;
+  white-space: nowrap;
 }
 .resource-text {
   white-space: pre-wrap;

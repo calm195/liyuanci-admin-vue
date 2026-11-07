@@ -7,6 +7,7 @@ import type {
   ResourceCategory,
   ResourceDetail,
   ResourceFilters,
+  ResourceFile,
   ResourceInput,
   ResourcePage,
   ResourceSummary,
@@ -227,7 +228,9 @@ export function parseResourceSummary(value: unknown): ResourceSummary {
   return { ...base(data), description_excerpt: excerpt }
 }
 export function parseResourceDetail(value: unknown): ResourceDetail {
-  const data = object(value, [...baseFields, 'description', 'download_url', 'extraction_code'])
+  const fields = [...baseFields, 'description', 'download_url', 'extraction_code']
+  if (record(value) && 'file' in value) fields.push('file')
+  const data = object(value, fields)
   const code = normalizeResourceText('extraction_code', data['extraction_code'])
   if (code !== data['extraction_code']) return invalid()
   return {
@@ -235,6 +238,9 @@ export function parseResourceDetail(value: unknown): ResourceDetail {
     description: canonical('description', data['description']),
     download_url: canonical('download_url', data['download_url']),
     extraction_code: code,
+    ...(data['file'] !== undefined
+      ? { file: data['file'] === null ? null : parseResourceFile(data['file']) }
+      : {}),
   }
 }
 export function parseResourcePage<T>(
@@ -252,13 +258,34 @@ export function parseResourcePage<T>(
     return invalid()
   return { items: data['items'].map(parse), next_cursor: cursor }
 }
+export function parseResourceFile(value: unknown): ResourceFile {
+  const file = object(value, ['id', 'name', 'content_type', 'size'])
+  const name = text(file['name'])
+  const content_type = text(file['content_type'])
+  if (!name.trim() || !content_type.trim()) return invalid()
+  return {
+    id: resourceId(file['id']),
+    name,
+    content_type,
+    size: integer(file['size'], 1, 20 * 1024 * 1024),
+  }
+}
 export function normalizeResourceInput(input: ResourceInput): ResourceInput {
+  if (input.file_id) {
+    if (input.download_url || input.extraction_code) return invalid()
+    return {
+      title: normalizeResourceText('title', input.title),
+      category_id: resourceId(input.category_id),
+      description: normalizeResourceText('description', input.description),
+      file_id: resourceId(input.file_id),
+    }
+  }
   return {
     title: normalizeResourceText('title', input.title),
     category_id: resourceId(input.category_id),
     description: normalizeResourceText('description', input.description),
     download_url: normalizeResourceText('download_url', input.download_url),
-    extraction_code: normalizeResourceText('extraction_code', input.extraction_code),
+    extraction_code: normalizeResourceText('extraction_code', input.extraction_code ?? null),
   }
 }
 export function normalizeResourceFilters(input: ResourceFilters): ResourceFilters {
@@ -473,6 +500,25 @@ export function createResourcesClient(
     return value
   }
   return {
+    async upload(file, key, signal) {
+      if (file.size < 1 || file.size > 20 * 1024 * 1024)
+        throw new Error('资料文件大小须为 1 字节至 20 MiB')
+      if (!/^[\u0021-\u007e]{1,128}$/u.test(key)) return invalid()
+      const body = new FormData()
+      body.append('file', file)
+      return parseResourceFile(
+        await request(
+          'resource-files',
+          signal,
+          {
+            method: 'POST',
+            headers: { 'Idempotency-Key': key },
+            body,
+          },
+          201,
+        ),
+      )
+    },
     async list(filters, cursor, signal) {
       const values = normalizeResourceFilters(filters),
         params = query(cursor, values.limit)
@@ -531,8 +577,8 @@ export function createResourcesClient(
         ),
       )
     },
-    async categories(enabled, cursor, signal) {
-      const params = query(cursor, 100)
+    async categories(enabled, cursor, signal, limit = 100) {
+      const params = query(cursor, integer(limit, 1, 100))
       if (enabled !== null) params.set('enabled', String(bool(enabled)))
       return parseResourcePage(
         await request(`resource-categories?${params}`, signal),
