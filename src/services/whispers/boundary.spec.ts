@@ -41,6 +41,11 @@ describe('WA-01 版本、隐私和响应边界', () => {
       'ready',
     )
   })
+  it('审核详情接收标题，列表继续拒绝标题正文', () => {
+    const detail = P.parseReviewDetail(example('whisperAdminReviewGet'))
+    expect(P.parseReviewDetail({ ...detail, title: '想说的心事' }).title).toBe('想说的心事')
+    expect(() => P.parseReviewDetail({ ...detail, title: ' ' })).toThrow()
+  })
   it('仅详情持有正文，未知动作或重复动作整体拒绝', () => {
     const detail = P.parseReviewDetail(example('whisperAdminReviewGet'))
     expect(() => P.parseReviewDetail({ ...detail, allowed_actions: ['unknown'] })).toThrow()

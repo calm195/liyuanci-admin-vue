@@ -37,6 +37,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       <p v-if="detail.privacy_recheck" class="banner">
         本案件需要隐私复核，内容通过不能替代隐私屏障检查。
       </p>
+      <h3 v-if="detail.title">{{ detail.title }}</h3>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
       <div class="workflow-actions">
         <button v-if="canDecide" :disabled="locked" @click="$emit('process', 'decision')">

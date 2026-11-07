@@ -178,6 +178,7 @@ export interface ReviewCommand {
 }
 
 export interface ReviewDetail {
+  title?: string
   id: string
   version: number
   source: ContentRef

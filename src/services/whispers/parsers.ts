@@ -378,6 +378,7 @@ export function parseReviewDetail(value: unknown): T.ReviewDetail {
     'created_at',
     'allowed_actions',
     'body',
+    'title',
     'school_related',
     'privacy_recheck',
   ])
@@ -398,6 +399,9 @@ export function parseReviewDetail(value: unknown): T.ReviewDetail {
       (item) => choice(item, ['whisperAdminReviewDecide', 'whisperAdminReviewEscalate']),
       true,
     ),
+    ...(data['title'] === undefined
+      ? {}
+      : { title: text(data['title'], { minLength: 1, maxLength: 40, pattern: '\\S' }) }),
     body: text(data['body'], { minLength: 1, maxLength: 500, pattern: '\\S' }),
     school_related: boolean(data['school_related']),
     privacy_recheck: boolean(data['privacy_recheck']),
