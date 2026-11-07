@@ -6,6 +6,8 @@ export interface ModerationSummary {
   content_version?: number
 }
 export interface ModerationCase {
+  title?: string
+  reward_text?: string
   id: string
   version: number
   content_version: number

@@ -29,6 +29,8 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       <p v-else-if="detail.school_related === undefined">
         此响应未提供涉校标记，不据此判断是否涉校。
       </p>
+      <h3 v-if="detail.title">{{ detail.title }}</h3>
+      <p v-if="detail.reward_text">报答方式 {{ detail.reward_text }}</p>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
       <p>{{ status }}</p>
       <button v-if="canEscalate" :disabled="locked" @click="$emit('process', 'crisis')">

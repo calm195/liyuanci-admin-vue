@@ -23,6 +23,8 @@ export function parseModerationCase(value: unknown): ModerationCase {
     content_version: reviewVersion(data['content_version']),
     body: reviewText(data['body']),
   }
+  if (data['title'] !== undefined) result.title = reviewText(data['title'])
+  if (data['reward_text'] !== undefined) result.reward_text = reviewText(data['reward_text'])
   if (data['school_related'] !== undefined) {
     if (typeof data['school_related'] !== 'boolean') throw new Error('涉校标记格式异常')
     result.school_related = data['school_related']

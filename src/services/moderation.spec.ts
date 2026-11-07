@@ -45,6 +45,19 @@ describe('T017 内容审核协议解析', () => {
       school_related: true,
     })
   })
+  it('审核详情保留同版本标题和自定义报答', () => {
+    expect(
+      parseModerationCase({
+        id: 'case',
+        version: 3,
+        content_version: 7,
+        status: 'human_required',
+        body: '正文',
+        title: '标题',
+        reward_text: '一杯奶茶',
+      }),
+    ).toMatchObject({ title: '标题', reward_text: '一杯奶茶' })
+  })
   it.each(businessOutcomes)('内容通过独立消费业务结果%s，不推断已公开', (business_outcome) => {
     expect(
       parseModerationOutcome({ content_decision: 'approved', business_outcome, version: 4 }),
