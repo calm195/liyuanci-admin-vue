@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
@@ -43,8 +44,16 @@ onMounted(() => {
     void loadTarget()
   }
 })
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
+  <FloatingNotice v-if="accepted" message="删除任务已受理，请继续核对清理进度" tone="success" />
   <main class="panel workflow" aria-label="证据删除">
     <template v-if="workspace.allowed()">
       <p class="banner">删除作用于该证据所属的整个保留范围，无法撤回。受理不代表物理清理完成。</p>
@@ -58,7 +67,7 @@ onMounted(() => {
             <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="loadTarget">
+        <form @submit.prevent="runRead(loadTarget, '证据元信息已读取')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据条目标识</legend>
             <label for="delete-evidence-id">证据条目标识</label>

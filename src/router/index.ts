@@ -23,6 +23,8 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
+  { path: '/report-types', group: '系统管理', title: '举报类型', role: 'super_admin' },
+  { path: '/dictionaries', group: '系统管理', title: '展示字典', role: 'super_admin' },
   { path: '/resources', group: '资料管理', title: '资料列表', roles: resourceRoles },
   { path: '/resource-categories', group: '资料管理', title: '资料分类', roles: resourceRoles },
   { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
@@ -50,6 +52,16 @@ export const menu: MenuItem[] = [
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/report-types',
+      component: () => import('@/views/system/ReportTypesView.vue'),
+      meta: { role: 'super_admin' },
+    },
+    {
+      path: '/dictionaries',
+      component: () => import('@/views/system/DictionariesView.vue'),
+      meta: { role: 'super_admin' },
+    },
     {
       path: '/resources',
       component: () => import('@/views/ResourcesView.vue'),

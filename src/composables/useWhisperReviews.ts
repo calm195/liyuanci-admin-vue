@@ -1,3 +1,4 @@
+import { useCursorProgress } from './useCursorProgress'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createWhispersClient } from '@/services/whispers'
@@ -23,12 +24,6 @@ export const whisperKindLabels: Record<ContentRef['kind'], string> = {
   whisper_nickname: '昵称',
   whisper_capsule: '私密胶囊',
 }
-export const whisperStatusLabels: Record<ReviewSummary['status'], string> = {
-  pending: '待审核',
-  approved: '内容已通过',
-  rejected: '内容已驳回',
-  cancelled: '案件已取消',
-}
 export const whisperOutcomeLabels: Record<ReviewOutcome['business_outcome'], string> = {
   published: '已公开',
   nickname_activated: '昵称已启用',
@@ -43,10 +38,10 @@ export function useWhisperReviews() {
   const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<ReviewSummary[]>([])
-  const nextCursor = ref<string | null>(null)
+  const pagination = useCursorProgress()
+  const { nextCursor, listNotice } = pagination
   const listBusy = ref(false)
   const listError = ref('')
-  const listNotice = ref('')
   const selectedId = ref('')
   const detail = ref<ReviewDetail | null>(null)
   const loading = ref(false)
@@ -61,7 +56,6 @@ export function useWhisperReviews() {
   const confirming = ref(false)
   const writing = ref(false)
   const uncertain = ref(false)
-  const usedCursors = new Set<string | null>()
   let attempt: Attempt | null = null
   const workspace = useAdminWorkspace(clearAll)
   const client = createWhispersClient(
@@ -130,7 +124,7 @@ export function useWhisperReviews() {
     clearDetail()
     items.value = []
     nextCursor.value = null
-    usedCursors.clear()
+    pagination.reset()
     listBusy.value = false
     listError.value = ''
     listNotice.value = ''
@@ -148,7 +142,6 @@ export function useWhisperReviews() {
     await workspace.run(
       (signal) => client.whisperAdminReviewsList(cursor, signal),
       (page) => {
-        usedCursors.add(cursor)
         const merged = new Map(items.value.map((item) => [item.id, item]))
         for (const item of page.items) {
           if (
@@ -163,17 +156,14 @@ export function useWhisperReviews() {
           merged.set(item.id, item)
         }
         items.value = [...merged.values()]
-        if (page.next_cursor !== null && usedCursors.has(page.next_cursor)) {
-          nextCursor.value = null
-          listNotice.value = '分页游标重复，已停止加载，请刷新列表。'
-        } else nextCursor.value = page.next_cursor
+        pagination.accept(cursor, page.next_cursor)
       },
       (cause) => {
         if (cause instanceof ApiError && cause.status === 409) {
           clearDetail()
           items.value = []
           nextCursor.value = null
-          usedCursors.clear()
+          pagination.reset()
         }
         listError.value = reviewErrorMessage(cause)
       },

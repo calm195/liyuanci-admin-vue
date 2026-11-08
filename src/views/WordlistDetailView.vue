@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed } from 'vue'
 import LocalPagination from '@/components/LocalPagination.vue'
@@ -36,8 +37,15 @@ watch(resultId, (id) => {
 const { pageSize, page, pages, pageRows } = useLocalPagination(
   computed(() => detail.value?.entries ?? []),
 )
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="词单详情">
     <nav class="workflow-actions" aria-label="词库页面导航">
       <RouterLink to="/wordlists">词库管理</RouterLink>
@@ -51,7 +59,9 @@ const { pageSize, page, pages, pageRows } = useLocalPagination(
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
 
-      <button :disabled="busy || writing" @click="load">刷新词库</button>
+      <button :disabled="busy || writing" @click="runRead(() => load(), '查询已完成')">
+        刷新词库
+      </button>
       <p v-if="busy" role="status">正在读取词库版本…</p>
       <p v-if="detailBusy" role="status">正在读取完整词条…</p>
       <section v-if="detail" class="workflow-box" aria-label="词库只读详情">

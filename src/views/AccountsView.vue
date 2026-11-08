@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { useDictionariesStore } from '@/stores/dictionaries'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -30,11 +32,7 @@ const error = ref('')
 const notice = ref('')
 const confirming = ref(false)
 let attempt: { fingerprint: string; key: string } | null = null
-const roleLabels: Record<Role, string> = {
-  review_operator: '审核运营',
-  crisis_operator: '危机处置人员',
-  super_admin: '超级管理员',
-}
+const dictionaries = useDictionariesStore()
 function resetForm() {
   editorOpen.value = false
   selected.value = null
@@ -199,9 +197,16 @@ async function submit() {
 onMounted(() => {
   void load()
 })
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="后台账号管理">
     <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
     <template v-if="workspace.allowed()">
@@ -215,7 +220,9 @@ onMounted(() => {
             创建后台账号
           </button>
           <template #tools>
-            <button :disabled="busy || editorOpen" @click="load()">从首页刷新</button>
+            <button :disabled="busy || editorOpen" @click="runRead(() => load(), '查询已完成')">
+              从首页刷新
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="busy" role="status">正在处理…</p>
@@ -241,7 +248,13 @@ onMounted(() => {
                   }}<span v-if="account.id === owner?.account.id">（本人）</span>
                 </th>
                 <td>{{ account.active ? '启用' : '停用' }}</td>
-                <td>{{ account.roles.map((role) => roleLabels[role]).join('、') || '无角色' }}</td>
+                <td>
+                  {{
+                    account.roles
+                      .map((role) => dictionaries.label('admin_role', role))
+                      .join('、') || '无角色'
+                  }}
+                </td>
                 <td>{{ account.version }}</td>
                 <td>
                   <button
@@ -295,7 +308,7 @@ onMounted(() => {
               /></template>
               <label v-for="role in roles" :key="role"
                 ><input v-model="selectedRoles" type="checkbox" :value="role" />{{
-                  roleLabels[role]
+                  dictionaries.label('admin_role', role)
                 }}</label
               >
               <label for="account-reason">{{ selected ? '角色修改理由' : '创建理由' }}</label>
@@ -307,7 +320,10 @@ onMounted(() => {
             <h3>确认{{ selected ? '替换角色' : '创建账号' }}</h3>
             <p>账号：{{ selected?.login_name ?? loginName }}</p>
             <p>
-              新角色：{{ selectedRoles.map((role) => roleLabels[role]).join('、') || '无角色' }}
+              新角色：{{
+                selectedRoles.map((role) => dictionaries.label('admin_role', role)).join('、') ||
+                '无角色'
+              }}
             </p>
             <p>理由：{{ reason }}</p>
             <p v-if="selected?.id === owner?.account.id">

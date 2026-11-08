@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
@@ -43,8 +44,15 @@ onMounted(() => {
     void loadTarget()
   }
 })
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="树洞证据">
     <template v-if="workspace.allowed()">
       <p class="banner">
@@ -63,7 +71,7 @@ onMounted(() => {
             <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="loadTarget">
+        <form @submit.prevent="runRead(() => loadTarget(), '查询已完成')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据范围</legend>
             <label for="whisper-evidence-id">证据范围标识</label
@@ -107,9 +115,14 @@ onMounted(() => {
         <h2>查询删除任务</h2>
         <div v-if="acceptedId" class="workflow-actions">
           <FloatingNotice message="删除任务已受理，待核对清理进度。" tone="info" />
-          <button :disabled="busy || editorOpen" @click="queryAccepted">查询刚受理的任务</button>
+          <button
+            :disabled="busy || editorOpen"
+            @click="runRead(() => queryAccepted(), '查询已完成')"
+          >
+            查询刚受理的任务
+          </button>
         </div>
-        <form @submit.prevent="query">
+        <form @submit.prevent="runRead(() => query(), '查询已完成')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知删除任务</legend>
             <label for="whisper-job-id">删除任务标识</label

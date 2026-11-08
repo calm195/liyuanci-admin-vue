@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { resourceStatusLabels } from '@/utils/dictionary-labels'
+
+import { computed } from 'vue'
+import { useDictionariesStore } from '@/stores/dictionaries'
+const dictionaries = useDictionariesStore()
+const feedbackLabels = computed(() => ({
+  valid: dictionaries.label('resource_feedback', 'valid'),
+  link_invalid: dictionaries.label('resource_feedback', 'link_invalid'),
+  outdated: dictionaries.label('resource_feedback', 'outdated'),
+  incomplete: dictionaries.label('resource_feedback', 'incomplete'),
+}))
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -6,7 +18,7 @@ import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import { useResources } from '@/composables/useResources'
-import { feedbackLabels, resourceStatuses, resourceStatusLabels } from '@/types/resources'
+import { resourceStatuses } from '@/types/resources'
 const {
   filters,
   items,
@@ -58,11 +70,24 @@ function time(value: string) {
     hour12: false,
   }).format(new Date(value))
 }
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(
+  () => Boolean(error.value) || Boolean(categoryError.value) || Boolean(detailError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow resource-workspace" aria-label="资料列表">
     <template v-if="workspace.allowed()">
-      <form id="resource-filters" class="business-filters" @submit.prevent="search">
+      <form
+        id="resource-filters"
+        class="business-filters"
+        @submit.prevent="runRead(() => search(), '查询已完成')"
+      >
         <label
           >关键词<input v-model="filters.q" autocomplete="off" placeholder="搜索标题或简介"
         /></label>
@@ -78,7 +103,7 @@ function time(value: string) {
           >状态<select v-model="filters.status">
             <option value="">全部状态</option>
             <option v-for="status in resourceStatuses" :key="status" :value="status">
-              {{ resourceStatusLabels[status] }}
+              {{ resourceStatusLabels(status) }}
             </option>
           </select></label
         >
@@ -92,7 +117,8 @@ function time(value: string) {
         </template>
       </BusinessToolbar>
       <FloatingNotice v-if="categoryError" :message="categoryError" tone="error">
-        {{ categoryError }} <button @click="loadCategories">重新读取分类</button>
+        {{ categoryError }}
+        <button @click="runRead(() => loadCategories(), '查询已完成')">重新读取分类</button>
       </FloatingNotice>
       <p v-if="categoriesBusy">正在读取分类…</p>
       <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
@@ -120,7 +146,7 @@ function time(value: string) {
                 {{ item.title }}
                 <p>{{ item.description_excerpt }}</p>
               </td>
-              <td>{{ item.category.name }} · {{ resourceStatusLabels[item.status] }}</td>
+              <td>{{ item.category.name }} · {{ resourceStatusLabels(item.status) }}</td>
               <td>
                 <span v-for="(label, kind) in feedbackLabels" :key="kind" class="feedback-count"
                   >{{ label }} {{ item.feedback_summary[kind] }}
@@ -173,14 +199,14 @@ function time(value: string) {
         <button
           v-if="selected !== 'new' && !pending"
           :disabled="writing || loading"
-          @click="refresh"
+          @click="runRead(() => refresh(), '查询已完成')"
         >
           重新读取并核对
         </button>
         <p v-if="conflict">请重新读取，核对当前内容与本地输入后再确认保存。</p>
         <template v-if="detail && mode === 'detail'">
           <h2>{{ detail.title }}</h2>
-          <p>{{ detail.category.name }} · {{ resourceStatusLabels[detail.status] }}</p>
+          <p>{{ detail.category.name }} · {{ resourceStatusLabels(detail.status) }}</p>
           <p class="resource-text">{{ detail.description || '暂无简介' }}</p>
           <p v-if="detail.file">
             文件：{{ detail.file.name }} · {{ (detail.file.size / 1024).toFixed(1) }} KiB

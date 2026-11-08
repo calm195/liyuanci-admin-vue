@@ -16,7 +16,10 @@ afterEach(() => {
   for (const wrapper of wrappers.splice(0)) wrapper.unmount()
   vi.useRealTimers()
 })
-function show(message: string, tone: 'success' | 'error' | 'info' = 'info') {
+function show(
+  message: string,
+  tone: 'success' | 'error' | 'info' | 'pending' | 'warning' | 'uncertain' = 'info',
+) {
   const wrapper = mount(FloatingNotice, {
     props: { message, tone },
     global: { plugins: [pinia], stubs: { NoticePortal: false } },
@@ -28,16 +31,16 @@ function elements() {
   return document.body.querySelectorAll<HTMLElement>('.floating-notice')
 }
 describe('悬浮操作提示', () => {
-  it('挂到body，成功4秒/错误6秒消失且不改变输入错误状态', async () => {
+  it('挂到body，成功3秒/错误6秒消失且不改变输入错误状态', async () => {
     const success = show('保存成功', 'success')
     const failure = show('读取失败', 'error')
     await nextTick()
     expect(success.html()).not.toContain('保存成功')
     expect(elements()).toHaveLength(2)
-    await vi.advanceTimersByTimeAsync(4000)
+    await vi.advanceTimersByTimeAsync(3000)
     expect(elements()).toHaveLength(1)
     expect(elements()[0]?.textContent).toContain('读取失败')
-    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(3000)
     expect(elements()).toHaveLength(0)
     expect(failure.props('message')).toBe('读取失败')
   })
@@ -90,6 +93,26 @@ describe('悬浮操作提示', () => {
     await nextTick()
     expect(elements()).toHaveLength(3)
     expect(document.body.textContent).not.toContain('第一条')
+  })
+  it('同样的操作结果可用代次重新提示，错误关闭后保留页面原因', async () => {
+    const wrapper = show('保存失败', 'error')
+    await nextTick()
+    document.body.querySelector<HTMLButtonElement>('.floating-notice-close')?.click()
+    await nextTick()
+    expect(wrapper.text()).toContain('保存失败')
+    await wrapper.setProps({ revision: 1 })
+    expect(elements()).toHaveLength(1)
+  })
+  it('处理提示等待结果，结果未知保留八秒', async () => {
+    const wrapper = show('正在提交', 'pending')
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(elements()).toHaveLength(1)
+    await wrapper.setProps({ message: '提交结果尚未确认，请核对后重试', tone: 'error' })
+    await vi.advanceTimersByTimeAsync(7999)
+    expect(elements()).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(elements()).toHaveLength(0)
   })
   it('离开页面移除提示和定时器，不在下一页残留', async () => {
     const wrapper = show('本页提示')

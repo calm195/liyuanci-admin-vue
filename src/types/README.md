@@ -1,1 +1,1 @@
-Shared domain types only. Colocate local types with their consumers.
+共享领域类型放在本目录；单个页面或模块使用的局部类型靠近消费者。协议代码保持稳定，展示名称从服务端字典读取。

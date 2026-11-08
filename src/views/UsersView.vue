@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { useDictionariesStore } from '@/stores/dictionaries'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import UserRestrictionActions from '@/components/UserRestrictionActions.vue'
@@ -21,25 +23,30 @@ const {
   refreshRestrictions,
 } = useUsers()
 const admin = useAdminStore()
-const verificationLabels = {
-  unverified: '未认证',
-  pending: '待审核',
-  verified: '已认证',
-  rejected: '已驳回',
-}
-const restrictionLabels = { normal: '正常', muted: '禁言', banned: '封禁' }
+const dictionaries = useDictionariesStore()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="平台用户">
     <template v-if="workspace.allowed()">
-      <form id="user-filters" class="business-filters" @submit.prevent="search">
+      <form
+        id="user-filters"
+        class="business-filters"
+        @submit.prevent="runRead(() => search(), '查询已完成')"
+      >
         <label>用户 ID<input v-model="draft.user_id" type="password" autocomplete="off" /></label>
         <label>昵称关键词<input v-model="draft.nickname" autocomplete="off" /></label>
         <label
           >认证状态<select v-model="draft.verification">
             <option value="">全部</option>
             <option v-for="value in verifications" :key="value" :value="value">
-              {{ verificationLabels[value] }}
+              {{ dictionaries.label('verification_status', value) }}
             </option>
           </select></label
         >
@@ -47,7 +54,7 @@ const restrictionLabels = { normal: '正常', muted: '禁言', banned: '封禁' 
           >限制状态<select v-model="draft.restriction">
             <option value="">全部</option>
             <option v-for="value in restrictions" :key="value" :value="value">
-              {{ restrictionLabels[value] }}
+              {{ dictionaries.label('restriction_status', value) }}
             </option>
           </select></label
         >
@@ -89,9 +96,9 @@ const restrictionLabels = { normal: '正常', muted: '禁言', banned: '封禁' 
               <td>
                 {{ item.display_name ?? '未设置' }}
               </td>
-              <td>{{ verificationLabels[item.verification] }}</td>
+              <td>{{ dictionaries.label('verification_status', item.verification) }}</td>
               <td>
-                {{ restrictionLabels[item.restriction]
+                {{ dictionaries.label('restriction_status', item.restriction)
                 }}<span v-if="item.muted_until"
                   ><br />至 {{ displayBeijingTime(item.muted_until) }}</span
                 >

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { whisperReportStatuses } from '@/utils/dictionary-labels'
+
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -9,7 +12,6 @@ import 'element-plus/theme-chalk/el-overlay.css'
 import {
   useWhisperReports,
   whisperPenaltyLabels,
-  whisperReportStatuses,
   whisperTaskLabels,
 } from '@/composables/useWhisperReports'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
@@ -51,8 +53,17 @@ const {
   back,
   submit,
 } = useWhisperReports()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(
+  () => Boolean(error.value) || Boolean(listError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="树洞举报">
     <p>仅处理当前授权举报及其来源，不提供匿名作者身份查询。</p>
     <template v-if="workspace.allowed()">
@@ -73,7 +84,12 @@ const {
         <BusinessToolbar label="树洞举报操作栏">
           <h2>举报案件</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              刷新列表
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取举报…</p>
@@ -101,7 +117,7 @@ const {
               <tr v-for="(item, index) in items" :key="item.id">
                 <th scope="row">{{ index + 1 }}</th>
                 <td>{{ whisperKindLabels[item.source.kind] }}</td>
-                <td>{{ whisperReportStatuses[item.status] }}</td>
+                <td>{{ whisperReportStatuses(item.status) }}</td>
                 <td>{{ item.version }}</td>
                 <td>{{ item.source.content_version }}</td>
                 <td>{{ displayBeijingTime(item.created_at) }}</td>
@@ -153,7 +169,7 @@ const {
           <template v-if="detail">
             <button :disabled="editorOpen" @click="close">关闭举报</button>
             <p>
-              {{ whisperReportStatuses[detail.status] }} · 举报版本
+              {{ whisperReportStatuses(detail.status) }} · 举报版本
               {{ detail.version }}
             </p>
             <p>

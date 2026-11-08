@@ -3,10 +3,18 @@ import NoticePortal from './NoticePortal.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useNoticesStore } from '@/stores/notices'
 import type { NoticeTone } from '@/stores/notices'
-const props = withDefaults(defineProps<{ message: string; tone?: NoticeTone }>(), { tone: 'info' })
+const props = withDefaults(
+  defineProps<{ message: string; tone?: NoticeTone; revision?: number }>(),
+  { tone: 'info', revision: 0 },
+)
 const notices = useNoticesStore()
 const id = notices.allocate()
 const element = ref<HTMLElement | null>(null)
+const effectiveTone = computed(() =>
+  props.tone !== 'pending' && /尚未确认|未获确认|未确认|不明确/.test(props.message)
+    ? 'uncertain'
+    : props.tone,
+)
 const visible = computed(() => notices.items.some((item) => item.id === id))
 let timer: ReturnType<typeof globalThis.setTimeout> | undefined
 let remaining = 0
@@ -27,7 +35,14 @@ function close() {
   notices.remove(id)
 }
 function resume() {
-  if (pointerInside || focusInside || !visible.value || timer !== undefined) return
+  if (
+    pointerInside ||
+    focusInside ||
+    !visible.value ||
+    timer !== undefined ||
+    effectiveTone.value === 'pending'
+  )
+    return
   started = Date.now()
   timer = globalThis.setTimeout(close, remaining)
 }
@@ -42,11 +57,18 @@ function focus(value: boolean) {
   else resume()
 }
 watch(
-  () => [props.message, props.tone],
+  () => [props.message, props.tone, props.revision],
   () => {
     stopTimer()
-    notices.show(id, props.message, props.tone)
-    remaining = props.tone === 'error' ? 6000 : 4000
+    notices.show(id, props.message, effectiveTone.value)
+    remaining = {
+      success: 3000,
+      warning: 5000,
+      error: 6000,
+      uncertain: 8000,
+      info: 4000,
+      pending: 0,
+    }[effectiveTone.value]
     resume()
   },
   { immediate: true },
@@ -73,12 +95,22 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
+  <div
+    v-if="
+      !visible &&
+      message &&
+      (tone === 'error' || tone === 'warning' || effectiveTone === 'uncertain')
+    "
+    class="notice-retained"
+  >
+    <slot>{{ message }}</slot>
+  </div>
   <NoticePortal>
     <aside
       v-if="visible"
       ref="element"
       class="floating-notice"
-      :class="`floating-notice--${tone}`"
+      :class="`floating-notice--${effectiveTone}`"
       :style="{ top: `${notices.offsets.get(id) ?? 20}px` }"
       :role="tone === 'error' ? 'alert' : 'status'"
       :aria-live="tone === 'error' ? 'assertive' : 'polite'"
@@ -89,7 +121,7 @@ onBeforeUnmount(() => {
       @focusout="focus(false)"
     >
       <span class="floating-notice-icon" aria-hidden="true">{{
-        tone === 'error' ? '!' : tone === 'success' ? '✓' : 'i'
+        effectiveTone === 'error' ? '!' : effectiveTone === 'success' ? '✓' : 'i'
       }}</span>
       <div class="floating-notice-content">
         <slot>{{ message }}</slot>
@@ -121,6 +153,14 @@ onBeforeUnmount(() => {
   font-size: 14px;
   line-height: 1.6;
   box-sizing: border-box;
+}
+.floating-notice--warning,
+.floating-notice--uncertain {
+  border-left-color: #b7791f;
+}
+.notice-retained {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 .floating-notice--error {
   border-left-color: #e5484d;

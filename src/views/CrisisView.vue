@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
@@ -63,8 +64,17 @@ const {
   confirm,
   submit,
 } = useCrisisReview()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
+  Boolean(error.value || listError.value || workError.value || timelineError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="危机工作台">
     <p>
       危机隔离和自动待办全天运行；北京时间 8–22
@@ -84,13 +94,20 @@ const {
         <BusinessToolbar label="危机案件操作栏">
           <h2>危机案件</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refresh()">从首页刷新</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              从首页刷新
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取危机案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
-          <button :disabled="editorOpen" @click="loadList">重试列表</button>
+          <button :disabled="editorOpen" @click="runRead(() => loadList(), '查询已完成')">
+            重试列表
+          </button>
         </FloatingNotice>
         <p v-else-if="!items.length">暂无危机案件</p>
         <div v-else class="business-table">
@@ -163,7 +180,12 @@ const {
             <blockquote class="workflow-body">{{ detail.body }}</blockquote>
             <section aria-label="危机投递待办" class="workflow-box" :aria-busy="workBusy">
               <h3>关怀与人员通知待办</h3>
-              <button :disabled="workBusy || editorOpen" @click="loadWork">刷新待办</button>
+              <button
+                :disabled="workBusy || editorOpen"
+                @click="runRead(() => loadWork(), '查询已完成')"
+              >
+                刷新待办
+              </button>
               <p v-if="workBusy" role="status">正在读取待办…</p>
               <FloatingNotice v-if="workError" :message="workError" tone="error">{{
                 workError
@@ -193,7 +215,10 @@ const {
             </section>
             <section aria-label="危机时间线" class="workflow-box" :aria-busy="timelineBusy">
               <h3>案件时间线</h3>
-              <button :disabled="timelineBusy || editorOpen" @click="loadTimeline">
+              <button
+                :disabled="timelineBusy || editorOpen"
+                @click="runRead(() => loadTimeline(), '查询已完成')"
+              >
                 刷新时间线
               </button>
               <p v-if="timelineBusy" role="status">正在读取时间线…</p>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -33,9 +34,16 @@ const editingVersion = computed(() =>
   selected.value?.id === head.value?.effective_id ? head.value?.version : undefined,
 )
 onBeforeRouteLeave(() => !writing.value)
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="内置词库管理">
     <template v-if="workspace.allowed()">
       <h2>go-swd 内置词库</h2>
@@ -49,7 +57,11 @@ onBeforeRouteLeave(() => !writing.value)
           <span v-if="selected.upstream_version"> · 上游 {{ selected.upstream_version }}</span>
         </p>
         <div v-if="selected.status === 'draft'" class="workflow-actions">
-          <button type="button" :disabled="writing || !!confirmation" @click="load">
+          <button
+            type="button"
+            :disabled="writing || !!confirmation"
+            @click="runRead(() => load(), '查询已完成')"
+          >
             返回当前生效版
           </button>
           <button
@@ -78,7 +90,12 @@ onBeforeRouteLeave(() => !writing.value)
         />
       </template>
       <p v-else-if="loaded">内置词库尚无生效版本。</p>
-      <button v-if="!selected" type="button" :disabled="busy || writing" @click="load">
+      <button
+        v-if="!selected"
+        type="button"
+        :disabled="busy || writing"
+        @click="runRead(() => load(), '查询已完成')"
+      >
         刷新内置词库
       </button>
     </template>

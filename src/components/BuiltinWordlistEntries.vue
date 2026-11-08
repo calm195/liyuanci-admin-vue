@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
 import { computed, onMounted, ref } from 'vue'
@@ -161,12 +162,19 @@ function save() {
 }
 onBeforeRouteLeave(() => !changeCount.value || globalThis.confirm('放弃尚未保存的内置词库调整？'))
 onMounted(() => void load(0))
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <section aria-label="内置词条" :aria-busy="loading || selecting">
     <p v-if="page">上游版本 {{ page.upstream_version }} · 当前筛选 {{ page.total }} 条</p>
-    <form @submit.prevent="load(0, true)">
+    <form @submit.prevent="runRead(() => load(0, true), '查询已完成')">
       <fieldset class="business-filters" :disabled="loading || selecting || locked">
         <legend>筛选内置词条</legend>
         <label>关键词 <input v-model="filters.q" type="search" maxlength="255" /></label>
@@ -302,7 +310,7 @@ onMounted(() => void load(0))
         <button
           type="button"
           :disabled="!offset || loading || selecting || locked"
-          @click="load(offset - pageSize)"
+          @click="runRead(() => load(offset - pageSize), '查询已完成')"
         >
           上一页
         </button>
@@ -310,7 +318,7 @@ onMounted(() => void load(0))
         <button
           type="button"
           :disabled="offset + pageSize >= page.total || loading || selecting || locked"
-          @click="load(offset + pageSize)"
+          @click="runRead(() => load(offset + pageSize), '查询已完成')"
         >
           下一页
         </button>

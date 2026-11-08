@@ -65,7 +65,7 @@ describe('T010 REQ-018/019 会话生命周期', () => {
     fail?.(new Error('offline'))
     await pending
     expect(admin.authenticated).toBe(true)
-    expect(admin.notice).toBe('')
+    expect(admin.notice).toBe('登录成功')
   })
   it.each([401, 403])('旧会话的 %s 晚到不会影响重新登录的会话', async (status) => {
     const admin = useAdminStore()
@@ -85,7 +85,7 @@ describe('T010 REQ-018/019 会话生命周期', () => {
     await expect(pending).rejects.toBeInstanceOf(ApiError)
     expect(admin.authenticated).toBe(true)
     expect(admin.forbidden).toBe(0)
-    expect(admin.notice).toBe('')
+    expect(admin.notice).toBe('登录成功')
   })
   it('运营无危机和超管权限，清理后全部禁入', async () => {
     vi.mocked(service.loginAdmin).mockResolvedValue(session)
@@ -168,7 +168,7 @@ describe('T010 0.2.0 本人改密会话代次', () => {
     else fail?.(new ApiError(status))
     await expect(pending).rejects.toThrow()
     expect(admin.session?.token).toBe('new-session')
-    expect(admin.notice).toBe('')
+    expect(admin.notice).toBe('登录成功')
     expect(admin.forbidden).toBe(0)
   })
   it('当前401清会话，未登录不发送改密', async () => {

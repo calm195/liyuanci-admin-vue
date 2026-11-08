@@ -64,7 +64,7 @@ export const useAdminStore = defineStore('admin-session', () => {
     session.value = result
     initialized.value = true
     restoreError.value = ''
-    notice.value = ''
+    notice.value = '登录成功'
   }
   let passwordBusy = false
   async function changePassword(input: AdminPasswordInput, key: string, signal?: AbortSignal) {
@@ -131,6 +131,7 @@ export const useAdminStore = defineStore('admin-session', () => {
     if (token) {
       try {
         await revokeAdmin(token)
+        if (current === generation) notice.value = '已退出登录'
       } catch {
         // 旧退出请求的结果不得覆盖后续登录的提示。
         if (current === generation)

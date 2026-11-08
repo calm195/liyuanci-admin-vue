@@ -1,13 +1,6 @@
 import type { Role } from './admin'
 export const resourceRoles: readonly Role[] = ['review_operator', 'super_admin']
 export const resourceStatuses = ['draft', 'published', 'offline'] as const
-export const resourceStatusLabels = { draft: '草稿', published: '已上架', offline: '已下架' }
-export const feedbackLabels = {
-  valid: '有用',
-  link_invalid: '链接失效',
-  outdated: '年代久远',
-  incomplete: '不全',
-}
 export type ResourceStatus = (typeof resourceStatuses)[number]
 export interface ResourceCategory {
   id: string

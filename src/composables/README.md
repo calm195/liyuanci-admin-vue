@@ -1,1 +1,1 @@
-Reusable reactive logic named useX. Keep feature-specific logic beside the feature.
+响应式复用逻辑使用 useX 命名。业务权限、状态流转与事务语义保留在所属领域；公共请求作用域、游标与操作反馈按独立职责抽取。

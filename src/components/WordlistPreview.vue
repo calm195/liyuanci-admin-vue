@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, ref } from 'vue'
 import WordlistMatches from '@/components/WordlistMatches.vue'
@@ -59,15 +60,22 @@ async function run() {
     },
   )
 }
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <section aria-label="发布前试跑">
     <h3>发布前试跑</h3>
     <p>
       用同一份测试文本对照生效版和草稿版，查看命中及预计审核流转。私信和胶囊中的涉校命中按普通复核处理。
     </p>
-    <form @submit.prevent="run">
+    <form @submit.prevent="runRead(() => run(), '查询已完成')">
       <fieldset :disabled="busy || disabled">
         <label>
           测试文本

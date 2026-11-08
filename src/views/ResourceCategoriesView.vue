@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -34,11 +35,22 @@ const {
   save,
   runPending,
 } = useResourceCategories()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="资料分类">
     <template v-if="workspace.allowed()"
-      ><form id="category-filters" class="business-filters" @submit.prevent="search">
+      ><form
+        id="category-filters"
+        class="business-filters"
+        @submit.prevent="runRead(() => search(), '查询已完成')"
+      >
         <label
           >启用状态
           <select v-model="enabled">
@@ -117,7 +129,7 @@ const {
         ><button
           v-if="selected !== 'new' && !pending"
           :disabled="writing || loading"
-          @click="refresh"
+          @click="runRead(() => refresh(), '查询已完成')"
         >
           重新读取并核对
         </button>

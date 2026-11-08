@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { whisperStatusLabels } from '@/utils/dictionary-labels'
+
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -10,7 +13,6 @@ import WhisperReviewDetail from '@/components/WhisperReviewDetail.vue'
 import {
   useWhisperReviews,
   whisperKindLabels,
-  whisperStatusLabels,
   whisperOutcomeLabels,
 } from '@/composables/useWhisperReviews'
 const {
@@ -50,8 +52,17 @@ const {
   submit,
   reread,
 } = useWhisperReviews()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(
+  () => Boolean(error.value) || Boolean(listError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="树洞审核">
     <p>仅按当前授权案件读取命中版本，不提供匿名作者查询或私密胶囊全量浏览。</p>
     <template v-if="workspace.allowed()">
@@ -59,6 +70,11 @@ const {
       <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
         error
       }}</FloatingNotice>
+      <FloatingNotice
+        v-if="outcome"
+        :message="`审核决定已确认：${whisperOutcomeLabels[outcome.business_outcome]}`"
+        tone="success"
+      />
       <section v-if="outcome" class="workflow-box" aria-label="树洞审核回执">
         <h2>审核回执</h2>
         <p>内容判定：{{ outcome.content_decision === 'approved' ? '通过' : '驳回' }}</p>
@@ -71,7 +87,12 @@ const {
         <BusinessToolbar label="树洞审核操作栏">
           <h2>审核案件</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              刷新列表
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
@@ -99,7 +120,7 @@ const {
               <tr v-for="(item, index) in items" :key="item.id">
                 <th scope="row">{{ index + 1 }}</th>
                 <td>{{ whisperKindLabels[item.source.kind] }}</td>
-                <td>{{ whisperStatusLabels[item.status] }}</td>
+                <td>{{ whisperStatusLabels(item.status) }}</td>
                 <td>{{ item.version }}</td>
                 <td>{{ item.source.content_version }}</td>
                 <td>{{ displayBeijingTime(item.created_at) }}</td>

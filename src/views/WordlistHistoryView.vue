@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import LocalPagination from '@/components/LocalPagination.vue'
 import { useLocalPagination } from '@/composables/useLocalPagination'
@@ -12,9 +13,16 @@ const rows = computed(() =>
   items.value.filter((item) => !filter.value || item.kind === filter.value),
 )
 const { pageSize, page, pages, pageRows } = useLocalPagination(rows)
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="词库发布记录">
     <template v-if="workspace.allowed()">
       <h2>发布记录</h2>
@@ -31,7 +39,9 @@ const { pageSize, page, pages, pageRows } = useLocalPagination(rows)
             </option>
           </select>
         </label>
-        <button type="button" :disabled="busy" @click="load">刷新发布记录</button>
+        <button type="button" :disabled="busy" @click="runRead(() => load(), '查询已完成')">
+          刷新发布记录
+        </button>
       </div>
       <p v-if="!busy && !rows.length">暂无版本记录</p>
       <div v-else-if="rows.length" class="business-table">

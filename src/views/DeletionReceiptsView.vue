@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
@@ -15,8 +16,15 @@ onMounted(() => {
     void query('job')
   }
 })
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="回执查询">
     <p>查询刚受理的证据清理任务，也可输入已知待办标识或完整匿名回执。查询不会触发删除。</p>
     <template v-if="workspace.allowed()">
@@ -29,7 +37,7 @@ onMounted(() => {
             <button :disabled="busy" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="query('job')">
+        <form @submit.prevent="runRead(() => query('job'), '查询已完成')">
           <fieldset :disabled="busy">
             <legend>后台证据删除待办</legend>
             <label for="delete-job-id">删除待办标识</label>
@@ -45,7 +53,7 @@ onMounted(() => {
             </button>
           </fieldset>
         </form>
-        <form @submit.prevent="query('receipt')">
+        <form @submit.prevent="runRead(() => query('receipt'), '查询已完成')">
           <fieldset :disabled="busy">
             <legend>匿名删除回执</legend>
             <label for="delete-receipt">本人主动提供的完整删除回执</label>

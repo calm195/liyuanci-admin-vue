@@ -1,3 +1,5 @@
+import { useCursorProgress } from './useCursorProgress'
+import { whisperReportStatuses } from '@/utils/dictionary-labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createWhispersClient } from '@/services/whispers'
@@ -29,11 +31,6 @@ type Attempt = { key: string; reportId: string } & (
   | { task: 'restriction'; source: ContentRef; body: RestrictionCommand }
   | { task: 'penalty'; source: ContentRef; body: PenaltyCommand }
 )
-export const whisperReportStatuses: Record<ReportSummary['status'], string> = {
-  pending: '待处理',
-  confirmed: '举报已确认',
-  dismissed: '举报已驳回',
-}
 export const whisperPenaltyLabels: Record<PenaltyCommand['level'], string> = {
   minor: '轻微：警告',
   general: '一般：禁言7天',
@@ -49,10 +46,10 @@ export function useWhisperReports() {
   const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<ReportSummary[]>([])
-  const nextCursor = ref<string | null>(null)
+  const pagination = useCursorProgress()
+  const { nextCursor, listNotice } = pagination
   const listBusy = ref(false)
   const listError = ref('')
-  const listNotice = ref('')
   const selectedId = ref('')
   const detail = ref<ReportDetail | null>(null)
   const control = ref<ContentControl | null>(null)
@@ -69,7 +66,6 @@ export function useWhisperReports() {
   const confirming = ref(false)
   const writing = ref(false)
   const uncertain = ref(false)
-  const usedCursors = new Set<string | null>()
   let attempt: Attempt | null = null
   const workspace = useAdminWorkspace(clearAll, safetyRoles)
   const client = createWhispersClient(
@@ -186,7 +182,7 @@ export function useWhisperReports() {
     clearDetail()
     items.value = []
     nextCursor.value = null
-    usedCursors.clear()
+    pagination.reset()
     listBusy.value = false
     listError.value = ''
     listNotice.value = ''
@@ -204,7 +200,6 @@ export function useWhisperReports() {
     await workspace.run(
       (signal) => client.whisperAdminReportsList(cursor, signal),
       (page) => {
-        usedCursors.add(cursor)
         const merged = new Map(items.value.map((item) => [item.id, item]))
         for (const item of page.items) {
           if (
@@ -221,17 +216,14 @@ export function useWhisperReports() {
           merged.set(item.id, item)
         }
         items.value = [...merged.values()]
-        if (page.next_cursor !== null && usedCursors.has(page.next_cursor)) {
-          nextCursor.value = null
-          listNotice.value = '分页游标重复，已停止加载，请刷新列表。'
-        } else nextCursor.value = page.next_cursor
+        pagination.accept(cursor, page.next_cursor)
       },
       (cause) => {
         if (cause instanceof ApiError && cause.status === 409) {
           clearDetail()
           items.value = []
           nextCursor.value = null
-          usedCursors.clear()
+          pagination.reset()
         }
         listError.value = reviewErrorMessage(cause)
       },
@@ -392,7 +384,7 @@ export function useWhisperReports() {
           items.value = items.value.map((item) =>
             item.id === result.value.id ? result.value : item,
           )
-          notice.value = `举报判定：${whisperReportStatuses[result.value.status]}。请重新读取举报后进行后续治理。`
+          notice.value = `举报判定：${whisperReportStatuses(result.value.status)}。请重新读取举报后进行后续治理。`
         } else if (result.task === 'restriction')
           notice.value = result.value.restricted
             ? '普通限制已设置，以服务端当前状态为准。'

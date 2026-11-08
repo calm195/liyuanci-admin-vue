@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { computed } from 'vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
@@ -72,12 +73,23 @@ const {
   close,
   download,
 } = useContentManagement(() => props.kind)
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" :aria-label="title">
     <template v-if="workspace.allowed()">
-      <form id="content-management-filters" class="business-filters" @submit.prevent="search">
+      <form
+        id="content-management-filters"
+        class="business-filters"
+        @submit.prevent="runRead(() => search(), '查询已完成')"
+      >
         <label>公开标题或正文<input v-model="draft.keyword" maxlength="80" /></label>
         <label>
           状态

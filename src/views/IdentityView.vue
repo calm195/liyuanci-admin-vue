@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -50,9 +51,18 @@ const {
   cancelProcessing,
   closeProcessing,
 } = useIdentityReview(props.history ? 'history' : 'pending')
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
+  Boolean(listError.value),
+)
 </script>
 
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" :aria-label="pageTitle">
     <template v-if="allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
@@ -73,13 +83,20 @@ const {
         <BusinessToolbar :label="`${pageTitle}操作栏`">
           <h2 id="case-list-title">{{ history ? '已处理案件' : '待审核案件' }}</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refreshList">刷新列表</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refreshList(), '查询已完成')"
+            >
+              刷新列表
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
-          <button :disabled="editorOpen" @click="loadList()">重试列表</button>
+          <button :disabled="editorOpen" @click="runRead(() => loadList(), '查询已完成')">
+            重试列表
+          </button>
         </FloatingNotice>
         <p v-else-if="!items.length">{{ history ? '暂无审核历史' : '暂无待审核案件' }}</p>
         <div v-else class="business-table">

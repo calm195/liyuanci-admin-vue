@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-export type NoticeTone = 'success' | 'error' | 'info'
+export type NoticeTone = 'success' | 'error' | 'info' | 'warning' | 'uncertain' | 'pending'
 interface Notice {
   id: number
   message: string

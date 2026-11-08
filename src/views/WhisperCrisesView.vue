@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import { whisperCrisisStatuses, whisperDeliveryLabels } from '@/utils/dictionary-labels'
+
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
@@ -7,12 +10,7 @@ import { displayBeijingTime } from '@/utils/admin-time'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
-import {
-  useWhisperCrises,
-  whisperCrisisStatuses,
-  whisperCrisisActions,
-  whisperDeliveryLabels,
-} from '@/composables/useWhisperCrises'
+import { useWhisperCrises, whisperCrisisActions } from '@/composables/useWhisperCrises'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
 const {
@@ -57,8 +55,17 @@ const timelineActions: Readonly<Record<string, string>> = {
 function timelineActionLabel(action: string) {
   return timelineActions[action] ?? '其他服务端动作'
 }
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(
+  () => Boolean(error.value) || Boolean(listError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="树洞危机">
     <p>仅供危机岗位及超级管理员按授权案件读取限定正文；不提供学生卡或身份反查。</p>
     <template v-if="workspace.allowed()">
@@ -68,7 +75,7 @@ function timelineActionLabel(action: string) {
       }}</FloatingNotice>
       <FloatingNotice
         v-if="outcome"
-        :message="`危机回执：${whisperCrisisStatuses[outcome.status]} · 案件版本 ${outcome.version}`"
+        :message="`危机回执：${whisperCrisisStatuses(outcome.status)} · 案件版本 ${outcome.version}`"
         tone="info"
       />
 
@@ -76,7 +83,12 @@ function timelineActionLabel(action: string) {
         <BusinessToolbar label="树洞危机操作栏">
           <h2>危机案件</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refresh">刷新列表</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              刷新列表
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在读取危机…</p>
@@ -104,7 +116,7 @@ function timelineActionLabel(action: string) {
               <tr v-for="(item, index) in items" :key="item.id">
                 <th scope="row">{{ index + 1 }}</th>
                 <td>{{ whisperKindLabels[item.source.kind] }}</td>
-                <td>{{ whisperCrisisStatuses[item.status] }}</td>
+                <td>{{ whisperCrisisStatuses(item.status) }}</td>
                 <td>{{ item.version }}</td>
                 <td>{{ item.source.content_version }}</td>
                 <td>{{ displayBeijingTime(item.handoff_at) }}</td>
@@ -156,7 +168,7 @@ function timelineActionLabel(action: string) {
           <template v-if="detail">
             <button :disabled="editorOpen" @click="close">关闭危机</button>
             <p>
-              {{ whisperCrisisStatuses[detail.status] }} · 案件版本
+              {{ whisperCrisisStatuses(detail.status) }} · 案件版本
               {{ detail.version }}
             </p>
             <p>
@@ -179,8 +191,8 @@ function timelineActionLabel(action: string) {
             />
             <section aria-label="危机投递状态">
               <h3>投递状态</h3>
-              <p>关怀消息：{{ whisperDeliveryLabels[detail.care_delivery] }}</p>
-              <p>工作人员通知：{{ whisperDeliveryLabels[detail.staff_delivery] }}</p>
+              <p>关怀消息：{{ whisperDeliveryLabels(detail.care_delivery) }}</p>
+              <p>工作人员通知：{{ whisperDeliveryLabels(detail.staff_delivery) }}</p>
               <p>仅重试仍有效的失败待办，不会恢复已取消通知。</p>
             </section>
             <section aria-label="危机时间线">

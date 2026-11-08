@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { useWordlists } from '@/composables/useWordlists'
 import { wordlistKinds } from '@/types/wordlists'
@@ -20,8 +21,15 @@ const {
   prepare,
   submit,
 } = useWordlists()
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="创建词单草稿">
     <nav class="workflow-actions" aria-label="词库页面导航">
       <RouterLink to="/wordlists">词库管理</RouterLink>
@@ -38,7 +46,9 @@ const {
         >查看新草稿</RouterLink
       >
 
-      <button :disabled="busy || writing" @click="load">刷新词库</button>
+      <button :disabled="busy || writing" @click="runRead(() => load(), '查询已完成')">
+        刷新词库
+      </button>
       <p v-if="busy" role="status">正在读取词库版本…</p>
       <template v-if="loaded">
         <form @submit.prevent="prepare">

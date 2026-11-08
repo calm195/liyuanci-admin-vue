@@ -201,6 +201,7 @@ try {
     assert.equal(await page.locator('.admin-shell').count(), 1, '只渲染一个管理工作区')
     assert.equal(await page.locator('tbody img').count(), 0)
     for (const theme of ['light', 'dark']) {
+      await page.locator('.floating-notice').first().waitFor({ state: 'hidden' })
       await page.locator(`input[value="${theme}"]`).check({ force: true })
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 })

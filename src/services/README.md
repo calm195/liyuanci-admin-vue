@@ -1,1 +1,1 @@
-External I/O and runtime validation belong here. Never store server secrets in client code.
+外部请求和运行时响应校验统一放在本目录。输入按 unknown 校验，不在客户端保存服务端秘密；协议错误不能当作操作成功。

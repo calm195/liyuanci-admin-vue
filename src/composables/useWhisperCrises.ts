@@ -1,3 +1,4 @@
+import { useCursorProgress } from './useCursorProgress'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createWhispersClient } from '@/services/whispers'
@@ -10,12 +11,6 @@ import type { CrisisCommand, CrisisDetail, CrisisSummary, ReasonCommand } from '
 type Attempt =
   | { kind: 'action'; id: string; key: string; body: CrisisCommand }
   | { kind: 'false_positive'; id: string; key: string; body: ReasonCommand }
-export const whisperCrisisStatuses: Record<CrisisSummary['status'], string> = {
-  open: '待接手',
-  in_progress: '跟进中',
-  resolved: '已结案',
-  false_positive: '已标记误报',
-}
 export const whisperCrisisActions: Record<CrisisCommand['action'] | 'false_positive', string> = {
   take_over: '接手危机',
   follow_up: '记录跟进',
@@ -23,20 +18,15 @@ export const whisperCrisisActions: Record<CrisisCommand['action'] | 'false_posit
   retry_notification: '重试有效通知',
   false_positive: '标记误报',
 }
-export const whisperDeliveryLabels: Record<CrisisDetail['care_delivery'], string> = {
-  pending: '待投递',
-  delivered: '已投递',
-  cancelled: '已取消',
-}
 
 export function useWhisperCrises() {
   const pageSize = ref(10)
   const admin = useAdminStore()
   const items = ref<CrisisSummary[]>([])
-  const nextCursor = ref<string | null>(null)
+  const pagination = useCursorProgress()
+  const { nextCursor, listNotice } = pagination
   const listBusy = ref(false)
   const listError = ref('')
-  const listNotice = ref('')
   const selectedId = ref('')
   const detail = ref<CrisisDetail | null>(null)
   const loading = ref(false)
@@ -49,7 +39,6 @@ export function useWhisperCrises() {
   const confirming = ref(false)
   const writing = ref(false)
   const uncertain = ref(false)
-  const usedCursors = new Set<string | null>()
   let attempt: Attempt | null = null
   const workspace = useAdminWorkspace(clearAll, 'crisis_operator')
   const client = createWhispersClient(
@@ -99,7 +88,7 @@ export function useWhisperCrises() {
     clearDetail()
     items.value = []
     nextCursor.value = null
-    usedCursors.clear()
+    pagination.reset()
     listBusy.value = false
     listError.value = ''
     listNotice.value = ''
@@ -117,7 +106,6 @@ export function useWhisperCrises() {
     await workspace.run(
       (signal) => client.whisperAdminCrisesList(cursor, signal),
       (page) => {
-        usedCursors.add(cursor)
         const merged = new Map(items.value.map((item) => [item.id, item]))
         for (const item of page.items) {
           if (
@@ -134,17 +122,14 @@ export function useWhisperCrises() {
           merged.set(item.id, item)
         }
         items.value = [...merged.values()]
-        if (page.next_cursor !== null && usedCursors.has(page.next_cursor)) {
-          nextCursor.value = null
-          listNotice.value = '分页游标重复，已停止加载，请刷新列表。'
-        } else nextCursor.value = page.next_cursor
+        pagination.accept(cursor, page.next_cursor)
       },
       (cause) => {
         if (cause instanceof ApiError && cause.status === 409) {
           clearDetail()
           items.value = []
           nextCursor.value = null
-          usedCursors.clear()
+          pagination.reset()
         }
         listError.value = reviewErrorMessage(cause)
       },

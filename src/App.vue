@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { useDictionariesStore } from '@/stores/dictionaries'
 import FloatingNotice from '@/components/FloatingNotice.vue'
-import { watch, ref } from 'vue'
+import { watch, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -9,9 +10,22 @@ import AdminLayout from '@/components/AdminLayout.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import './assets/styles/layout.css'
 
+const dictionaries = useDictionariesStore()
+let lastDictionaryRefresh = 0
+function refreshDictionaries() {
+  if (Date.now() - lastDictionaryRefresh < 30000) return
+  lastDictionaryRefresh = Date.now()
+  void dictionaries.load()
+}
+onMounted(() => {
+  refreshDictionaries()
+  globalThis.addEventListener('focus', refreshDictionaries)
+})
+onBeforeUnmount(() => globalThis.removeEventListener('focus', refreshDictionaries))
 const admin = useAdminStore()
 const router = useRouter()
 const route = useRoute()
+watch(() => route.path, refreshDictionaries)
 const navigationError = ref('')
 async function retryRestore() {
   await admin.restore()
@@ -46,6 +60,15 @@ watch(
 
 <template>
   <ElConfigProvider :locale="zhCn">
+    <FloatingNotice
+      v-if="admin.authenticated && admin.notice"
+      :message="admin.notice"
+      tone="success"
+    />
+    <FloatingNotice v-if="dictionaries.error" :message="dictionaries.error" tone="warning"
+      ><p>{{ dictionaries.error }}</p>
+      <button :disabled="dictionaries.busy" @click="dictionaries.load">重试</button></FloatingNotice
+    >
     <FloatingNotice v-if="navigationError" :message="navigationError" tone="error">{{
       navigationError
     }}</FloatingNotice>

@@ -1,3 +1,4 @@
+import { useDictionariesStore } from '@/stores/dictionaries'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -110,6 +111,18 @@ beforeEach(() => {
   vi.resetAllMocks()
   const pinia = createPinia()
   setActivePinia(pinia)
+  useDictionariesStore().accept({
+    version: 1,
+    items: Object.entries({ delivered: '已投递', pending: '待投递', cancelled: '已取消' }).map(
+      ([code, label]) => ({
+        type: 'whisper_delivery_status',
+        code,
+        label,
+        sort_order: 0,
+        enabled: true,
+      }),
+    ),
+  })
   useAdminStore().session = {
     token: 'test',
     account: {

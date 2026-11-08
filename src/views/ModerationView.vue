@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -56,8 +57,17 @@ const kindLabels: Readonly<Record<string, string>> = {
 function moderationKindLabel(kind?: string) {
   return kind ? (kindLabels[kind] ?? '其他内容') : '未提供'
 }
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(
+  () => Boolean(error.value) || Boolean(listError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" aria-label="内容审核">
     <p>仅查看授权案件命中正文，不提供全站私聊或上下文会话搜索。</p>
     <template v-if="workspace.allowed()">
@@ -78,13 +88,20 @@ function moderationKindLabel(kind?: string) {
         <BusinessToolbar label="内容审核操作栏">
           <h2>审核案件</h2>
           <template #tools>
-            <button :disabled="listBusy || editorOpen" @click="refresh()">刷新列表</button>
+            <button
+              :disabled="listBusy || editorOpen"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              刷新列表
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
-          <button :disabled="editorOpen" @click="loadList">重试列表</button>
+          <button :disabled="editorOpen" @click="runRead(() => loadList(), '查询已完成')">
+            重试列表
+          </button>
         </FloatingNotice>
         <p v-else-if="!items.length">暂无审核案件</p>
         <div v-else class="business-table">

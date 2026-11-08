@@ -1,1 +1,1 @@
-Pure reusable functions; colocate behavioral tests as *.spec.ts.
+存放无业务副作用的共享函数及展示适配，行为测试与实现相邻。字典展示名称从统一 store 读取，不重复硬编码业务名称。

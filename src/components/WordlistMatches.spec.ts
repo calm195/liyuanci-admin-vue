@@ -1,8 +1,24 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { useDictionariesStore } from '@/stores/dictionaries'
 import { mount } from '@vue/test-utils'
 import { expect, it } from 'vitest'
 import WordlistMatches from './WordlistMatches.vue'
 
 it('用中文展示内置词库命中标签，并保留未识别的标签', () => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  useDictionariesStore().accept({
+    version: 1,
+    items: [
+      {
+        type: 'builtin_wordlist_label',
+        code: 'inappropriate_oral',
+        label: '低俗口头语',
+        sort_order: 0,
+        enabled: true,
+      },
+    ],
+  })
   const match = {
     word: '示例',
     source: 'builtin',
@@ -12,6 +28,7 @@ it('用中文展示内置词库命中标签，并保留未识别的标签', () =
     end: 2,
   } as const
   const wrapper = mount(WordlistMatches, {
+    global: { plugins: [pinia] },
     props: {
       matches: [
         { ...match, label: 'inappropriate_oral' },

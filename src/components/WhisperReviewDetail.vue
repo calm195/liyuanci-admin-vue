@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { whisperStatusLabels } from '@/utils/dictionary-labels'
+
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import type { ReviewDetail } from '@/types/whispers'
-import { whisperKindLabels, whisperStatusLabels } from '@/composables/useWhisperReviews'
+import { whisperKindLabels } from '@/composables/useWhisperReviews'
 defineProps<{
   detail: ReviewDetail | null
   selectedId: string
@@ -24,7 +26,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
     </button>
     <template v-if="detail">
       <button :disabled="locked" @click="$emit('close')">关闭案件</button>
-      <p>{{ whisperKindLabels[detail.source.kind] }} · {{ whisperStatusLabels[detail.status] }}</p>
+      <p>{{ whisperKindLabels[detail.source.kind] }} · {{ whisperStatusLabels(detail.status) }}</p>
       <p>
         案件版本 {{ detail.version }} · 正文版本
         {{ detail.source.content_version }}

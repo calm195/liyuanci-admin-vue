@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
 import BusinessToolbar from './BusinessToolbar.vue'
@@ -64,8 +65,17 @@ const {
   submit,
   crisisEscalated,
 } = useSafety(mode, initialReport, initialAppeal)
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
+  Boolean(error.value || listError.value),
+)
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel workflow" :aria-label="title">
     <p v-if="mode === 'penalties'" class="banner">
       本页从已确认举报查询处罚依据；处罚历史可在“用户管理 →
@@ -95,13 +105,23 @@ const {
             }}
           </h2>
           <template #tools>
-            <button :disabled="busy || editorOpen || writing" @click="refresh()">从首页刷新</button>
+            <button
+              :disabled="busy || editorOpen || writing"
+              @click="runRead(() => refresh(), '查询已完成')"
+            >
+              从首页刷新
+            </button>
           </template>
         </BusinessToolbar>
         <p v-if="busy" role="status">正在读取案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
-          <button :disabled="busy || editorOpen || writing" @click="loadList">重试列表</button>
+          <button
+            :disabled="busy || editorOpen || writing"
+            @click="runRead(() => loadList(), '查询已完成')"
+          >
+            重试列表
+          </button>
         </FloatingNotice>
         <p v-else-if="!items.length">
           {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}

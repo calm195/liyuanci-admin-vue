@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
@@ -55,15 +56,22 @@ function dateLabel(date?: string) {
   return date ? (data.value?.range === 'year' ? date.slice(0, 7) : date.slice(5)) : ''
 }
 onMounted(load)
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 <template>
+  <FloatingNotice
+    v-if="readFeedback.message"
+    :message="readFeedback.message"
+    :tone="readFeedback.tone"
+    :revision="readFeedback.revision"
+  />
   <main class="panel dashboard" aria-label="首页">
     <div class="dashboard-heading">
       <div>
         <h1>首页</h1>
         <p>用户、资料与心愿概况</p>
       </div>
-      <button :disabled="busy" @click="load">刷新数据</button>
+      <button :disabled="busy" @click="runRead(() => load(), '查询已完成')">刷新数据</button>
     </div>
     <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <p v-if="busy" role="status">正在读取统计…</p>

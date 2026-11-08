@@ -24,7 +24,8 @@
     "codex": "codex",
     "codex:login": "codex login",
     "test:browser:users": "node scripts/users-browser.spec.js",
-    "test:browser:resources": "node scripts/resources-browser.spec.js"
+    "test:browser:resources": "node scripts/resources-browser.spec.js",
+    "test:browser:dictionaries": "node scripts/dictionaries-browser.spec.js"
   },
   "dependencies": {
     "element-plus": "2.14.7",
