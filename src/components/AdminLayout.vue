@@ -16,7 +16,7 @@ const expandedGroup = ref<string | null>(null)
 const error = ref('')
 const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
-  return ['用户管理', '资料管理', '内容治理', '安全治理', '隐私管理', '系统管理']
+  return ['用户管理', '资料管理', '内容管理', '内容治理', '安全治理', '隐私管理', '系统管理']
     .filter((title) => visible.some((item) => item.group === title))
     .map((title) => ({
       title,

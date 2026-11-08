@@ -14,8 +14,12 @@ import { wordlistKinds } from '@/types/wordlists'
 import type { ModerationClient } from '@/types/moderation'
 import type { WordlistClient } from '@/types/wordlists'
 
-/** 词库和内容审核共用当前后台会话及标准封装，取消或撤权后丢弃响应。 */
-function createContentRequest(token: string, allowed: () => boolean, transport: typeof fetch) {
+/** 内容管理和治理请求共用当前后台会话及标准封装，取消或撤权后丢弃响应。 */
+export function createContentRequest(
+  token: string,
+  allowed: () => boolean,
+  transport: typeof fetch,
+) {
   function guard(signal: AbortSignal) {
     signal.throwIfAborted()
     if (!token.trim()) throw new ApiError(401)
