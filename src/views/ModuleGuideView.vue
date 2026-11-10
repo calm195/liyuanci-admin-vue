@@ -14,6 +14,7 @@ const form = ref<GuideModule[]>([])
 const busy = ref(false)
 const selectedIndex = ref(0)
 const moduleNames: Record<string, string> = {
+  matchmaking: '包分配',
   wishes: '心愿',
   whispers: '树洞',
   capsules: '时光胶囊',

@@ -1,0 +1,176 @@
+{
+  "list": {
+    "code": 0,
+    "message": "成功",
+    "request_id": "synthetic",
+    "data": {
+      "items": [
+        {
+          "id": "aa110000-0000-4000-8000-000000000001",
+          "version": 3,
+          "expected_version": 0,
+          "title": "冬日相遇",
+          "description": "从一次认真介绍开始，共同完成每日任务。",
+          "campuses": ["wushan", "university_town"],
+          "registration_opens_at": "2026-12-01T00:00:00Z",
+          "registration_closes_at": "2026-12-05T10:00:00Z",
+          "results_at": "2026-12-06T10:00:00Z",
+          "starts_at": "2026-12-07T01:00:00Z",
+          "ends_at": "2026-12-10T15:59:00Z",
+          "days": 3,
+          "status": "draft",
+          "phase": "draft"
+        }
+      ],
+      "total": 1
+    }
+  },
+  "workspace": {
+    "code": 0,
+    "message": "成功",
+    "request_id": "synthetic",
+    "data": {
+      "activity": {
+        "id": "aa110000-0000-4000-8000-000000000001",
+        "version": 3,
+        "expected_version": 0,
+        "title": "冬日相遇",
+        "description": "从一次认真介绍开始，共同完成每日任务。",
+        "campuses": ["wushan", "university_town"],
+        "registration_opens_at": "2026-12-01T00:00:00Z",
+        "registration_closes_at": "2026-12-05T10:00:00Z",
+        "results_at": "2026-12-06T10:00:00Z",
+        "starts_at": "2026-12-07T01:00:00Z",
+        "ends_at": "2026-12-10T15:59:00Z",
+        "days": 3,
+        "status": "draft",
+        "phase": "draft"
+      },
+      "enrollments": [
+        {
+          "id": "aa110000-0000-4000-8000-000000000002",
+          "version": 2,
+          "status": "pending",
+          "reason": "",
+          "eligible": false,
+          "profile": {
+            "name": "合成参与者甲",
+            "gender": "male",
+            "education": "本科生",
+            "grade": "grade_2024",
+            "campus": "wushan",
+            "mbti": "INFP",
+            "age": 21,
+            "age_min": 18,
+            "age_max": 25,
+            "height": 175,
+            "height_min": 150,
+            "height_max": 190,
+            "weight": 130,
+            "weight_min": 90,
+            "weight_max": 160,
+            "wechat": "synthetic_a",
+            "introduction": "喜欢阅读和散步，希望认识新朋友。",
+            "consent": true
+          }
+        }
+      ],
+      "total": 1,
+      "pairs": [
+        {
+          "id": "aa110000-0000-4000-8000-000000000004",
+          "version": 1,
+          "status": "draft",
+          "score": 82,
+          "score_details": {
+            "mbti": 12,
+            "age": 20,
+            "campus": 25,
+            "height": 15,
+            "weight": 10
+          },
+          "algorithm": "legacy-fixed-v1",
+          "enrollments": [
+            "aa110000-0000-4000-8000-000000000002",
+            "aa110000-0000-4000-8000-000000000003"
+          ],
+          "member_names": ["合成参与者甲", "合成参与者乙"],
+          "accessible": false
+        }
+      ],
+      "pair_total": 1,
+      "templates": [
+        {
+          "kind": "online",
+          "body": "交换一本喜欢的书。",
+          "fixed_day": 1
+        },
+        {
+          "kind": "offline",
+          "body": "一起在校园散步。",
+          "fixed_day": 0
+        },
+        {
+          "kind": "online",
+          "body": "分享一首最近喜欢的歌。",
+          "fixed_day": 0
+        }
+      ],
+      "templates_locked": false
+    }
+  },
+  "candidates": {
+    "code": 0,
+    "message": "成功",
+    "request_id": "synthetic",
+    "data": {
+      "items": [
+        {
+          "enrollment": {
+            "id": "aa110000-0000-4000-8000-000000000003",
+            "version": 2,
+            "status": "approved",
+            "reason": "",
+            "eligible": true,
+            "profile": {
+              "name": "合成参与者乙",
+              "gender": "female",
+              "education": "本科生",
+              "grade": "grade_2024",
+              "campus": "wushan",
+              "mbti": "INFP",
+              "age": 21,
+              "age_min": 18,
+              "age_max": 25,
+              "height": 175,
+              "height_min": 150,
+              "height_max": 190,
+              "weight": 130,
+              "weight_min": 90,
+              "weight_max": 160,
+              "wechat": "synthetic_b",
+              "introduction": "喜欢阅读和散步，希望认识新朋友。",
+              "consent": true
+            }
+          },
+          "score": 82,
+          "score_details": {
+            "mbti": 12,
+            "age": 20,
+            "campus": 25,
+            "height": 15,
+            "weight": 10
+          }
+        }
+      ]
+    }
+  },
+  "receipt": {
+    "code": 0,
+    "message": "成功",
+    "request_id": "synthetic",
+    "data": {
+      "id": "aa110000-0000-4000-8000-000000000001"
+    }
+  }
+}

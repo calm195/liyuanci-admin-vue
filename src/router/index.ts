@@ -7,6 +7,7 @@ import { safetyRoles } from '@/types/safety'
 import { userRoles } from '@/types/users'
 import { resourceRoles } from '@/types/resources'
 import { crisisRoles } from '@/types/crisis'
+import { matchmakingRoles } from '@/types/matchmaking'
 
 export interface MenuItem {
   path: string
@@ -23,6 +24,7 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
+  { path: '/matchmaking', group: '活动管理', title: '包分配活动', roles: matchmakingRoles },
   { path: '/report-types', group: '系统管理', title: '举报类型', role: 'super_admin' },
   { path: '/dictionaries', group: '系统管理', title: '展示字典', role: 'super_admin' },
   { path: '/resources', group: '资料管理', title: '资料列表', roles: resourceRoles },
@@ -52,6 +54,11 @@ export const menu: MenuItem[] = [
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/matchmaking',
+      component: () => import('@/views/MatchmakingView.vue'),
+      meta: { roles: matchmakingRoles },
+    },
     {
       path: '/report-types',
       component: () => import('@/views/system/ReportTypesView.vue'),
