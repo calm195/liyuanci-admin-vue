@@ -81,3 +81,56 @@ export async function readDashboard(token: string, range: 'month' | 'year', sign
   if (result.range !== range) throw new Error('统计时间范围不匹配')
   return result
 }
+
+export type HotKind = 'wish' | 'whisper'
+
+export interface HotItem {
+  id: string
+  title: string
+  body: string
+  heatScore: number
+  supportCount?: number
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+export function parseHotItems(value: unknown, kind: HotKind): HotItem[] {
+  if (!record(value) || value['code'] !== 0 || !record(value['data']))
+    throw new Error('热点响应格式不正确')
+  const items = value['data']['items']
+  if (!Array.isArray(items) || items.length > 10) throw new Error('热点条数不正确')
+  return items.map((item: unknown) => {
+    if (
+      !record(item) ||
+      typeof item['id'] !== 'string' ||
+      typeof item['title'] !== 'string' ||
+      typeof item['body'] !== 'string' ||
+      !isCount(item['heat_score'])
+    )
+      throw new Error('热点字段不完整')
+    const supportCount = item['support_count']
+    if (kind === 'wish' && !isCount(supportCount)) throw new Error('心愿支持数格式不正确')
+    return {
+      id: item['id'],
+      title: item['title'],
+      body: item['body'],
+      heatScore: item['heat_score'],
+      ...(kind === 'wish' && isCount(supportCount) ? { supportCount } : {}),
+    }
+  })
+}
+
+/** 使用有效后台会话读取公开周榜的运营投影。 */
+export async function readHotItems(token: string, kind: HotKind, signal: AbortSignal) {
+  const response = await fetch(`/api/v1/admin/content/hot?kind=${kind}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+    credentials: 'omit',
+    cache: 'no-store',
+    redirect: 'error',
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return parseHotItems(await response.json(), kind)
+}

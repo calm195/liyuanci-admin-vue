@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import DashboardHotList from '@/components/DashboardHotList.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
@@ -10,6 +11,7 @@ const admin = useAdminStore()
 const range = ref<'month' | 'year'>('month')
 const data = ref<Dashboard | null>(null)
 const busy = ref(false)
+const hotRevision = ref(0)
 const error = ref('')
 let request = new AbortController()
 const workspace = useAdminWorkspace(() => {
@@ -41,6 +43,10 @@ async function load() {
     },
   )
 }
+function refresh() {
+  hotRevision.value++
+  return load()
+}
 function maximum(key: Metric) {
   return Math.max(1, ...(data.value?.series.map((point) => point[key]) ?? []))
 }
@@ -71,10 +77,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         <h1>首页</h1>
         <p>用户、资料与心愿概况</p>
       </div>
-      <button :disabled="busy" @click="runRead(() => load(), '查询已完成')">刷新数据</button>
+      <button :disabled="busy" @click="runRead(refresh, '查询已完成')">刷新数据</button>
     </div>
     <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <p v-if="busy" role="status">正在读取统计…</p>
+    <div class="hot-lists">
+      <DashboardHotList kind="wish" title="心愿热点 TOP 10" :revision="hotRevision" />
+      <DashboardHotList kind="whisper" title="悄悄话热点 TOP 10" :revision="hotRevision" />
+    </div>
     <template v-if="data">
       <div class="metric-cards">
         <article v-for="(label, key) in dashboardMetrics" :key="key" class="metric-card">
@@ -139,6 +149,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
   </main>
 </template>
 <style scoped>
+.hot-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
 .dashboard {
   display: grid;
   gap: 1.25rem;
