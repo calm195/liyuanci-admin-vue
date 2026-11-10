@@ -4,6 +4,7 @@ import MatchmakingProfile from '@/components/MatchmakingProfile.vue'
 import { activityDateFields, useMatchmaking } from '@/composables/useMatchmaking'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { phaseLabels, enrollmentLabels, pairLabels } from '@/types/matchmaking'
+const { libraryOnly = false } = defineProps<{ libraryOnly?: boolean }>()
 const {
   activities,
   total,
@@ -52,7 +53,8 @@ const {
   libraryTotal,
   libraryEditID,
   libraryForm,
-  showLibrary,
+  showFirstTaskPicker,
+  pendingOnOtherPage,
   hideLibrary,
   libraryTurn,
   editLibraryTask,
@@ -60,7 +62,7 @@ const {
   chooseFirstTask,
   addTemplate,
   saveTemplates,
-} = useMatchmaking()
+} = useMatchmaking(libraryOnly)
 const { feedback, run: runRead } = useOperationFeedback(() => !!error.value)
 const tabs = [
   { key: 'activity', label: '活动设置' },
@@ -81,19 +83,24 @@ function time(value: string) {
 }
 </script>
 <template>
-  <main class="panel matchmaking-workspace" aria-label="包分配活动管理">
+  <main class="panel matchmaking-workspace" :aria-label="libraryOnly ? '每日任务库' : '活动维护'">
     <template v-if="workspace.allowed()">
       <div class="match-heading">
         <div>
-          <h1>包分配活动</h1>
-          <p>审核报名，安排配对，让每一次相遇都有准备。</p>
+          <h1>{{ libraryOnly ? '每日任务库' : '活动维护' }}</h1>
+          <p v-if="libraryOnly">维护活动共用的每日任务与最早可分配日。</p>
+          <p v-else>审核报名，安排配对，让每一次相遇都有准备。</p>
         </div>
         <div class="match-actions">
-          <button class="business-primary" :disabled="locked" @click="create">新建活动</button>
-          <button v-if="!libraryOpen" :disabled="locked" @click="runRead(() => showLibrary())">
-            每日任务库
+          <button
+            v-if="!libraryOnly && !libraryOpen"
+            class="business-primary"
+            :disabled="locked"
+            @click="create"
+          >
+            新建活动
           </button>
-          <button :disabled="locked" @click="runRead(refresh, '活动状态已刷新')">重新读取</button>
+          <button :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">重新读取</button>
         </div>
       </div>
       <FloatingNotice v-if="error" :message="error" tone="error" />
@@ -108,22 +115,25 @@ function time(value: string) {
         <p>
           {{ pending.title }}的结果尚未确认，表单已锁定。重试会使用同一份内容，不会创建另一项操作。
         </p>
-        <button :disabled="writing || busy" @click="runPending">原样重试</button>
+        <RouterLink v-if="pendingOnOtherPage" :to="pendingOnOtherPage">前往原页面核实</RouterLink>
+        <button v-else :disabled="writing || busy" @click="runPending">原样重试</button>
       </section>
       <p v-if="conflict" role="alert">当前数据已变化，请点击“重新读取”，核对后再操作。</p>
       <p v-if="busy || writing" role="status">
-        {{ writing ? '正在提交，请稍候…' : '正在读取活动…' }}
+        {{ writing ? '正在提交，请稍候…' : '正在读取数据…' }}
       </p>
       <section v-if="libraryOpen" aria-label="每日任务库" class="match-section">
         <div class="match-heading">
           <div>
-            <h2>每日任务库</h2>
+            <h2 v-if="choosingFirst">选择固定首日任务</h2>
             <p v-if="choosingFirst">为 {{ detail?.activity.title }} 选择固定首日任务。</p>
             <p>最早可分配日填 0 时无额外限制。首日可用的启用任务可设为活动的固定首日任务。</p>
           </div>
-          <button :disabled="locked" @click="runRead(hideLibrary)">返回活动</button>
+          <button v-if="choosingFirst" :disabled="locked" @click="runRead(hideLibrary)">
+            返回活动
+          </button>
         </div>
-        <form @submit.prevent="saveLibraryTask">
+        <form v-if="libraryOnly" @submit.prevent="saveLibraryTask">
           <fieldset :disabled="locked || conflict">
             <legend>{{ libraryEditID ? '编辑任务' : '新建任务' }}</legend>
             <div class="match-form-grid">
@@ -169,7 +179,9 @@ function time(value: string) {
             {{ task.enabled ? '已启用' : '已停用' }}
           </p>
           <div class="match-actions">
-            <button :disabled="locked" @click="editLibraryTask(task)">编辑任务</button>
+            <button v-if="libraryOnly" :disabled="locked" @click="editLibraryTask(task)">
+              编辑任务
+            </button>
             <button
               v-if="choosingFirst"
               :disabled="
@@ -500,7 +512,7 @@ function time(value: string) {
               <button
                 v-if="canEditTemplates"
                 :disabled="locked || conflict"
-                @click="runRead(() => showLibrary(true))"
+                @click="runRead(showFirstTaskPicker)"
               >
                 {{ detail.task_plan ? '更换固定首日任务' : '选择固定首日任务' }}
               </button>
@@ -562,7 +574,7 @@ function time(value: string) {
         </div>
       </div>
     </template>
-    <p v-else role="alert">当前会话无权管理包分配活动，请联系管理员。</p>
+    <p v-else role="alert">当前会话无权管理包分配，请联系管理员。</p>
   </main>
 </template>
 <style scoped>

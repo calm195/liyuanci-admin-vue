@@ -62,8 +62,13 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   expect(navigation.get('a[href="/resources"]').text()).toBe('资料列表')
   expect(navigation.get('a[href="/resource-categories"]').text()).toBe('资料分类')
   const matchmaking = navigation.get('a[href="/matchmaking"]')
-  expect(matchmaking.text()).toBe('包分配活动')
-  expect(matchmaking.element.closest('.navigation-group')?.textContent).toContain('活动管理')
+  expect(matchmaking.text()).toBe('活动维护')
+  expect(matchmaking.element.closest('.navigation-group')?.textContent).toContain('包分配')
+  const taskLibrary = navigation.get('a[href="/matchmaking/task-library"]')
+  expect(taskLibrary.text()).toBe('每日任务库')
+  expect(taskLibrary.element.closest('.navigation-group')).toBe(
+    matchmaking.element.closest('.navigation-group'),
+  )
   expect(navigation.find('a[href="/crisis"]').exists()).toBe(false)
   const identity = navigation.get('a[href="/identity"]')
   expect(identity.element.closest('.navigation-group')?.textContent).toContain('用户管理')

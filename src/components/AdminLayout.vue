@@ -18,7 +18,7 @@ const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
   return [
     '用户管理',
-    '活动管理',
+    '包分配',
     '资料管理',
     '内容管理',
     '内容治理',

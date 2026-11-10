@@ -63,8 +63,8 @@ const emptyLibraryTask = (): LibraryTaskInput => ({
   enabled: true,
 })
 
-export function useMatchmaking() {
-  const libraryOpen = ref(false),
+export function useMatchmaking(libraryOnly = false) {
+  const libraryOpen = ref(libraryOnly),
     choosingFirst = ref(false),
     libraryTasks = ref<LibraryTask[]>([]),
     libraryPage = ref(1),
@@ -88,6 +88,13 @@ export function useMatchmaking() {
     writing = ref(false)
   const commands = useMatchmakingCommands()
   const pending = computed(() => commands.pending)
+  const pendingOnOtherPage = computed(() =>
+    pending.value && pending.value.path.startsWith(libraryPath) !== libraryOnly
+      ? libraryOnly
+        ? '/matchmaking'
+        : '/matchmaking/task-library'
+      : '',
+  )
   const error = ref(''),
     notice = ref(''),
     conflict = ref(false)
@@ -125,7 +132,7 @@ export function useMatchmaking() {
   }
   function clear() {
     clearDetail()
-    libraryOpen.value = false
+    libraryOpen.value = libraryOnly
     choosingFirst.value = false
     libraryTasks.value = []
     libraryTotal.value = 0
@@ -208,9 +215,9 @@ export function useMatchmaking() {
       },
     )
   }
-  async function showLibrary(selectFirst = false) {
+  async function showFirstTaskPicker() {
     if (locked.value) return
-    choosingFirst.value = selectFirst
+    choosingFirst.value = true
     libraryOpen.value = true
     libraryPage.value = 1
     editLibraryTask()
@@ -265,7 +272,7 @@ export function useMatchmaking() {
         body: { ...libraryForm },
         key: crypto.randomUUID(),
         title: '保存任务库条目',
-        activityID: selected.value === 'new' ? '' : selected.value,
+        activityID: '',
       })
     )
       await runPending()
@@ -339,7 +346,7 @@ export function useMatchmaking() {
   }
   async function runPending() {
     const command = pending.value
-    if (!command || writing.value || busy.value) return
+    if (!command || pendingOnOtherPage.value || writing.value || busy.value) return
     writing.value = true
     error.value = ''
     notice.value = ''
@@ -604,20 +611,23 @@ export function useMatchmaking() {
         )),
   )
   onMounted(async () => {
+    if (libraryOnly) {
+      const command = pending.value
+      if (command && !pendingOnOtherPage.value && 'min_day' in command.body) {
+        libraryEditID.value =
+          command.method === 'PUT' ? command.path.slice(libraryPath.length + 1) : ''
+        Object.assign(libraryForm, command.body)
+      }
+      await loadLibrary()
+      return
+    }
     await loadActivities()
-    if (!workspace.allowed() || !pending.value) return
+    if (!workspace.allowed() || !pending.value || pendingOnOtherPage.value) return
     const command = pending.value
     selected.value = command.activityID || 'new'
     if (command.activityID) await loadDetail()
     if (!workspace.allowed() || pending.value !== command) return
-    if ('min_day' in command.body) {
-      libraryOpen.value = true
-      selected.value = command.activityID
-      libraryEditID.value =
-        command.method === 'PUT' ? command.path.slice(libraryPath.length + 1) : ''
-      Object.assign(libraryForm, command.body)
-      await loadLibrary()
-    } else if ('title' in command.body) {
+    if ('title' in command.body) {
       Object.assign(form, command.body)
       for (const field of activityDateFields)
         form[field.key] = beijingInput(command.body[field.key])
@@ -671,7 +681,8 @@ export function useMatchmaking() {
     libraryTotal,
     libraryEditID,
     libraryForm,
-    showLibrary,
+    showFirstTaskPicker,
+    pendingOnOtherPage,
     hideLibrary,
     libraryTurn,
     editLibraryTask,

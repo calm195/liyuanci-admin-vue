@@ -24,7 +24,13 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
-  { path: '/matchmaking', group: '活动管理', title: '包分配活动', roles: matchmakingRoles },
+  { path: '/matchmaking', group: '包分配', title: '活动维护', roles: matchmakingRoles },
+  {
+    path: '/matchmaking/task-library',
+    group: '包分配',
+    title: '每日任务库',
+    roles: matchmakingRoles,
+  },
   { path: '/report-types', group: '系统管理', title: '举报类型', role: 'super_admin' },
   { path: '/dictionaries', group: '系统管理', title: '展示字典', role: 'super_admin' },
   { path: '/resources', group: '资料管理', title: '资料列表', roles: resourceRoles },
@@ -57,6 +63,11 @@ export const router = createRouter({
     {
       path: '/matchmaking',
       component: () => import('@/views/MatchmakingView.vue'),
+      meta: { roles: matchmakingRoles },
+    },
+    {
+      path: '/matchmaking/task-library',
+      component: () => import('@/views/MatchmakingTaskLibraryView.vue'),
       meta: { roles: matchmakingRoles },
     },
     {

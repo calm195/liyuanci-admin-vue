@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MatchmakingView from './MatchmakingView.vue'
+import MatchmakingTaskLibraryView from './MatchmakingTaskLibraryView.vue'
 import fixture from '@/services/matchmaking.contract.spec.json'
 import { useAdminStore } from '@/stores/admin'
 import { beijingInput, beijingISO } from '@/composables/useMatchmaking'
@@ -52,6 +53,7 @@ beforeEach(async () => {
     history: createMemoryHistory(),
     routes: [
       { path: '/matchmaking', component: MatchmakingView },
+      { path: '/matchmaking/task-library', component: MatchmakingTaskLibraryView },
       { path: '/other', component: { template: '<p>其他工作区</p>' } },
     ],
   })
@@ -218,9 +220,11 @@ describe('包分配工作台', () => {
         })
       return response(fixture.list)
     })
-    await button('每日任务库').trigger('click')
+    await router.push('/matchmaking/task-library')
     await flushPromises()
-    const library = wrapper.get('[aria-label="每日任务库"]')
+    expect(wrapper.get('h1').text()).toBe('每日任务库')
+    expect(wrapper.find('.match-activities').exists()).toBe(false)
+    const library = wrapper.get('section[aria-label="每日任务库"]')
     await library.get('textarea').setValue('另一个合成任务')
     await library.get('form').trigger('submit')
     await flushPromises()
@@ -232,7 +236,9 @@ describe('包分配工作台', () => {
       min_day: 0,
       enabled: true,
     })
-    await button('返回活动').trigger('click')
+    await router.push('/matchmaking')
+    await flushPromises()
+    expect(wrapper.get('h1').text()).toBe('活动维护')
     await openActivity()
     await button('每日任务').trigger('click')
     await button('选择固定首日任务').trigger('click')
