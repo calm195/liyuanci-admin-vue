@@ -56,7 +56,6 @@
           "profile": {
             "name": "合成参与者甲",
             "gender": "male",
-            "education": "本科生",
             "grade": "grade_2024",
             "campus": "wushan",
             "mbti": "INFP",
@@ -135,7 +134,6 @@
             "profile": {
               "name": "合成参与者乙",
               "gender": "female",
-              "education": "本科生",
               "grade": "grade_2024",
               "campus": "wushan",
               "mbti": "INFP",

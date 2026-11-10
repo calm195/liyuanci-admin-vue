@@ -127,9 +127,8 @@ function activity(value: unknown): Activity {
 function profile(value: unknown): Profile {
   const v = object(value)
   const out: Profile = {
-    name: text(v['name'], 32),
+    name: text(v['name'], 40),
     gender: choice(v['gender'], ['male', 'female']),
-    education: text(v['education'], 32),
     grade: text(v['grade'], 32),
     campus: choice(v['campus'], ['wushan', 'university_town', 'international']),
     mbti: choice(v['mbti'], [

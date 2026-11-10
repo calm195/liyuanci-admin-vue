@@ -6,7 +6,7 @@ defineProps<{ profile: Profile }>()
 <template>
   <dl class="match-profile">
     <div>
-      <dt>姓名</dt>
+      <dt>昵称</dt>
       <dd>{{ profile.name }}</dd>
     </div>
     <div>
@@ -18,8 +18,8 @@ defineProps<{ profile: Profile }>()
       <dd>{{ campuses.find((item) => item.code === profile.campus)?.label ?? profile.campus }}</dd>
     </div>
     <div>
-      <dt>学历 / 年级</dt>
-      <dd>{{ profile.education }} / {{ profile.grade }}</dd>
+      <dt>年级</dt>
+      <dd>{{ profile.grade }}</dd>
     </div>
     <div>
       <dt>MBTI</dt>

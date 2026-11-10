@@ -355,7 +355,7 @@ function time(value: string) {
                   </caption>
                   <thead>
                     <tr>
-                      <th scope="col">姓名</th>
+                      <th scope="col">昵称</th>
                       <th scope="col">审核状态</th>
                       <th scope="col">配对资格</th>
                       <th scope="col">操作</th>

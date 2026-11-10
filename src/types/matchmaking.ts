@@ -40,7 +40,6 @@ export interface Activity extends ActivityInput {
 export interface Profile {
   name: string
   gender: 'male' | 'female'
-  education: string
   grade: string
   campus: string
   mbti: string
