@@ -24,6 +24,7 @@ export function canAccessMenu(item: MenuItem): boolean {
   )
 }
 export const menu: MenuItem[] = [
+  { path: '/matchmaking/traits', group: '包分配', title: '特质标签', roles: matchmakingRoles },
   { path: '/matchmaking', group: '包分配', title: '活动维护', roles: matchmakingRoles },
   {
     path: '/matchmaking/task-library',
@@ -60,6 +61,11 @@ export const menu: MenuItem[] = [
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/matchmaking/traits',
+      component: () => import('@/views/MatchmakingTraitsView.vue'),
+      meta: { roles: matchmakingRoles },
+    },
     {
       path: '/matchmaking',
       component: () => import('@/views/MatchmakingView.vue'),

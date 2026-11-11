@@ -161,6 +161,8 @@ function profile(value: unknown): Profile {
     weight_max: integer(v['weight_max'], 50, 500),
     wechat: text(v['wechat'], 64),
     introduction: text(v['introduction'], 500),
+    ideal_traits: list(v['ideal_traits'] ?? [], (item) => text(item, 20), 10),
+    personal_traits: list(v['personal_traits'] ?? [], (item) => text(item, 20), 10),
     consent: bool(v['consent']),
   }
   if (
@@ -183,7 +185,7 @@ function enrollment(value: unknown): Enrollment {
   if (v['profile'] !== undefined && v['profile'] !== null) result.profile = profile(v['profile'])
   return result
 }
-function score(value: unknown): ScoreDetails {
+export function parseMatchmakingScore(value: unknown): ScoreDetails {
   const v = object(value)
   return {
     mbti: number(v['mbti'], 0, 30),
@@ -191,6 +193,9 @@ function score(value: unknown): ScoreDetails {
     campus: number(v['campus'], 0, 25),
     height: number(v['height'], 0, 15),
     weight: number(v['weight'], 0, 10),
+    traits: number(v['traits'] ?? 0, 0, 100),
+    personal_to_ideal: list(v['personal_to_ideal'] ?? [], (item) => text(item, 20), 10),
+    ideal_to_personal: list(v['ideal_to_personal'] ?? [], (item) => text(item, 20), 10),
   }
 }
 function pair(value: unknown): Pair {
@@ -199,8 +204,8 @@ function pair(value: unknown): Pair {
     id: identifier(v['id']),
     version: integer(v['version'], 1),
     status: choice(v['status'], pairStatuses),
-    score: integer(v['score'], 0, 100),
-    score_details: score(v['score_details']),
+    score: integer(v['score'], 0, 200),
+    score_details: parseMatchmakingScore(v['score_details']),
     algorithm: text(v['algorithm'], 80),
     enrollments: list(v['enrollments'] ?? [], identifier, 2),
     member_names: list(v['member_names'] ?? [], (item) => text(item, 80), 2),
@@ -275,8 +280,8 @@ export function parseCandidates(value: unknown): Candidate[] {
       const v = object(item)
       return {
         enrollment: enrollment(v['enrollment']),
-        score: integer(v['score'], 0, 100),
-        score_details: score(v['score_details']),
+        score: integer(v['score'], 0, 200),
+        score_details: parseMatchmakingScore(v['score_details']),
       }
     },
     50,

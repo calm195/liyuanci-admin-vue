@@ -11,6 +11,9 @@ import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useModerationReview } from '@/composables/useModerationReview'
 const {
   pageSize,
+  filters,
+  search,
+  resetFilters,
   editorOpen,
   editorTask,
   escalating,
@@ -69,7 +72,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     :revision="readFeedback.revision"
   />
   <main class="panel workflow" aria-label="内容审核">
-    <p>仅查看授权案件命中正文，不提供全站私聊或上下文会话搜索。</p>
+    <p>仅搜索授权审核案件的编号，查看详情时展示命中正文；不提供全站私聊或上下文会话搜索。</p>
     <template v-if="workspace.allowed()">
       <p class="banner">仅展示当前授权的审核案件，决定提交后以服务端业务结果为准。</p>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
@@ -96,6 +99,45 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </button>
           </template>
         </BusinessToolbar>
+        <form
+          class="moderation-filters"
+          aria-label="审核案件筛选"
+          @submit.prevent="runRead(search, '筛选结果已更新')"
+        >
+          <fieldset :disabled="listBusy || writing || editorOpen">
+            <label
+              >搜索案件或内容编号<input
+                v-model="filters.q"
+                type="search"
+                maxlength="80"
+                placeholder="输入案件 ID 或内容 ID"
+            /></label>
+            <label
+              >审核状态<select v-model="filters.status">
+                <option value="human_required">需要审核</option>
+                <option value="all">全部状态</option>
+                <option value="approved">已通过</option>
+                <option value="rejected">已驳回</option>
+              </select></label
+            >
+            <label
+              >内容类型<select v-model="filters.kind">
+                <option value="">全部类型</option>
+                <option value="wish">心愿</option>
+                <option value="application">应愿留言</option>
+                <option value="message">私聊消息</option>
+                <option value="story">还愿故事</option>
+              </select></label
+            >
+            <button type="submit" class="business-primary">查询</button>
+            <button type="button" @click="runRead(resetFilters, '已恢复需要审核的案件')">
+              重置筛选
+            </button>
+          </fieldset>
+        </form>
+        <p class="moderation-query-note">
+          默认展示需要人工审核的案件；全部状态下，需要审核的案件在所有分页中优先展示。
+        </p>
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
@@ -103,12 +145,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             重试列表
           </button>
         </FloatingNotice>
-        <p v-else-if="!items.length">暂无审核案件</p>
+        <p v-else-if="!items.length">当前筛选下暂无审核案件</p>
         <div v-else class="business-table">
           <table>
             <thead>
               <tr>
                 <th scope="col">本页序号</th>
+                <th scope="col">案件编号</th>
                 <th scope="col">内容类型</th>
                 <th scope="col">状态</th>
                 <th scope="col">案件版本</th>
@@ -119,6 +162,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             <tbody>
               <tr v-for="(item, index) in items" :key="item.id">
                 <th scope="row">{{ index + 1 }}</th>
+                <td class="moderation-case-id">{{ item.id }}</td>
                 <td>{{ moderationKindLabel(item.kind) }}</td>
                 <td>{{ stateLabel(item.status) }}</td>
                 <td>{{ item.version }}</td>
@@ -198,7 +242,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             @conflict="reloadSelected"
           />
           <template v-else>
-            <form v-if="detail.status === 'human_required'" @submit.prevent="check">
+            <form
+              v-if="detail.status === 'human_required'"
+              aria-label="审核决定"
+              @submit.prevent="check"
+            >
               <fieldset :disabled="writing || confirming">
                 <legend>审核决定</legend>
                 <label
@@ -254,3 +302,39 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     </template>
   </main>
 </template>
+
+<style scoped>
+.moderation-filters {
+  margin: 1rem 0;
+}
+.moderation-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.8rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.moderation-filters label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1 1 150px;
+}
+.moderation-filters input,
+.moderation-filters select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.moderation-case-id {
+  max-width: 17rem;
+  overflow-wrap: anywhere;
+}
+.moderation-query-note {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+</style>

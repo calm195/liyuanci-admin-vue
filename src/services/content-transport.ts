@@ -11,7 +11,7 @@ import {
 } from './wordlists'
 import { reviewText, reviewVersion } from './review-boundary'
 import { wordlistKinds } from '@/types/wordlists'
-import type { ModerationClient } from '@/types/moderation'
+import type { ModerationClient, ModerationFilters } from '@/types/moderation'
 import type { WordlistClient } from '@/types/wordlists'
 
 /** 内容管理和治理请求共用当前后台会话及标准封装，取消或撤权后丢弃响应。 */
@@ -74,6 +74,19 @@ export function validModerationFeedback(value: string): boolean {
   return !!value.trim() && new TextEncoder().encode(value).byteLength <= 2000
 }
 
+/** 游标与已应用筛选一起提交，列表优先级和分页均由服务端决定。 */
+export function moderationQuery(
+  cursor: string | null,
+  pageSize: () => number,
+  filters?: ModerationFilters,
+): string {
+  const params = new URLSearchParams(query(cursor, pageSize))
+  params.set('status', filters?.status ?? 'human_required')
+  if (filters?.kind) params.set('kind', filters.kind)
+  if (filters?.q.trim()) params.set('q', filters.q.trim())
+  return params.toString()
+}
+
 export function createModerationTransport(
   token: string,
   allowed: () => boolean,
@@ -82,9 +95,9 @@ export function createModerationTransport(
 ): ModerationClient {
   const request = createContentRequest(token, allowed, transport)
   return {
-    async list(cursor, signal) {
+    async list(cursor, signal, filters) {
       return parseModerationPage(
-        await request(`moderation-tasks?${query(cursor, pageSize)}`, signal),
+        await request(`moderation-tasks?${moderationQuery(cursor, pageSize, filters)}`, signal),
       )
     },
     async detail(id, signal) {

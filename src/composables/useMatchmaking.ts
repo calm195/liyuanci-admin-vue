@@ -2,6 +2,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { useMatchmakingCommands } from '@/stores/matchmaking'
+import { useAutoPairingCommands } from '@/stores/matchmaking-auto'
 import { useAdminWorkspace } from './useAdminWorkspace'
 import {
   createMatchmakingClient,
@@ -87,6 +88,9 @@ export function useMatchmaking(libraryOnly = false) {
   const busy = ref(false),
     writing = ref(false)
   const commands = useMatchmakingCommands()
+  const autoCommands = useAutoPairingCommands()
+  const autoWriting = ref(false)
+  const autoPending = computed(() => autoCommands.pending)
   const pending = computed(() => commands.pending)
   const pendingOnOtherPage = computed(() =>
     pending.value && pending.value.path.startsWith(libraryPath) !== libraryOnly
@@ -101,7 +105,10 @@ export function useMatchmaking(libraryOnly = false) {
   const tab = ref<'activity' | 'enrollments' | 'pairs' | 'tasks'>('activity')
   const workspace = useAdminWorkspace(clear, matchmakingRoles)
   const client = createMatchmakingClient(useAdminStore().session?.token ?? '', workspace.allowed)
-  const locked = computed(() => busy.value || writing.value || !!pending.value)
+  const locked = computed(
+    () =>
+      busy.value || writing.value || !!pending.value || autoWriting.value || !!autoPending.value,
+  )
   const canNext = computed(
     () => detailPage.value * 20 < Math.max(detail.value?.total ?? 0, detail.value?.pair_total ?? 0),
   )
@@ -293,6 +300,10 @@ export function useMatchmaking(libraryOnly = false) {
       { expected_version: activity.version, first_task_id: item.id },
       '设置首日任务',
     )
+  }
+  async function autoApplied() {
+    await loadDetail()
+    if (workspace.allowed()) await loadActivities()
   }
   async function refresh() {
     if (locked.value) return
@@ -605,6 +616,7 @@ export function useMatchmaking(libraryOnly = false) {
   onBeforeRouteLeave(
     () =>
       !writing.value &&
+      !autoWriting.value &&
       (!pending.value ||
         window.confirm(
           '操作结果尚未确认。原请求将保留在当前会话内存，返回后可原样重试。确认离开？',
@@ -622,6 +634,12 @@ export function useMatchmaking(libraryOnly = false) {
       return
     }
     await loadActivities()
+    if (workspace.allowed() && autoPending.value) {
+      selected.value = autoPending.value.activityID
+      tab.value = 'pairs'
+      await loadDetail()
+      return
+    }
     if (!workspace.allowed() || !pending.value || pendingOnOtherPage.value) return
     const command = pending.value
     selected.value = command.activityID || 'new'
@@ -634,6 +652,9 @@ export function useMatchmaking(libraryOnly = false) {
     }
   })
   return {
+    autoWriting,
+    autoPending,
+    autoApplied,
     activities,
     total,
     listPage,

@@ -53,6 +53,8 @@ export interface Profile {
   weight_min: number
   weight_max: number
   wechat: string
+  ideal_traits?: string[]
+  personal_traits?: string[]
   introduction: string
   consent: boolean
 }
@@ -65,6 +67,9 @@ export interface Enrollment {
   profile?: Profile
 }
 export interface ScoreDetails {
+  traits?: number
+  personal_to_ideal?: string[]
+  ideal_to_personal?: string[]
   mbti: number
   age: number
   campus: number

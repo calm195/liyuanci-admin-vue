@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import MatchmakingProfile from '@/components/MatchmakingProfile.vue'
+import MatchmakingScore from '@/components/MatchmakingScore.vue'
+import MatchmakingAutoPairing from '@/components/MatchmakingAutoPairing.vue'
 import { activityDateFields, useMatchmaking } from '@/composables/useMatchmaking'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { phaseLabels, enrollmentLabels, pairLabels } from '@/types/matchmaking'
 const { libraryOnly = false } = defineProps<{ libraryOnly?: boolean }>()
 const {
+  autoWriting,
+  autoPending,
+  autoApplied,
   activities,
   total,
   listPage,
@@ -111,6 +116,10 @@ function time(value: string) {
         :tone="feedback.tone"
         :revision="feedback.revision"
       />
+      <section v-if="autoPending && libraryOnly" class="match-alert" aria-label="待确认自动分配">
+        <p>有自动分配操作结果尚未确认，请返回活动维护核实原请求。</p>
+        <RouterLink to="/matchmaking">返回活动维护</RouterLink>
+      </section>
       <section v-if="pending" class="match-alert" aria-label="待确认操作">
         <p>
           {{ pending.title }}的结果尚未确认，表单已锁定。重试会使用同一份内容，不会创建另一项操作。
@@ -429,13 +438,12 @@ function time(value: string) {
                     <h4>{{ candidate.enrollment.profile?.name ?? '候选人' }}</h4>
                     <strong>{{ candidate.score }} 分</strong>
                   </div>
-                  <p class="match-score">
-                    MBTI {{ candidate.score_details.mbti }}/30 · 年龄
-                    {{ candidate.score_details.age }}/20 · 校区
-                    {{ candidate.score_details.campus }}/25 · 身高
-                    {{ candidate.score_details.height }}/15 · 体重
-                    {{ candidate.score_details.weight }}/10
-                  </p>
+                  <MatchmakingScore
+                    :score="candidate.score"
+                    :details="candidate.score_details"
+                    :first="source.profile?.name ?? '所选报名者'"
+                    :second="candidate.enrollment.profile?.name ?? '候选人'"
+                  />
                   <details v-if="candidate.enrollment.profile">
                     <summary>查看候选资料</summary>
                     <MatchmakingProfile :profile="candidate.enrollment.profile" />
@@ -450,6 +458,14 @@ function time(value: string) {
               </section>
             </section>
             <section v-if="tab === 'pairs' && detail" aria-label="配对记录">
+              <MatchmakingAutoPairing
+                :key="detail.activity.id"
+                :activity-i-d="detail.activity.id"
+                :activity-version="detail.activity.version"
+                :disabled="locked || conflict || !canPair"
+                @busy-change="autoWriting = $event"
+                @applied="autoApplied"
+              />
               <div class="match-heading">
                 <h2>配对记录</h2>
                 <button
@@ -474,11 +490,12 @@ function time(value: string) {
                   </h3>
                   <span class="match-badge">{{ pairLabels[row.status] }}</span>
                 </div>
-                <p>
-                  推荐分数 {{ row.score }} · MBTI {{ row.score_details.mbti }} / 年龄
-                  {{ row.score_details.age }} / 校区 {{ row.score_details.campus }} / 身高
-                  {{ row.score_details.height }} / 体重 {{ row.score_details.weight }}
-                </p>
+                <MatchmakingScore
+                  :score="row.score"
+                  :details="row.score_details"
+                  :first="row.member_names[0] ?? '参与者一'"
+                  :second="row.member_names[1] ?? '参与者二'"
+                />
                 <p v-if="row.reason">解除原因：{{ row.reason }}</p>
                 <button v-if="row.status !== 'ended'" :disabled="locked" @click="prepareEnd(row)">
                   解除配对

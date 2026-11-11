@@ -1,6 +1,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import type { CrisisSummary } from '@/types/crisis'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createModerationTransport, validModerationFeedback } from '@/services/content-transport'
 import { useAdminStore } from '@/stores/admin'
@@ -10,11 +10,15 @@ import type {
   ModerationCase,
   ModerationOutcome,
   ModerationSummary,
+  ModerationFilters,
   ReviewDecision,
 } from '@/types/moderation'
 
 export function useModerationReview() {
   const pageSize = ref(10)
+  const defaultFilters = (): ModerationFilters => ({ q: '', status: 'human_required', kind: '' })
+  const filters = reactive(defaultFilters())
+  let appliedFilters = defaultFilters()
   const editorOpen = ref(false)
   const editorTask = ref<'decision' | 'crisis'>('decision')
   const escalating = ref(false)
@@ -140,7 +144,7 @@ export function useModerationReview() {
     items.value = []
     nextCursor.value = null
     await workspace.run(
-      (signal) => client.list(cursor.value, signal),
+      (signal) => client.list(cursor.value, signal, { ...appliedFilters }),
       (page) => {
         items.value = page.items
         nextCursor.value = page.next_cursor
@@ -152,6 +156,16 @@ export function useModerationReview() {
         listBusy.value = false
       },
     )
+  }
+  async function search() {
+    if (listBusy.value || editorOpen.value || writing.value) return
+    appliedFilters = { ...filters, q: filters.q.trim() }
+    await refresh()
+  }
+  async function resetFilters() {
+    if (listBusy.value || editorOpen.value || writing.value) return
+    Object.assign(filters, defaultFilters())
+    await search()
   }
   async function refresh(reset = true) {
     workspace.cancel()
@@ -264,6 +278,9 @@ export function useModerationReview() {
 
   return {
     pageSize,
+    filters,
+    search,
+    resetFilters,
     editorOpen,
     editorTask,
     escalating,

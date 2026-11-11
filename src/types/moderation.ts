@@ -41,8 +41,18 @@ export interface ModerationOutcome {
   business_outcome: BusinessOutcome
   version: number
 }
+export interface ModerationFilters {
+  q: string
+  status: 'human_required' | 'all' | 'approved' | 'rejected'
+  kind: '' | 'wish' | 'application' | 'message' | 'story'
+}
+
 export interface ModerationClient {
-  list(cursor: string | null, signal: AbortSignal): Promise<CursorPage<ModerationSummary>>
+  list(
+    cursor: string | null,
+    signal: AbortSignal,
+    filters?: ModerationFilters,
+  ): Promise<CursorPage<ModerationSummary>>
   detail(id: string, signal: AbortSignal): Promise<ModerationCase>
   decide(
     id: string,

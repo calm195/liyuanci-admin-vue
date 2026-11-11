@@ -74,14 +74,14 @@ async function open(id = 'case-a') {
   await flushPromises()
 }
 async function processing() {
-  if (!wrapper?.find('form').exists()) {
+  if (!wrapper?.find('form[aria-label="审核决定"]').exists()) {
     await button('处理内容审核').trigger('click')
     await flushPromises()
   }
 }
 async function confirm() {
   await processing()
-  await wrapper?.get('form').trigger('submit')
+  await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
   await button('确认提交').trigger('click')
   await flushPromises()
 }
@@ -132,7 +132,7 @@ describe('T017 真实内容审核页面交互', () => {
     expect(wrapper?.text()).toContain('合成涉校命中正文')
     expect(wrapper?.text()).toContain('正文版本 2')
     expect(wrapper?.text()).toContain('未经证实')
-    expect(wrapper?.find('input[type="search"]').exists()).toBe(false)
+    expect(wrapper?.find('input[type="search"]').exists()).toBe(true)
     await open('case-b')
     expect(wrapper?.text()).not.toContain('本正文版本涉及学校官方内容')
   })
@@ -160,7 +160,7 @@ describe('T017 真实内容审核页面交互', () => {
     expect(button('核对操作').attributes('disabled')).toBeDefined()
     await wrapper?.get('#moderation-reason').setValue(' 合成违规 ')
     await processing()
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
     expect(mocks.decide).not.toHaveBeenCalled()
     await button('返回修改').trigger('click')
     await confirm()
@@ -219,7 +219,7 @@ describe('T017 真实内容审核页面交互', () => {
     const write = deferred<ModerationOutcome>()
     mocks.decide.mockReturnValueOnce(write.promise)
     await processing()
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
     await button('确认提交').trigger('click')
     expect(button('刷新列表').attributes('disabled')).toBeDefined()
     wrapper?.unmount()
@@ -239,7 +239,7 @@ describe('T017 真实内容审核页面交互', () => {
     const pending = deferred<ModerationOutcome>()
     mocks.decide.mockReturnValueOnce(pending.promise)
     await processing()
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
     await button('确认提交').trigger('click')
     await button('正在提交…').trigger('click')
     expect(mocks.decide).toHaveBeenCalledTimes(1)
@@ -265,7 +265,7 @@ describe('T017 真实内容审核页面交互', () => {
     mocks.decide.mockRejectedValueOnce(new ApiError(status))
     await confirm()
     expect(wrapper?.find('blockquote').exists()).toBe(false)
-    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
     expect(useAdminStore().authenticated).toBe(status !== 401)
     expect(useAdminStore().forbidden).toBe(status === 403 ? 1 : 0)
   })
@@ -304,31 +304,39 @@ describe('T017 真实内容审核页面交互', () => {
     await open()
     await button('下一页').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal))
+    expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal), {
+      q: '',
+      status: 'human_required',
+      kind: '',
+    })
     await button('上一页').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal))
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: '',
+      status: 'human_required',
+      kind: '',
+    })
     mocks.detail.mockResolvedValueOnce({ ...first, status: 'future-state' })
     await open()
     expect(wrapper?.text()).toContain('当前状态只读')
-    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   })
 })
 
 it('列表与案件详情只读，取消处理清空意见但保留正文和当前查询', async () => {
   await flushPromises()
   await open()
-  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   expect(wrapper?.get('[aria-label="案件详情"]').find('textarea').exists()).toBe(false)
   await processing()
   await wrapper?.get('input[value="rejected"]').setValue()
   await wrapper?.get('#moderation-reason').setValue('旧原因')
   await wrapper?.get('#moderation-suggestion').setValue('旧建议')
-  await wrapper?.get('form').trigger('submit')
+  await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
   await button('取消处理').trigger('click')
   await flushPromises()
   expect(wrapper?.text()).toContain('合成涉校命中正文')
-  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   expect(mocks.list).toHaveBeenCalledTimes(1)
   expect(mocks.decide).not.toHaveBeenCalled()
   await processing()
@@ -341,7 +349,7 @@ it('处理期间禁用切案和查询，提交期间不能取消，404后关闭�
   await processing()
   const pending = deferred<ModerationOutcome>()
   mocks.decide.mockReturnValueOnce(pending.promise)
-  await wrapper?.get('form').trigger('submit')
+  await wrapper?.get('form[aria-label="审核决定"]').trigger('submit')
   await button('确认提交').trigger('click')
   const done = vi.fn()
   const beforeClose = wrapper?.findComponent(ElDialog).props('beforeClose')
@@ -352,11 +360,11 @@ it('处理期间禁用切案和查询，提交期间不能取消，404后关闭�
   await open('case-b')
   expect(wrapper?.text()).not.toContain('合成涉校命中正文')
   expect(wrapper?.text()).not.toContain('另一合成正文')
-  expect(wrapper?.find('form').exists()).toBe(true)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(true)
   pending.resolve(Promise.reject(new ApiError(404)))
   await flushPromises()
   expect(wrapper?.find('blockquote').exists()).toBe(false)
-  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
 })
 it('危机升级从详情显式打开独立抽屉，忙碌时禁止关闭，冲突后重读且清空抽屉', async () => {
   const session = useAdminStore().session
@@ -369,7 +377,7 @@ it('危机升级从详情显式打开独立抽屉，忙碌时禁止关闭，冲�
   await flushPromises()
   const escalation = wrapper?.findComponent(CrisisEscalation)
   if (!escalation) throw new Error('缺少升级组件')
-  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   escalation.vm.$emit('busyChange', true)
   await flushPromises()
   await button('取消处理').trigger('click')
@@ -380,7 +388,7 @@ it('危机升级从详情显式打开独立抽屉，忙碌时禁止关闭，冲�
   await flushPromises()
   expect(wrapper?.findComponent(CrisisEscalation).exists()).toBe(false)
   expect(wrapper?.text()).toContain('案件版本 4')
-  expect(wrapper?.find('form').exists()).toBe(false)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   expect(mocks.decide).not.toHaveBeenCalled()
 })
 it('普通审核角色不展示危机升级入口', async () => {
@@ -417,4 +425,70 @@ it('通过关联入口直接读取授权审核案件，无需从列表手动匹�
   await flushPromises()
   expect(mocks.detail).toHaveBeenLastCalledWith(second.id, expect.any(AbortSignal))
   expect(wrapper.text()).toContain(second.body)
+})
+
+describe('内容审核筛选与游标', () => {
+  it('默认请求需要审核，查询改变筛选重置页码且翻页保留已应用筛选', async () => {
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: '',
+      status: 'human_required',
+      kind: '',
+    })
+    await wrapper?.get('input[type="search"]').setValue(' case- ')
+    await wrapper?.get('form[aria-label="审核案件筛选"] select').setValue('all')
+    await wrapper?.findAll('form[aria-label="审核案件筛选"] select')[1]?.setValue('wish')
+    mocks.list.mockResolvedValue({
+      items: [
+        { id: 'pending-z', status: 'human_required', version: 1 },
+        { id: 'approved-a', status: 'approved', version: 1 },
+      ],
+      next_cursor: 'next-filtered',
+    })
+    await wrapper?.get('form[aria-label="审核案件筛选"]').trigger('submit')
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: 'case-',
+      status: 'all',
+      kind: 'wish',
+    })
+    expect(wrapper?.findAll('tbody tr')[0]?.text()).toContain('待人工审核')
+    await wrapper?.get('input[type="search"]').setValue('未提交输入')
+    await button('下一页').trigger('click')
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith('next-filtered', expect.any(AbortSignal), {
+      q: 'case-',
+      status: 'all',
+      kind: 'wish',
+    })
+    await wrapper?.get('form[aria-label="审核案件筛选"]').trigger('submit')
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: '未提交输入',
+      status: 'all',
+      kind: 'wish',
+    })
+    expect(button('上一页').attributes('disabled')).toBeDefined()
+    await button('重置筛选').trigger('click')
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: '',
+      status: 'human_required',
+      kind: '',
+    })
+  })
+  it('审核编辑期间锁定搜索筛选，审核完成沿用筛选刷新', async () => {
+    await flushPromises()
+    await open()
+    await processing()
+    expect(
+      wrapper?.get('form[aria-label="审核案件筛选"] fieldset').attributes('disabled'),
+    ).toBeDefined()
+    await confirm()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
+      q: '',
+      status: 'human_required',
+      kind: '',
+    })
+  })
 })

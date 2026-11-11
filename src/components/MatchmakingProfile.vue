@@ -44,6 +44,14 @@ defineProps<{ profile: Profile }>()
       <dd>{{ profile.wechat || '未填写' }}</dd>
     </div>
     <div class="match-introduction">
+      <dt>个人特质</dt>
+      <dd>{{ profile.personal_traits?.join('、') || '未填写' }}</dd>
+    </div>
+    <div class="match-introduction">
+      <dt>理想型特质</dt>
+      <dd>{{ profile.ideal_traits?.join('、') || '未填写' }}</dd>
+    </div>
+    <div class="match-introduction">
       <dt>自我介绍</dt>
       <dd>{{ profile.introduction }}</dd>
     </div>

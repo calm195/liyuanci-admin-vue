@@ -1,0 +1,53 @@
+{
+  "id": "bb220000-0000-4000-8000-000000000001",
+  "activity_id": "aa110000-0000-4000-8000-000000000001",
+  "version": 3,
+  "activity_version": 8,
+  "status": "ready",
+  "algorithm": "maximum-cardinality-weight-v1",
+  "participant_count": 5,
+  "eligible_count": 3,
+  "paired_count": 1,
+  "unmatched_count": 1,
+  "excluded_count": 2,
+  "total_score": 120,
+  "created_at": "2026-11-11T10:00:00Z",
+  "expires_at": "2099-11-11T11:00:00Z",
+  "error": "",
+  "pairs": [
+    {
+      "first": { "enrollment_id": "aa110000-0000-4000-8000-000000000002", "name": "合成参与者甲" },
+      "second": { "enrollment_id": "aa110000-0000-4000-8000-000000000003", "name": "合成参与者乙" },
+      "score": 120,
+      "score_details": {
+        "mbti": 30,
+        "age": 20,
+        "campus": 25,
+        "height": 15,
+        "weight": 10,
+        "traits": 20,
+        "personal_to_ideal": ["温柔", "真诚"],
+        "ideal_to_personal": ["温柔", "幽默"]
+      }
+    }
+  ],
+  "unmatched": [
+    {
+      "enrollment_id": "aa110000-0000-4000-8000-000000000004",
+      "name": "合成参与者丙",
+      "reason": "competition"
+    }
+  ],
+  "excluded": [
+    {
+      "enrollment_id": "aa110000-0000-4000-8000-000000000005",
+      "name": "合成参与者丁",
+      "reason": "occupied"
+    },
+    {
+      "enrollment_id": "aa110000-0000-4000-8000-000000000006",
+      "name": "合成参与者戊",
+      "reason": "not_approved"
+    }
+  ]
+}

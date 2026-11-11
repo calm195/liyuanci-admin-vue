@@ -16,6 +16,18 @@ describe('包分配后台协议边界', () => {
     expect(parseMatchmakingWorkspace(fixture.workspace).pairs[0]?.member_names).toHaveLength(2)
     expect(parseCandidates(fixture.candidates)[0]?.score_details.campus).toBe(25)
   })
+  it('报名资料保留个人与理想标签，旧快照缺省为空', () => {
+    const data = structuredClone(fixture.workspace)
+    const first = data.data.enrollments[0]
+    if (!first) throw new Error('缺少合成报名')
+    Object.assign(first.profile, { personal_traits: ['温柔'], ideal_traits: ['真诚'] })
+    const profile = parseMatchmakingWorkspace(data).enrollments[0]?.profile
+    expect(profile?.personal_traits).toEqual(['温柔'])
+    expect(profile?.ideal_traits).toEqual(['真诚'])
+    expect(
+      parseMatchmakingWorkspace(fixture.workspace).enrollments[0]?.profile?.personal_traits,
+    ).toEqual([])
+  })
   it('拒绝畸形状态、无时区时间、超限模板和反向区间', () => {
     const changed = structuredClone(fixture.workspace)
     changed.data.activity.phase = 'unknown'

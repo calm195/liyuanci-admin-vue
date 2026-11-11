@@ -11,7 +11,9 @@ describe('T017 内容审核与词库真实传输', () => {
       .mockResolvedValue(envelope({ items: [], next_cursor: null }))
     await createModerationTransport('token', () => true, transport).list('a+/=&', signal())
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/moderation-tasks?limit=10&cursor=a%2B%2F%3D%26')
+    expect(url).toBe(
+      '/api/v1/admin/moderation-tasks?limit=10&cursor=a%2B%2F%3D%26&status=human_required',
+    )
     expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' })
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token')
   })
@@ -155,5 +157,36 @@ describe('T017 内容审核与词库真实传输', () => {
       client.publish('draft', { expected_version: 0, expected_head_version: 1 }, 'key', signal()),
     ).rejects.toThrow('版本')
     expect(transport).not.toHaveBeenCalled()
+  })
+})
+
+describe('内容审核查询筛选', () => {
+  it('全部、类型及编号搜索与不透明游标同时发送，不在客户端重排结果', async () => {
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      envelope({
+        items: [
+          { id: 'pending-z', status: 'human_required', version: 1 },
+          { id: 'approved-a', status: 'approved', version: 1 },
+        ],
+        next_cursor: null,
+      }),
+    )
+    const result = await createModerationTransport('token', () => true, transport).list(
+      'opaque',
+      signal(),
+      { q: '  ab+/  ', status: 'all', kind: 'message' },
+    )
+    const url = transport.mock.calls[0]?.[0]
+    expect(typeof url).toBe('string')
+    if (typeof url !== 'string') throw new Error('缺少请求')
+    const params = new URL(url, 'https://local.invalid').searchParams
+    expect(Object.fromEntries(params)).toEqual({
+      limit: '10',
+      cursor: 'opaque',
+      status: 'all',
+      kind: 'message',
+      q: 'ab+/',
+    })
+    expect(result.items.map((item) => item.id)).toEqual(['pending-z', 'approved-a'])
   })
 })
