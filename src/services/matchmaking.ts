@@ -46,6 +46,11 @@ function integer(value: unknown, min = 0, max = Number.MAX_SAFE_INTEGER): number
   if (!Number.isSafeInteger(result)) throw invalid()
   return result
 }
+function score(value: unknown): number {
+  const result = number(value, 0, 215)
+  if (!Number.isSafeInteger(result * 2)) throw invalid()
+  return result
+}
 function bool(value: unknown): boolean {
   if (typeof value !== 'boolean') throw invalid()
   return value
@@ -130,6 +135,7 @@ function profile(value: unknown): Profile {
     name: text(v['name'], 40),
     gender: choice(v['gender'], ['male', 'female']),
     grade: text(v['grade'], 32),
+    grade_label: text(v['grade_label'] ?? '', 80),
     campus: choice(v['campus'], ['wushan', 'university_town', 'international']),
     mbti: choice(v['mbti'], [
       '',
@@ -150,6 +156,37 @@ function profile(value: unknown): Profile {
       'ISTJ',
       'ESTJ',
     ]),
+    preferred_campuses: list(
+      v['preferred_campuses'] ?? [],
+      (c) => choice(c, ['wushan', 'university_town', 'international']),
+      3,
+    ),
+    preferred_mbti: list(
+      v['preferred_mbti'] ?? [],
+      (c) =>
+        choice(c, [
+          'INFP',
+          'ENFP',
+          'INFJ',
+          'ENFJ',
+          'INTJ',
+          'ENTJ',
+          'INTP',
+          'ENTP',
+          'ISFP',
+          'ESFP',
+          'ISTP',
+          'ESTP',
+          'ISFJ',
+          'ESFJ',
+          'ISTJ',
+          'ESTJ',
+        ]),
+      16,
+    ),
+    enrollment_year: integer(v['enrollment_year'] ?? 0, 0, 9999),
+    education_level: choice(v['education_level'] ?? '', ['', 'undergraduate', 'master', 'doctor']),
+    grade_override: text(v['grade_override'] ?? '', 32),
     age: integer(v['age'], 18, 80),
     age_min: integer(v['age_min'], 18, 80),
     age_max: integer(v['age_max'], 18, 80),
@@ -188,6 +225,8 @@ function enrollment(value: unknown): Enrollment {
 export function parseMatchmakingScore(value: unknown): ScoreDetails {
   const v = object(value)
   return {
+    preferred_campus: number(v['preferred_campus'] ?? 0, 0, 5),
+    preferred_mbti: number(v['preferred_mbti'] ?? 0, 0, 10),
     mbti: number(v['mbti'], 0, 30),
     age: number(v['age'], 0, 20),
     campus: number(v['campus'], 0, 25),
@@ -204,7 +243,7 @@ function pair(value: unknown): Pair {
     id: identifier(v['id']),
     version: integer(v['version'], 1),
     status: choice(v['status'], pairStatuses),
-    score: integer(v['score'], 0, 200),
+    score: score(v['score']),
     score_details: parseMatchmakingScore(v['score_details']),
     algorithm: text(v['algorithm'], 80),
     enrollments: list(v['enrollments'] ?? [], identifier, 2),
@@ -280,7 +319,7 @@ export function parseCandidates(value: unknown): Candidate[] {
       const v = object(item)
       return {
         enrollment: enrollment(v['enrollment']),
-        score: integer(v['score'], 0, 200),
+        score: score(v['score']),
         score_details: parseMatchmakingScore(v['score_details']),
       }
     },

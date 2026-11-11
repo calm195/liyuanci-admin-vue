@@ -33,8 +33,12 @@ const make = (n) => ({
 const pairs = Array.from({ length: 498 }, (_, i) => ({
   first: make(i * 2 + 1),
   second: make(i * 2 + 2),
-  score: 120,
-  score_details: jobFixture.pairs[0].score_details,
+  score: 120 + (i % 3) * 2.5,
+  score_details: {
+    ...jobFixture.pairs[0].score_details,
+    preferred_campus: (i % 3) * 2.5,
+    preferred_mbti: 0,
+  },
 }))
 const job = {
   ...jobFixture,
@@ -44,7 +48,7 @@ const job = {
   paired_count: 498,
   unmatched_count: 2,
   excluded_count: 2,
-  total_score: 59760,
+  total_score: pairs.reduce((sum, pair) => sum + pair.score, 0),
   pairs,
   unmatched: [
     { ...make(997), reason: 'competition' },
@@ -59,7 +63,9 @@ const output = await mkdtemp(path.join(tmpdir(), 'auto-pairing-browser-'))
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 let created = false,
   readCount = 0,
-  failApply = true
+  failApply = true,
+  failJobRead = true,
+  readFailures = 0
 const writes = [],
   errors = [],
   unexpected = []
@@ -111,6 +117,12 @@ try {
         await route.fulfill({ status: 404, json: { code: 404 } })
         return
       }
+      if (failJobRead) {
+        failJobRead = false
+        readFailures++
+        await route.abort('failed')
+        return
+      }
       readCount++
       if (readCount > 1 && job.status === 'running') job.status = 'ready'
       data = job
@@ -155,17 +167,29 @@ try {
   await page.getByRole('button', { name: '查看与审核', exact: true }).first().click()
   assert.ok((await page.locator('.match-profile').textContent()).includes('个人特质温柔'))
   await page.getByRole('button', { name: '配对记录', exact: true }).click()
-  const panel = page.getByRole('region', { name: '全员自动分配', exact: true })
-  await panel.getByRole('button', { name: '生成全员分配预览', exact: true }).click()
+  const launcher = page.getByRole('region', { name: '全员自动分配', exact: true })
+  await launcher.getByRole('button', { name: '自动分配', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: '全员自动分配', exact: true })
+  await panel.getByRole('progressbar', { name: '后台分配计算进度', exact: true }).waitFor()
+  await panel.locator('.el-dialog__headerbtn').click()
+  await launcher.getByRole('button', { name: '查看最近方案', exact: true }).click()
   await panel.getByRole('button', { name: '确认应用为待发布配对', exact: true }).waitFor()
+  assert.equal(readFailures, 1, '创建成功后的首次读取断网仍可恢复任务')
   assert.equal(writes[0].body.expected_version, 8)
-  assert.equal(await panel.locator('.auto-pair').count(), 20)
+  assert.equal(writes.length, 1)
+  await panel.getByRole('button', { name: '查看匹配方案', exact: true }).click()
+  const details = page.getByRole('dialog', { name: '匹配方案列表', exact: true })
+  assert.equal(await details.locator('.auto-pair').count(), 20)
   assert.equal(await panel.locator('.auto-stats dd').first().textContent(), '1000')
+  assert.ok((await details.locator('.auto-pair').first().textContent()).includes('合成参与者5'))
+  await details.getByLabel('匹配方案排序').selectOption('asc')
+  assert.ok((await details.locator('.auto-pair').first().textContent()).includes('合成参与者1'))
+  await details.getByLabel('匹配方案排序').selectOption('original')
   assert.ok(
-    (await panel.locator('.auto-pair').first().textContent()).includes('基础 100 + 标签 20'),
+    (await details.locator('.auto-pair').first().textContent()).includes('基础 100 + 标签 20'),
   )
-  await panel.getByRole('button', { name: '下一页预览', exact: true }).click()
-  assert.ok((await panel.locator('.auto-pair').first().textContent()).includes('合成参与者41'))
+  await details.getByRole('button', { name: '下一页预览', exact: true }).click()
+  assert.ok((await details.locator('.auto-pair').first().textContent()).includes('合成参与者41'))
   while (await page.getByRole('button', { name: '关闭提示', exact: true }).count())
     await page.getByRole('button', { name: '关闭提示', exact: true }).first().click()
   await page.screenshot({
@@ -173,12 +197,13 @@ try {
     fullPage: true,
     animations: 'disabled',
   })
-  await panel.evaluate((node) => node.scrollIntoView({ block: 'start' }))
+  await details.locator('.el-dialog__headerbtn').click()
   await page.screenshot({ path: path.join(output, 'desktop-summary.png'), animations: 'disabled' })
-  await panel.getByRole('button', { name: '未匹配原因（2）', exact: true }).click()
-  assert.ok((await panel.textContent()).includes('没有满足条件的候选'))
-  await panel.getByRole('button', { name: '未参与原因（2）', exact: true }).click()
-  assert.ok((await panel.textContent()).includes('保持原配对'))
+  await panel.getByRole('button', { name: '查看匹配方案', exact: true }).click()
+  await details.getByRole('button', { name: '未匹配原因（2）', exact: true }).click()
+  assert.ok((await details.textContent()).includes('没有满足条件的候选'))
+  await details.getByRole('button', { name: '未参与原因（2）', exact: true }).click()
+  assert.ok((await details.textContent()).includes('保持原配对'))
   await page.setViewportSize({ width: 390, height: 844 })
   await page.screenshot({
     path: path.join(output, 'mobile-reasons.png'),
@@ -191,14 +216,24 @@ try {
     ),
     true,
   )
+  await details.locator('.el-dialog__headerbtn').click()
+  await panel.locator('.el-dialog__headerbtn').click()
+  await launcher.getByRole('button', { name: '查看最近方案', exact: true }).click()
+  await panel.getByRole('button', { name: '重新生成', exact: true }).waitFor()
+  assert.equal(writes.length, 1, '只读查看不创建任务')
+  await panel.locator('.el-dialog__headerbtn').click()
+  await launcher.getByRole('button', { name: '自动分配', exact: true }).click()
+  await panel.getByRole('button', { name: '确认应用为待发布配对', exact: true }).waitFor()
+  assert.equal(writes.length, 2, '再次自动分配创建新任务')
+  assert.notEqual(writes[0].key, writes[1].key)
   await panel.getByRole('button', { name: '确认应用为待发布配对', exact: true }).click()
   await panel.getByRole('button', { name: '确认应用 498 组', exact: true }).click()
   await panel.getByRole('button', { name: '原样重试自动分配', exact: true }).waitFor()
   await panel.getByRole('button', { name: '原样重试自动分配', exact: true }).click()
   await panel.getByText('已应用为待发布配对', { exact: true }).waitFor()
-  assert.deepEqual(writes[1], writes[2])
-  assert.equal(writes[1].body.expected_version, 3)
-  assert.equal(writes[1].body.activity_version, 8)
+  assert.deepEqual(writes[2], writes[3])
+  assert.equal(writes[2].body.expected_version, 3)
+  assert.equal(writes[2].body.activity_version, 8)
   assert.ok(
     (await page.getByRole('region', { name: '配对记录', exact: true }).textContent()).includes(
       '合成参与者1',

@@ -1,7 +1,18 @@
 <script setup lang="ts">
+import { useDictionariesStore } from '@/stores/dictionaries'
 import { campuses } from '@/types/matchmaking'
 import type { Profile } from '@/types/matchmaking'
 defineProps<{ profile: Profile }>()
+const dictionaries = useDictionariesStore()
+function campusLabel(code: string) {
+  return campuses.find((item) => item.code === code)?.label ?? code
+}
+function educationLabel(value: string | undefined) {
+  if (value === 'undergraduate') return '本科'
+  if (value === 'master') return '硕士研究生'
+  if (value === 'doctor') return '博士研究生'
+  return value ?? ''
+}
 </script>
 <template>
   <dl class="match-profile">
@@ -19,11 +30,28 @@ defineProps<{ profile: Profile }>()
     </div>
     <div>
       <dt>年级</dt>
-      <dd>{{ profile.grade }}</dd>
+      <dd>{{ profile.grade_label || dictionaries.label('grade', profile.grade) }}</dd>
     </div>
     <div>
       <dt>MBTI</dt>
       <dd>{{ profile.mbti || '未填写' }}</dd>
+    </div>
+    <div>
+      <dt>期望校区</dt>
+      <dd>
+        {{ profile.preferred_campuses?.map(campusLabel).join('、') || '不限校区' }}
+      </dd>
+    </div>
+    <div>
+      <dt>期望 MBTI</dt>
+      <dd>{{ profile.preferred_mbti?.join('、') || '不限' }}</dd>
+    </div>
+    <div>
+      <dt>入学信息</dt>
+      <dd>
+        {{ profile.enrollment_year || '待补全' }} {{ educationLabel(profile.education_level)
+        }}{{ profile.grade_override ? ' · 手动年级' : '' }}
+      </dd>
     </div>
     <div>
       <dt>年龄</dt>

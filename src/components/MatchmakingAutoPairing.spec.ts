@@ -18,7 +18,7 @@ function render() {
       activityVersion: fixture.activity_version,
       disabled: false,
     },
-    global: { plugins: [pinia] },
+    global: { plugins: [pinia], stubs: { ElDialog: { template: '<div><slot /></div>' } } },
   })
 }
 function button(label: string) {
@@ -102,7 +102,7 @@ describe('全员自动分配工作台', () => {
     await wrapper.setProps({ activityVersion: 9 })
     expect(wrapper.text()).not.toContain('合成参与者甲')
     expect(button('确认应用为待发布配对').attributes('disabled')).toBeDefined()
-    await button('重新生成全员预览').trigger('click')
+    await button('重新生成').trigger('click')
     await flushPromises()
     expect(writes()[0]?.[1]?.body).toBe(JSON.stringify({ expected_version: 9 }))
   })
@@ -142,13 +142,61 @@ describe('全员自动分配工作台', () => {
     expect(wrapper.find('progress').exists()).toBe(false)
     expect(wrapper.text()).toContain('合成参与者甲')
   })
+  it('新任务回执成功但首次回读断网时撤下旧方案，继续按新任务轮询', async () => {
+    wrapper.unmount()
+    vi.useFakeTimers()
+    wrapper = render()
+    await flushPromises()
+    const nextID = 'aa110000-0000-4000-8000-000000000099'
+    let firstRead = true
+    transport.mockImplementation((input, init) => {
+      if (init?.method === 'POST') return response({ id: nextID })
+      const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (path.endsWith(`/${nextID}`)) {
+        if (firstRead) {
+          firstRead = false
+          return Promise.reject(new TypeError('offline'))
+        }
+        return response({ ...fixture, id: nextID })
+      }
+      throw new Error('不应继续读取旧任务')
+    })
+    await button('自动分配').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('合成参与者甲')
+    expect(wrapper.find('progress').exists()).toBe(true)
+    expect(wrapper.text()).toContain('操作已成功，但预览刷新失败')
+    expect(button('自动分配').attributes('disabled')).toBeDefined()
+    expect(writes()).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1500)
+    await flushPromises()
+    expect(wrapper.find('progress').exists()).toBe(false)
+    expect(wrapper.text()).toContain('合成参与者甲')
+    expect(writes()).toHaveLength(1)
+  })
+  it('应用回执成功但回读失败仍保持已应用，不能再次应用旧ready方案', async () => {
+    await button('确认应用为待发布配对').trigger('click')
+    transport.mockImplementation((_input, init) =>
+      init?.method === 'POST'
+        ? response({ id: fixture.id })
+        : Promise.reject(new TypeError('offline')),
+    )
+    await button('确认应用 1 组').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('已应用为待发布配对')
+    expect(wrapper.findAll('button').some((item) => item.text() === '确认应用为待发布配对')).toBe(
+      false,
+    )
+    expect(wrapper.emitted('applied')).toHaveLength(1)
+    expect(writes()).toHaveLength(1)
+  })
   it('无历史任务时可创建，404不展示错误', async () => {
     wrapper.unmount()
     transport.mockResolvedValueOnce(Response.json({ code: 404 }, { status: 404 }))
     wrapper = render()
     await flushPromises()
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    expect(button('生成全员分配预览').attributes('disabled')).toBeUndefined()
+    expect(button('自动分配').attributes('disabled')).toBeUndefined()
   })
 })
 

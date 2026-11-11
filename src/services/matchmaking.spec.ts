@@ -20,13 +20,42 @@ describe('包分配后台协议边界', () => {
     const data = structuredClone(fixture.workspace)
     const first = data.data.enrollments[0]
     if (!first) throw new Error('缺少合成报名')
-    Object.assign(first.profile, { personal_traits: ['温柔'], ideal_traits: ['真诚'] })
+    Object.assign(first.profile, {
+      personal_traits: ['温柔'],
+      ideal_traits: ['真诚'],
+      preferred_campuses: ['wushan'],
+      preferred_mbti: ['INFP', 'ENFP'],
+      enrollment_year: 2025,
+      education_level: 'undergraduate',
+      grade_label: '大二',
+    })
     const profile = parseMatchmakingWorkspace(data).enrollments[0]?.profile
     expect(profile?.personal_traits).toEqual(['温柔'])
+    expect(profile?.preferred_campuses).toEqual(['wushan'])
+    expect(profile?.preferred_mbti).toEqual(['INFP', 'ENFP'])
+    expect(profile?.enrollment_year).toBe(2025)
+    expect(profile?.grade_label).toBe('大二')
     expect(profile?.ideal_traits).toEqual(['真诚'])
     expect(
       parseMatchmakingWorkspace(fixture.workspace).enrollments[0]?.profile?.personal_traits,
     ).toEqual([])
+  })
+  it('候选与已保存配对统一接受半分，拒绝更细精度和超限总分', () => {
+    const candidates = structuredClone(fixture.candidates)
+    const candidate = candidates.data.items[0]
+    const workspace = structuredClone(fixture.workspace)
+    const pair = workspace.data.pairs[0]
+    if (!candidate || !pair) throw new Error('缺少合成评分')
+    candidate.score = 212.5
+    pair.score = 212.5
+    expect(parseCandidates(candidates)[0]?.score).toBe(212.5)
+    expect(parseMatchmakingWorkspace(workspace).pairs[0]?.score).toBe(212.5)
+    for (const invalid of [100.1, 215.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      candidate.score = invalid
+      pair.score = invalid
+      expect(() => parseCandidates(candidates)).toThrow()
+      expect(() => parseMatchmakingWorkspace(workspace)).toThrow()
+    }
   })
   it('拒绝畸形状态、无时区时间、超限模板和反向区间', () => {
     const changed = structuredClone(fixture.workspace)

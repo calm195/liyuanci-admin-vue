@@ -21,6 +21,17 @@ function number(value: unknown, max = Number.MAX_SAFE_INTEGER) {
     throw invalid()
   return value
 }
+function score(value: unknown, max = Number.MAX_SAFE_INTEGER) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > max ||
+    !Number.isSafeInteger(value * 2)
+  )
+    throw invalid()
+  return value
+}
 function id(value: unknown) {
   const result = text(value)
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(result))
@@ -60,7 +71,7 @@ export function parseAutoPairingJob(value: unknown): AutoPairingJob {
     paired_count: number(v['paired_count'], 1000),
     unmatched_count: number(v['unmatched_count'], 2000),
     excluded_count: number(v['excluded_count'], 2000),
-    total_score: number(v['total_score']),
+    total_score: score(v['total_score']),
     created_at: timestamp(v['created_at']),
     expires_at: timestamp(v['expires_at']),
     error: text(v['error']),
@@ -71,7 +82,7 @@ export function parseAutoPairingJob(value: unknown): AutoPairingJob {
         return {
           first: member(p['first']),
           second: member(p['second']),
-          score: number(p['score'], 200),
+          score: score(p['score'], 215),
           score_details: parseMatchmakingScore(p['score_details']),
         }
       },

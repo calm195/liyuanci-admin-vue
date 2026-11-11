@@ -14,6 +14,24 @@ describe('自动分配协议边界', () => {
       parseMatchmakingScore({ mbti: 30, age: 20, campus: 25, height: 15, weight: 10 }).traits,
     ).toBe(0)
   })
+  it('保留偏好半分和超过原上限的总分', () => {
+    const data = structuredClone(fixture)
+    const first = data.pairs[0]
+    if (!first) throw new Error('缺少合成配对')
+    Object.assign(first, {
+      score: 212.5,
+      score_details: { ...first.score_details, preferred_campus: 2.5, preferred_mbti: 10 },
+    })
+    data.total_score = 212.5
+    const job = parseAutoPairingJob(data)
+    expect(job.pairs[0]?.score).toBe(212.5)
+    expect(job.total_score).toBe(212.5)
+    expect(job.pairs[0]?.score_details.preferred_campus).toBe(2.5)
+    first.score = 215.5
+    expect(() => parseAutoPairingJob(data)).toThrow()
+    first.score = 100.1
+    expect(() => parseAutoPairingJob(data)).toThrow()
+  })
   it('拒绝人数不一致、重复占用、超限分数和错活动响应', async () => {
     expect(() => parseAutoPairingJob({ ...fixture, participant_count: 6 })).toThrow()
     const duplicate = structuredClone(fixture)

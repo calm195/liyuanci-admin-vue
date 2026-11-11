@@ -17,6 +17,8 @@ export function useAutoPairing(
   const job = ref<AutoPairingJob | null>(null),
     reading = ref(false),
     writing = ref(false)
+  // 写回执已确认后保留任务标识，即使首次读取失败也继续核实新任务。
+  const acknowledgedJobID = ref('')
   const error = ref(''),
     notice = ref(''),
     confirming = ref(false),
@@ -27,7 +29,12 @@ export function useAutoPairing(
   let expiryTimer: ReturnType<typeof setTimeout> | undefined
   const workspace = useAdminWorkspace(clear, matchmakingRoles)
   const client = createAutoPairingClient(useAdminStore().session?.token ?? '', workspace.allowed)
-  const running = computed(() => job.value?.status === 'pending' || job.value?.status === 'running')
+  const running = computed(
+    () =>
+      (!job.value && !!acknowledgedJobID.value) ||
+      job.value?.status === 'pending' ||
+      job.value?.status === 'running',
+  )
   const stale = computed(
     () =>
       job.value?.status === 'stale' ||
@@ -57,6 +64,8 @@ export function useAutoPairing(
   function clear() {
     stop()
     job.value = null
+    acknowledgedJobID.value = ''
+    expired.value = false
     reading.value = false
     writing.value = false
     error.value = ''
@@ -66,6 +75,7 @@ export function useAutoPairing(
   function accept(value: AutoPairingJob) {
     const previous = job.value?.status
     job.value = value
+    acknowledgedJobID.value = value.id
     const remaining = Date.parse(value.expires_at) - Date.now()
     expired.value = remaining <= 0
     if (expiryTimer !== undefined) clearTimeout(expiryTimer)
@@ -95,16 +105,18 @@ export function useAutoPairing(
     if (!workspace.allowed() || reading.value || writing.value) return
     reading.value = true
     error.value = ''
-    const current = job.value
+    const targetID = job.value?.id || acknowledgedJobID.value
     await workspace.run(
       (signal) =>
-        latest || !current
+        latest || !targetID
           ? client.latest(activityID(), signal)
-          : client.job(activityID(), current.id, signal),
+          : client.job(activityID(), targetID, signal),
       accept,
       (cause) => {
         if (latest && cause instanceof MatchmakingError && cause.status === 404) {
           job.value = null
+          acknowledgedJobID.value = ''
+          expired.value = false
           return
         }
         error.value = matchmakingErrorMessage(cause)
@@ -133,6 +145,15 @@ export function useAutoPairing(
       (signal) => client.execute(command, signal),
       async (receipt) => {
         commands.clear()
+        acknowledgedJobID.value = receipt.id
+        if (command.kind === 'generate') {
+          // 新任务已创建，旧预览不能继续作为本轮结果展示或应用。
+          job.value = null
+          expired.value = false
+        } else if (job.value) {
+          // 应用回执已确认，回读暂时失败也不能退回可再次应用的ready状态。
+          job.value = { ...job.value, status: 'applied' }
+        }
         await workspace.run(
           (signal) => client.job(activityID(), receipt.id, signal),
           accept,

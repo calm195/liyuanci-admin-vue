@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ElDialog } from 'element-plus'
+import 'element-plus/theme-chalk/el-dialog.css'
+import 'element-plus/theme-chalk/el-overlay.css'
 import FloatingNotice from './FloatingNotice.vue'
 import MatchmakingScore from './MatchmakingScore.vue'
 import { useAutoPairing } from '@/composables/useAutoPairing'
@@ -31,11 +34,27 @@ const {
   () => emit('applied'),
 )
 const { feedback, run } = useOperationFeedback(() => !!error.value)
+const opened = ref(false),
+  detailsOpened = ref(false)
+const order = ref<'desc' | 'asc' | 'original'>('desc')
+const sortedPairs = computed(() => {
+  const rows = [...(job.value?.pairs ?? [])]
+  if (order.value !== 'original')
+    rows.sort((a, b) => (order.value === 'desc' ? b.score - a.score : a.score - b.score))
+  return rows
+})
+async function openGenerate() {
+  detailsOpened.value = false
+  opened.value = true
+  await generate()
+}
+async function openLatest() {
+  opened.value = true
+  await run(refresh, '最近分配方案已读取')
+}
 const tab = ref<'pairs' | 'unmatched' | 'excluded'>('pairs'),
   page = ref(1)
-const pairRows = computed(
-  () => job.value?.pairs.slice((page.value - 1) * 20, page.value * 20) ?? [],
-)
+const pairRows = computed(() => sortedPairs.value.slice((page.value - 1) * 20, page.value * 20))
 const reasonRows = computed(() =>
   tab.value === 'pairs'
     ? []
@@ -57,7 +76,14 @@ const reasons: Record<string, string> = {
   ineligible: '当前配对资格无效',
   occupied: '已有配对占用，保持原配对',
 }
-watch([() => job.value?.id, tab], () => {
+watch(
+  () => job.value?.id,
+  () => {
+    order.value = 'desc'
+    tab.value = 'pairs'
+  },
+)
+watch([() => job.value?.id, tab, order], () => {
   page.value = 1
 })
 watch(writing, (value) => emit('busyChange', value), { flush: 'sync' })
@@ -66,130 +92,195 @@ function time(value: string) {
 }
 </script>
 <template>
-  <section class="auto-panel" aria-label="全员自动分配">
-    <div class="auto-heading">
-      <div>
-        <h2>全员自动分配</h2>
-        <p>覆盖本活动全部报名者，保留已有配对，为未占用的合格报名者生成分配预览。</p>
-      </div>
-      <button :disabled="reading || writing || !!pending" @click="run(refresh, '分配进度已刷新')">
-        刷新分配进度
-      </button>
-    </div>
-    <p>优先让更多人完成配对，再优化总分；同分方案随机选择。重新生成可能得到不同方案。</p>
-    <FloatingNotice v-if="error" :message="error" tone="error" />
-    <FloatingNotice v-if="notice" :message="notice" tone="success" />
-    <FloatingNotice
-      v-if="feedback.message"
-      :message="feedback.message"
-      :tone="feedback.tone"
-      :revision="feedback.revision"
-    />
-    <p v-if="error" role="alert">{{ error }}</p>
-    <div v-if="pending" class="auto-warning" aria-label="待确认自动分配操作">
-      <p>提交结果尚未确认，已保留原请求。请原样重试后再继续操作。</p>
-      <button :disabled="writing" @click="retry">原样重试自动分配</button>
-    </div>
-    <p v-if="reading && !running" role="status">正在读取分配预览…</p>
-    <div v-if="running" class="auto-progress" role="status">
-      <progress aria-label="后台分配计算进度" /><span
-        >{{ job ? statusLabels[job.status] : '' }}。可离开页面，返回后继续查看。</span
-      >
-    </div>
-    <div class="auto-actions">
-      <button class="business-primary" :disabled="!canGenerate" @click="generate">
-        {{ job ? '重新生成全员预览' : '生成全员分配预览' }}</button
-      ><button v-if="job?.status === 'ready'" :disabled="!canApply" @click="confirming = true">
-        确认应用为待发布配对
-      </button>
-    </div>
-    <template v-if="job">
-      <p>
-        <strong>{{ statusLabels[job.status] }}</strong> · 创建于 {{ time(job.created_at) }}
-      </p>
-      <p v-if="job.status !== 'applied'">预览有效期至 {{ time(job.expires_at) }}</p>
-      <p v-if="stale || (expired && job.status !== 'applied')" class="auto-warning" role="alert">
-        {{
-          stale
-            ? '活动或参与资料已变化，当前预览不能应用。请刷新活动并重新生成。'
-            : '预览已过期，请重新生成。'
-        }}
-      </p>
-      <dl class="auto-stats">
-        <div>
-          <dt>报名人数</dt>
-          <dd>{{ job.participant_count }}</dd>
-        </div>
-        <div>
-          <dt>参与计算</dt>
-          <dd>{{ job.eligible_count }}</dd>
-        </div>
-        <div>
-          <dt>拟配对</dt>
-          <dd>{{ job.paired_count }} 组 / {{ job.paired_count * 2 }} 人</dd>
-        </div>
-        <div>
-          <dt>未匹配</dt>
-          <dd>{{ job.unmatched_count }} 人</dd>
-        </div>
-        <div>
-          <dt>未参与</dt>
-          <dd>{{ job.excluded_count }} 人</dd>
-        </div>
-        <div>
-          <dt>总分</dt>
-          <dd>{{ job.total_score }}</dd>
-        </div>
-      </dl>
-      <section v-if="confirming && canApply" class="auto-confirm" aria-label="确认分配方案">
-        <h3>确认应用当前方案</h3>
-        <p>
-          将新增
-          {{ job.paired_count }}
-          组待发布配对，保留原有配对。应用时会重新核对报名、资格与版本；结果仍需按原流程发布。
-        </p>
-        <button :disabled="!canApply" @click="apply">确认应用 {{ job.paired_count }} 组</button
-        ><button :disabled="writing" @click="confirming = false">继续核对</button>
-      </section>
-      <template v-if="job.status === 'applied' || (!running && !stale && !expired)">
-        <div class="auto-tabs" role="group" aria-label="分配预览分类">
-          <button :aria-pressed="tab === 'pairs'" @click="tab = 'pairs'">
-            配对方案（{{ job.paired_count }}）</button
-          ><button :aria-pressed="tab === 'unmatched'" @click="tab = 'unmatched'">
-            未匹配原因（{{ job.unmatched_count }}）</button
-          ><button :aria-pressed="tab === 'excluded'" @click="tab = 'excluded'">
-            未参与原因（{{ job.excluded_count }}）
+  <section class="auto-launcher" aria-label="全员自动分配">
+    <button class="business-primary" :disabled="!canGenerate" @click="openGenerate">
+      自动分配
+    </button>
+    <button :disabled="reading || writing" @click="openLatest">查看最近方案</button>
+    <p v-if="running" role="status">自动分配正在后台计算，可查看最近方案。</p>
+    <p v-if="pending" role="alert">有自动分配操作结果尚未确认，请查看最近方案并原样重试。</p>
+    <ElDialog
+      v-model="opened"
+      title="全员自动分配"
+      class="auto-dialog"
+      width="min(900px, 94vw)"
+      :close-on-click-modal="false"
+      :lock-scroll="true"
+      @closed="detailsOpened = false"
+    >
+      <div class="auto-panel">
+        <div class="auto-heading">
+          <div>
+            <h2>全员自动分配</h2>
+            <p>覆盖本活动全部报名者，保留已有配对，为未占用的合格报名者生成分配预览。</p>
+          </div>
+          <button
+            :disabled="reading || writing || !!pending"
+            @click="run(refresh, '分配进度已刷新')"
+          >
+            刷新分配进度
           </button>
         </div>
-        <template v-if="tab === 'pairs'"
-          ><article v-for="pair in pairRows" :key="pair.first.enrollment_id" class="auto-pair">
-            <h3>{{ pair.first.name }} × {{ pair.second.name }}</h3>
-            <MatchmakingScore
-              :score="pair.score"
-              :details="pair.score_details"
-              :first="pair.first.name"
-              :second="pair.second.name"
-            />
-          </article>
-          <p v-if="!pairRows.length">本次没有可新增的配对。</p></template
-        >
-        <ul v-else-if="reasonRows.length" class="auto-reasons">
-          <li v-for="person in reasonRows" :key="person.enrollment_id">
-            <strong>{{ person.name || '报名者' }}</strong
-            >：{{ reasons[person.reason] ?? person.reason }}
-          </li>
-        </ul>
-        <p v-else>本分类暂无记录。</p>
-        <nav v-if="total > 20" class="auto-pagination" aria-label="分配预览分页">
-          <button :disabled="page <= 1" @click="page--">上一页预览</button
-          ><span>第 {{ page }} / {{ Math.ceil(total / 20) }} 页，共 {{ total }} 条</span
-          ><button :disabled="page * 20 >= total" @click="page++">下一页预览</button>
-        </nav>
-      </template>
-    </template>
+        <p>优先让更多人完成配对，再优化总分；同分方案随机选择。重新生成可能得到不同方案。</p>
+        <FloatingNotice v-if="error" :message="error" tone="error" />
+        <FloatingNotice v-if="notice" :message="notice" tone="success" />
+        <FloatingNotice
+          v-if="feedback.message"
+          :message="feedback.message"
+          :tone="feedback.tone"
+          :revision="feedback.revision"
+        />
+        <p v-if="error" role="alert">{{ error }}</p>
+        <div v-if="pending" class="auto-warning" aria-label="待确认自动分配操作">
+          <p>提交结果尚未确认，已保留原请求。请原样重试后再继续操作。</p>
+          <button :disabled="writing" @click="retry">原样重试自动分配</button>
+        </div>
+        <p v-if="reading && !running" role="status">正在读取分配预览…</p>
+        <div v-if="running" class="auto-progress" role="status">
+          <progress aria-label="后台分配计算进度" /><span
+            >{{ job ? statusLabels[job.status] : '' }}。可离开页面，返回后继续查看。</span
+          >
+        </div>
+        <div class="auto-actions">
+          <button class="business-primary" :disabled="!canGenerate" @click="openGenerate">
+            {{ job ? '重新生成' : '生成全员分配预览' }}</button
+          ><button v-if="job?.status === 'ready'" :disabled="!canApply" @click="confirming = true">
+            确认应用为待发布配对
+          </button>
+        </div>
+        <template v-if="job">
+          <p>
+            <strong>{{ statusLabels[job.status] }}</strong> · 创建于 {{ time(job.created_at) }}
+          </p>
+          <p v-if="job.status !== 'applied'">预览有效期至 {{ time(job.expires_at) }}</p>
+          <p
+            v-if="stale || (expired && job.status !== 'applied')"
+            class="auto-warning"
+            role="alert"
+          >
+            {{
+              stale
+                ? '活动或参与资料已变化，当前预览不能应用。请刷新活动并重新生成。'
+                : '预览已过期，请重新生成。'
+            }}
+          </p>
+          <dl class="auto-stats">
+            <div>
+              <dt>报名人数</dt>
+              <dd>{{ job.participant_count }}</dd>
+            </div>
+            <div>
+              <dt>参与计算</dt>
+              <dd>{{ job.eligible_count }}</dd>
+            </div>
+            <div>
+              <dt>拟配对</dt>
+              <dd>{{ job.paired_count }} 组 / {{ job.paired_count * 2 }} 人</dd>
+            </div>
+            <div>
+              <dt>未匹配</dt>
+              <dd>{{ job.unmatched_count }} 人</dd>
+            </div>
+            <div>
+              <dt>未参与</dt>
+              <dd>{{ job.excluded_count }} 人</dd>
+            </div>
+            <div>
+              <dt>总分</dt>
+              <dd>{{ job.total_score }}</dd>
+            </div>
+          </dl>
+          <section v-if="confirming && canApply" class="auto-confirm" aria-label="确认分配方案">
+            <h3>确认应用当前方案</h3>
+            <p>
+              将新增
+              {{ job.paired_count }}
+              组待发布配对，保留原有配对。应用时会重新核对报名、资格与版本；结果仍需按原流程发布。
+            </p>
+            <button :disabled="!canApply" @click="apply">确认应用 {{ job.paired_count }} 组</button
+            ><button :disabled="writing" @click="confirming = false">继续核对</button>
+          </section>
+          <template v-if="job.status === 'applied' || (!running && !stale && !expired)">
+            <button @click="detailsOpened = true">查看匹配方案</button>
+            <ElDialog
+              v-model="detailsOpened"
+              title="匹配方案列表"
+              class="auto-dialog"
+              width="min(1000px, 94vw)"
+              append-to-body
+              :close-on-click-modal="false"
+            >
+              <label v-if="tab === 'pairs'" class="auto-order"
+                >排序
+                <select v-model="order" aria-label="匹配方案排序">
+                  <option value="desc">分数降序</option>
+                  <option value="asc">分数升序</option>
+                  <option value="original">原始顺序</option>
+                </select>
+              </label>
+              <div class="auto-tabs" role="group" aria-label="分配预览分类">
+                <button :aria-pressed="tab === 'pairs'" @click="tab = 'pairs'">
+                  配对方案（{{ job.paired_count }}）</button
+                ><button :aria-pressed="tab === 'unmatched'" @click="tab = 'unmatched'">
+                  未匹配原因（{{ job.unmatched_count }}）</button
+                ><button :aria-pressed="tab === 'excluded'" @click="tab = 'excluded'">
+                  未参与原因（{{ job.excluded_count }}）
+                </button>
+              </div>
+              <template v-if="tab === 'pairs'"
+                ><article
+                  v-for="pair in pairRows"
+                  :key="pair.first.enrollment_id"
+                  class="auto-pair"
+                >
+                  <h3>{{ pair.first.name }} × {{ pair.second.name }}</h3>
+                  <MatchmakingScore
+                    :score="pair.score"
+                    :details="pair.score_details"
+                    :first="pair.first.name"
+                    :second="pair.second.name"
+                  />
+                </article>
+                <p v-if="!pairRows.length">本次没有可新增的配对。</p></template
+              >
+              <ul v-else-if="reasonRows.length" class="auto-reasons">
+                <li v-for="person in reasonRows" :key="person.enrollment_id">
+                  <strong>{{ person.name || '报名者' }}</strong
+                  >：{{ reasons[person.reason] ?? person.reason }}
+                </li>
+              </ul>
+              <p v-else>本分类暂无记录。</p>
+              <nav v-if="total > 20" class="auto-pagination" aria-label="分配预览分页">
+                <button :disabled="page <= 1" @click="page--">上一页预览</button
+                ><span>第 {{ page }} / {{ Math.ceil(total / 20) }} 页，共 {{ total }} 条</span
+                ><button :disabled="page * 20 >= total" @click="page++">下一页预览</button>
+              </nav>
+            </ElDialog>
+          </template>
+        </template>
+      </div>
+    </ElDialog>
   </section>
 </template>
 <style scoped>
+.auto-dialog {
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+}
+.auto-dialog :deep(.el-dialog__body) {
+  overflow-y: auto;
+}
+.auto-launcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+.auto-launcher > p {
+  flex-basis: 100%;
+}
 .auto-panel {
   border: 1px solid var(--border-color, #dce3df);
   border-radius: 1rem;

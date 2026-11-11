@@ -41,8 +41,14 @@ export interface Profile {
   name: string
   gender: 'male' | 'female'
   grade: string
+  grade_label?: string
   campus: string
   mbti: string
+  preferred_campuses?: string[]
+  preferred_mbti?: string[]
+  enrollment_year?: number
+  education_level?: string
+  grade_override?: string
   age: number
   age_min: number
   age_max: number
@@ -67,6 +73,8 @@ export interface Enrollment {
   profile?: Profile
 }
 export interface ScoreDetails {
+  preferred_campus?: number
+  preferred_mbti?: number
   traits?: number
   personal_to_ideal?: string[]
   ideal_to_personal?: string[]

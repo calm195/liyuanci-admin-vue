@@ -5,16 +5,24 @@ const props = withDefaults(
   defineProps<{ score: number; details: ScoreDetails; first?: string; second?: string }>(),
   { first: '参与者一', second: '参与者二' },
 )
-const base = computed(() => props.score - (props.details.traits ?? 0))
+const preference = computed(
+  () => (props.details.preferred_campus ?? 0) + (props.details.preferred_mbti ?? 0),
+)
+const base = computed(() => props.score - (props.details.traits ?? 0) - preference.value)
 </script>
 <template>
   <div class="match-score-detail">
     <p>
-      <strong>总分 {{ score }}</strong> · 基础 {{ base }} + 标签 {{ details.traits ?? 0 }}
+      <strong>总分 {{ score }}</strong> · 基础 {{ base }} + 标签 {{ details.traits ?? 0 }} + 偏好
+      {{ preference }}
     </p>
     <p class="score-base">
       MBTI {{ details.mbti }}/30 · 年龄 {{ details.age }}/20 · 校区 {{ details.campus }}/25 · 身高
       {{ details.height }}/15 · 体重 {{ details.weight }}/10
+    </p>
+    <p>
+      期望校区 {{ details.preferred_campus ?? 0 }}/5 · 期望 MBTI
+      {{ details.preferred_mbti ?? 0 }}/10
     </p>
     <p>
       {{ first }}个人 → {{ second }}理想：{{ details.personal_to_ideal?.join('、') || '无命中' }}
