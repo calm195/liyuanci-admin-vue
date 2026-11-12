@@ -1,3 +1,4 @@
+import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import {
   parseIdentityCase,
@@ -28,28 +29,13 @@ export function createIdentityTransport(
   transport: typeof fetch = fetch,
   pageSize: () => number = () => 10,
 ): IdentityReviewClient {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token.trim()) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
+  const { guard, request: send } = createSessionTransport(token, allowed, transport)
   function path(id: string) {
     if (!id.trim() || id === '.' || id === '..') throw new Error('案件标识不能为空或相对路径')
     return `/api/v1/admin/identity-reviews/${encodeURIComponent(id)}`
   }
   async function request(url: string, signal: AbortSignal, init: RequestInit = {}) {
-    guard(signal)
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const response = await transport(url, {
-      ...init,
-      headers,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
+    const response = await send(url, signal, init)
     if (response.status !== 200) throw new ApiError(response.status)
     return response
   }

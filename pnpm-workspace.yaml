@@ -1,2 +1,6 @@
 patchedDependencies:
   '@vue/runtime-core@3.5.44': patches/@vue__runtime-core@3.5.44.patch
+# 测试与 lint 的传递依赖尚未更新安全下限，限定受影响范围并锁定已修复版本。
+overrides:
+  'glob@>=9.0.0 <=14.0.1': 14.0.2
+  'minimatch@>=7.0.0 <11.0.1': 11.0.1

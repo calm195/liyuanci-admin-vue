@@ -1,5 +1,5 @@
 import { parseContentImages } from './content-images'
-import { createContentRequest } from './content-transport'
+import { createContentRequest } from './content-request'
 import { record } from '@/types/admin'
 
 export type ContentKind = 'wishes' | 'whispers'

@@ -1,5 +1,4 @@
-import { ApiError } from './admin'
-import { record } from '@/types/admin'
+import { createContentRequest } from './content-request'
 import { parseModerationCase, parseModerationOutcome, parseModerationPage } from './moderation'
 import {
   parseBuiltinEntries,
@@ -15,44 +14,6 @@ import { wordlistKinds } from '@/types/wordlists'
 import type { ModerationClient, ModerationFilters } from '@/types/moderation'
 import type { WordlistClient } from '@/types/wordlists'
 
-/** 内容管理和治理请求共用当前后台会话及标准封装，取消或撤权后丢弃响应。 */
-export function createContentRequest(
-  token: string,
-  allowed: () => boolean,
-  transport: typeof fetch,
-) {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token.trim()) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
-  return async (path: string, signal: AbortSignal, init: RequestInit = {}, status = 200) => {
-    guard(signal)
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const response = await transport(`/api/v1/admin/${path}`, {
-      ...init,
-      headers,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
-    if (response.status !== status) throw new ApiError(response.status)
-    const value: unknown = await response.json()
-    guard(signal)
-    if (
-      !record(value) ||
-      value['code'] !== 0 ||
-      typeof value['message'] !== 'string' ||
-      typeof value['request_id'] !== 'string' ||
-      !('data' in value)
-    )
-      throw new Error('内容管理响应封装不符合契约')
-    return value['data']
-  }
-}
 function resource(collection: string, id: string): string {
   if (!id.trim() || id === '.' || id === '..') throw new Error('资源标识不能为空或相对路径')
   return `${collection}/${encodeURIComponent(id)}`

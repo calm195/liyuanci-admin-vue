@@ -1,3 +1,4 @@
+import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { resourceStatuses } from '@/types/resources'
@@ -376,29 +377,14 @@ export function createResourcesClient(
   allowed: () => boolean,
   transport: typeof fetch = fetch,
 ): ResourcesClient {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
+  const { guard, request: send } = createSessionTransport(token, allowed, transport)
   async function request(
     path: string,
     signal: AbortSignal,
     init: RequestInit = {},
     status = 200,
   ): Promise<unknown> {
-    guard(signal)
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const response = await transport(`/api/v1/admin/${path}`, {
-      ...init,
-      headers,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
+    const response = await send(`/api/v1/admin/${path}`, signal, init)
     // 失权响应即使正文损坏也先清理当前工作区，不能保留旧资料。
     if (response.status === 401 || response.status === 403)
       throw new ResourceApiError(

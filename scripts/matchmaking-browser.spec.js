@@ -113,8 +113,8 @@ try {
   await page.getByLabel('口令', { exact: true }).fill('synthetic-password')
   await page.getByRole('button', { name: '登录后台', exact: true }).click()
   await page.waitForURL(`${base}/`)
-  await page.getByRole('button', { name: '活动管理', exact: true }).click()
-  await page.getByRole('link', { name: '包分配活动', exact: true }).click()
+  await page.getByRole('button', { name: '包分配', exact: true }).click()
+  await page.getByRole('link', { name: '活动维护', exact: true }).click()
   await page.getByRole('button', { name: /冬日相遇/ }).click()
   assert.equal(await page.getByLabel('首日任务开始（北京时间）').inputValue(), '2026-12-07T09:00')
   await page.getByLabel('活动名称', { exact: true }).fill('一起度过冬天')
@@ -127,8 +127,8 @@ try {
     .getByRole('link', { name: '首页', exact: true })
     .click()
   await page.waitForURL(`${base}/`)
-  await page.getByRole('button', { name: '活动管理', exact: true }).click()
-  await page.getByRole('link', { name: '包分配活动', exact: true }).click()
+  await page.getByRole('button', { name: '包分配', exact: true }).click()
+  await page.getByRole('link', { name: '活动维护', exact: true }).click()
   await page.getByRole('button', { name: '原样重试', exact: true }).waitFor()
   assert.equal(await page.getByLabel('活动名称', { exact: true }).inputValue(), '一起度过冬天')
   assert.equal(await page.getByRole('button', { name: '新建活动', exact: true }).isDisabled(), true)
@@ -151,11 +151,9 @@ try {
   workspace.pairs = []
   workspace.pair_total = 21
   await page.getByRole('button', { name: '重新读取', exact: true }).click()
-  await page.getByText('活动状态已刷新', { exact: true }).waitFor()
+  await page.getByText('页面数据已刷新', { exact: true }).waitFor()
   await page.getByRole('button', { name: '每日任务', exact: true }).click()
-  await page
-    .getByText('已有配对结果发布，任务模板已冻结。历史任务内容保持不变。', { exact: true })
-    .waitFor()
+  await page.getByText('已有配对结果发布，活动任务池与模板已冻结。', { exact: true }).waitFor()
   assert.equal(
     await page.getByRole('button', { name: '保存任务模板', exact: true }).isDisabled(),
     true,

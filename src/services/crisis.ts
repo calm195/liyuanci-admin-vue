@@ -1,3 +1,4 @@
+import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import { parseWordlistEvidence } from './wordlists'
 import { record } from '@/types/admin'
@@ -115,28 +116,13 @@ export function createCrisisClient(
   transport: typeof fetch = fetch,
   pageSize: () => number = () => 10,
 ): CrisisClient {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token.trim()) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
+  const { guard, request: send } = createSessionTransport(token, allowed, transport)
   async function request(
     path: string,
     signal: AbortSignal,
     init: RequestInit = {},
   ): Promise<unknown> {
-    guard(signal)
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const response = await transport(`/api/v1/admin/${path}`, {
-      ...init,
-      headers,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
+    const response = await send(`/api/v1/admin/${path}`, signal, init)
     if (response.status !== 200) throw new ApiError(response.status)
     const value: unknown = await response.json()
     guard(signal)

@@ -1,3 +1,4 @@
+import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import { isRole, record } from '@/types/admin'
 import type { AdminAccount, Role } from '@/types/admin'
@@ -49,24 +50,9 @@ export function createAccountsClient(
   transport: typeof fetch = fetch,
   pageSize: () => number = () => 10,
 ): AccountsClient {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token.trim()) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
+  const { guard, request: send } = createSessionTransport(token, allowed, transport)
   async function request(url: string, status: number, signal: AbortSignal, init: RequestInit = {}) {
-    guard(signal)
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const response = await transport(url, {
-      ...init,
-      headers,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
+    const response = await send(url, signal, init)
     if (response.status !== status) throw new ApiError(response.status)
     const value: unknown = await response.json()
     guard(signal)

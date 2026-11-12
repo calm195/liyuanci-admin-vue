@@ -1,3 +1,4 @@
+import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { restrictionActions, restrictions, userActions, verifications } from '@/types/users'
@@ -236,22 +237,9 @@ export function createUsersClient(
   allowed: () => boolean,
   transport: typeof fetch = fetch,
 ): UsersClient {
-  function guard(signal: AbortSignal) {
-    signal.throwIfAborted()
-    if (!token.trim()) throw new ApiError(401)
-    if (!allowed()) throw new ApiError(403)
-  }
+  const { guard, request: send } = createSessionTransport(token, allowed, transport)
   async function request(path: string, signal: AbortSignal, init: RequestInit = {}) {
-    guard(signal)
-    const response = await transport(`/api/v1/admin/users${path}`, {
-      ...init,
-      headers: { ...init.headers, Authorization: `Bearer ${token}` },
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    })
-    guard(signal)
+    const response = await send(`/api/v1/admin/users${path}`, signal, init)
     if (response.status !== 200) throw new ApiError(response.status)
     const raw: unknown = await response.json()
     guard(signal)
