@@ -7,6 +7,7 @@ const admin = useAdminStore()
 const previews = ref<{ id: string; url: string; position: number; state: string }[]>([])
 const error = ref('')
 const revision = ref(0)
+const original = ref(false)
 let generation = 0
 let controller: AbortController | undefined
 let urls: string[] = []
@@ -19,7 +20,14 @@ function clear() {
   error.value = ''
 }
 watch(
-  () => [props.images, admin.session?.token, revision.value] as const,
+  () => [props.images, admin.session?.token],
+  () => {
+    original.value = false
+  },
+  { flush: 'sync' },
+)
+watch(
+  () => [props.images, admin.session?.token, revision.value, original.value] as const,
   async ([images, token]) => {
     clear()
     if (!token) return
@@ -30,6 +38,10 @@ watch(
       for (const image of images) {
         let url = image.url
         if (url.startsWith('/api/v1/')) {
+          // 审核列表先读取有相同权限约束的展示图，需要核对细节时再取原图。
+          if (!original.value && url.startsWith('/api/v1/admin/wish-images/')) {
+            url += `${url.includes('?') ? '&' : '?'}variant=preview`
+          }
           const response = await globalThis.fetch(url, {
             headers: { Authorization: `Bearer ${token}` },
             signal: abort.signal,
@@ -84,6 +96,9 @@ onBeforeUnmount(clear)
       <figcaption>图片 {{ image.position + 1 }} · {{ image.state }}</figcaption>
     </figure>
     <p v-if="error" role="alert">{{ error }}</p>
+    <button v-if="previews.length && !original" type="button" @click="original = true">
+      查看原图
+    </button>
     <button v-if="error" type="button" @click="revision++">重试图片</button>
   </section>
 </template>

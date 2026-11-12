@@ -51,10 +51,16 @@ describe('受控内容图片', () => {
     })
     await flushPromises()
     expect(fetcher).toHaveBeenCalledWith(
-      '/api/v1/admin/wish-images/image?case_id=case',
+      '/api/v1/admin/wish-images/image?case_id=case&variant=preview',
       expect.objectContaining({ headers: { Authorization: 'Bearer test-admin' } }),
     )
     expect(wrapper.find('img').attributes('src')).toBe('blob:test-preview')
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(fetcher).toHaveBeenLastCalledWith(
+      '/api/v1/admin/wish-images/image?case_id=case',
+      expect.objectContaining({ headers: { Authorization: 'Bearer test-admin' } }),
+    )
     admin.clear()
     await flushPromises()
     expect(wrapper.find('img').exists()).toBe(false)
