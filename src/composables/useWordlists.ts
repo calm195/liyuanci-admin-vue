@@ -6,6 +6,7 @@ import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWor
 import { wordlistKinds } from '@/types/wordlists'
 import type {
   Wordlist,
+  WordlistRule,
   BuiltinDraftInput,
   WordlistConfirmation,
   WordlistKind,
@@ -27,6 +28,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
   const resultId = ref<string | null>(null)
   const kind = ref<WordlistKind>('school')
   const text = ref('')
+  const rules = ref<WordlistRule[]>([])
   const confirmation = ref<WordlistConfirmation | null>(null)
   let generation = 0
   let attempt: { fingerprint: string; key: string } | null = null
@@ -59,6 +61,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     notice.value = ''
     resultId.value = null
     text.value = ''
+    rules.value = []
     confirmation.value = null
     attempt = null
   }
@@ -115,6 +118,9 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     confirmation.value = {
       kind: kind.value,
       entries,
+      ...(rules.value.length
+        ? { rules: rules.value.map((rule) => ({ ...rule, aliases: [...rule.aliases] })) }
+        : {}),
       expected_version: base.value.version,
     }
   }
@@ -231,6 +237,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     resultId,
     kind,
     text,
+    rules,
     confirmation,
     workspace,
     labels,

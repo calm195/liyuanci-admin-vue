@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContentImages from '@/components/ContentImages.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
 import type { ModerationCase } from '@/types/moderation'
@@ -34,6 +35,11 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
       <h3 v-if="detail.title">{{ detail.title }}</h3>
       <p v-if="detail.reward_text">报答方式 {{ detail.reward_text }}</p>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
+      <section v-if="detail.images?.length" aria-label="待审图片">
+        <h3>同版本图片</h3>
+        <p>审核决定同时覆盖当前正文与以下图片。</p>
+        <ContentImages :images="detail.images" />
+      </section>
       <WordlistEvidence
         v-if="detail.wordlist_evidence"
         :evidence="detail.wordlist_evidence"
@@ -57,3 +63,15 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
     <p v-else-if="!loading && !selectedId">选择案件，按需读取精确版本正文。</p>
   </section>
 </template>
+
+<style scoped>
+img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+figure {
+  margin: 12px 0;
+}
+</style>

@@ -4,6 +4,7 @@ import type {
   BuiltinEntries,
   MatchDisposition,
   WordlistMatch,
+  WordlistRule,
   WordlistPreview,
   WordlistEvidence,
   Wordlist,
@@ -48,6 +49,34 @@ export function parseDisabledEntries(value: unknown, entries: readonly string[])
     throw new Error('停用词条必须是完整快照内不重复的词条')
   return disabled
 }
+/** 规则必须引用完整词条快照，防止配置与实际审核内容分离。 */
+export function parseWordlistRules(value: unknown, entries: readonly string[]): WordlistRule[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('词条规则格式异常')
+  const seen = new Set<string>()
+  return value.map((item) => {
+    const row = reviewRecord(item)
+    const entry = reviewText(row['entry'])
+    if (!entries.includes(entry) || seen.has(entry)) throw new Error('规则词条缺失或重复')
+    seen.add(entry)
+    const mode = row['match_mode']
+    const action = row['action']
+    if (
+      (mode !== 'contains' && mode !== 'word') ||
+      (action !== 'hint' && action !== 'review') ||
+      !Array.isArray(row['aliases'])
+    )
+      throw new Error('匹配方式或处置格式异常')
+    if (typeof row['category'] !== 'string') throw new Error('词条分类格式异常')
+    return {
+      entry,
+      category: row['category'],
+      aliases: row['aliases'].map(reviewText),
+      match_mode: mode,
+      action,
+    }
+  })
+}
 export function parseWordlistDetail(value: unknown): WordlistDetail {
   const data = reviewRecord(value)
   if (!Array.isArray(data['entries'])) throw new Error('词条快照格式异常')
@@ -56,6 +85,7 @@ export function parseWordlistDetail(value: unknown): WordlistDetail {
   return {
     ...parseWordlist(value),
     entries,
+    ...(data['rules'] === undefined ? {} : { rules: parseWordlistRules(data['rules'], entries) }),
     ...(disabled.length ? { disabled_entries: disabled } : {}),
   }
 }

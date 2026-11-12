@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { wordlistRuleCategories } from '@/types/wordlists'
 import WordlistPreview from '@/components/WordlistPreview.vue'
 import type { WordlistConfirmation, WordlistKind } from '@/types/wordlists'
 defineProps<{
@@ -38,6 +39,14 @@ defineEmits<{ submit: []; cancel: [] }>()
       </p>
       <ul>
         <li v-for="(entry, index) in confirmation.entries" :key="index">{{ entry }}</li>
+      </ul>
+      <ul v-if="confirmation.rules?.length">
+        <li v-for="rule in confirmation.rules" :key="rule.entry">
+          {{ rule.entry }} · {{ wordlistRuleCategories[rule.category] ?? rule.category }} ·
+          {{ rule.match_mode === 'word' ? '完整词匹配' : '包含匹配' }} ·
+          {{ rule.action === 'hint' ? '提示' : '人工复核' }}
+          <span v-if="rule.aliases.length"> · 变体：{{ rule.aliases.join('、') }}</span>
+        </li>
       </ul>
       <p>创建后尚未发布，不改变当前生效版本。</p>
     </template>

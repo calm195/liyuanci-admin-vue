@@ -75,3 +75,35 @@ describe('T017 内容审核协议解析', () => {
     expect(() => parseModerationPage({ items: [], next_cursor: 5 })).toThrow()
   })
 })
+
+it('拒绝不安全图片地址并保留同版本合法图片', () => {
+  const detail = {
+    id: 'case',
+    version: 1,
+    content_version: 2,
+    status: 'human_required',
+    body: '图文',
+  }
+  expect(() =>
+    parseModerationCase({
+      ...detail,
+      images: [{ id: 'image', url: 'javascript:alert(1)', position: 0, scan_state: 'approved' }],
+    }),
+  ).toThrow()
+  expect(
+    parseModerationCase({
+      ...detail,
+      images: [
+        { id: 'image', url: '/api/v1/wishes/w/images/i', position: 0, scan_state: 'approved' },
+      ],
+    }).images,
+  ).toHaveLength(1)
+  expect(() =>
+    parseModerationCase({
+      ...detail,
+      images: [
+        { id: 'fourth', url: '/api/v1/wish-images/fourth', position: 3, scan_state: 'approved' },
+      ],
+    }),
+  ).toThrow()
+})

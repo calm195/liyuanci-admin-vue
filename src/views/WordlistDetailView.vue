@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { wordlistRuleCategories } from '@/types/wordlists'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed } from 'vue'
@@ -100,6 +101,15 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </tbody>
           </table>
         </div>
+        <section v-if="detail.rules?.length" aria-label="当前词条规则">
+          <h3>匹配与处置</h3>
+          <p v-for="rule in detail.rules" :key="rule.entry">
+            {{ rule.entry }} · {{ wordlistRuleCategories[rule.category] ?? rule.category }} ·
+            {{ rule.match_mode === 'word' ? '完整词匹配' : '包含匹配' }} ·
+            {{ rule.action === 'hint' ? '提示' : '人工复核' }} · 变体
+            {{ rule.aliases.join('、') || '无' }}
+          </p>
+        </section>
         <LocalPagination
           v-if="detail.kind !== 'builtin'"
           v-model:page="page"

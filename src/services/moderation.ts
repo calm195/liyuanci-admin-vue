@@ -1,3 +1,4 @@
+import { parseContentImages } from './content-images'
 import { parseWordlistEvidence } from './wordlists'
 import { reviewPage, reviewRecord, reviewText, reviewVersion } from './review-boundary'
 import { businessOutcomes } from '@/types/moderation'
@@ -24,6 +25,7 @@ export function parseModerationCase(value: unknown): ModerationCase {
     content_version: reviewVersion(data['content_version']),
     body: reviewText(data['body']),
   }
+  if (data['images'] !== undefined) result.images = parseContentImages(data['images'])
   if (data['wordlist_evidence'] !== undefined)
     result.wordlist_evidence = parseWordlistEvidence(data['wordlist_evidence'])
   if (data['title'] !== undefined) result.title = reviewText(data['title'])

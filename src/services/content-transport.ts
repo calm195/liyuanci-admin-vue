@@ -3,6 +3,7 @@ import { record } from '@/types/admin'
 import { parseModerationCase, parseModerationOutcome, parseModerationPage } from './moderation'
 import {
   parseBuiltinEntries,
+  parseWordlistRules,
   parseDisabledEntries,
   parseWordlist,
   parseWordlistDetail,
@@ -199,6 +200,9 @@ export function createWordlistTransport(
             {
               kind: input.kind,
               entries,
+              ...(input.rules === undefined
+                ? {}
+                : { rules: parseWordlistRules(input.rules, entries) }),
               ...(disabled.length ? { disabled_entries: disabled } : {}),
               expected_version: input.expected_version,
             },

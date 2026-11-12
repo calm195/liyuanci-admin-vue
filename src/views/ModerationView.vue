@@ -54,6 +54,7 @@ const {
 const kindLabels: Readonly<Record<string, string>> = {
   wish: '心愿',
   application: '应愿留言',
+  wish_comment: '心愿评论与补充',
   message: '私聊消息',
   story: '还愿故事',
 }
@@ -127,6 +128,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
                 <option value="application">应愿留言</option>
                 <option value="message">私聊消息</option>
                 <option value="story">还愿故事</option>
+                <option value="wish_comment">心愿评论与补充</option>
               </select></label
             >
             <button type="submit" class="business-primary">查询</button>

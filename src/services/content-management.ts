@@ -1,3 +1,4 @@
+import { parseContentImages } from './content-images'
 import { createContentRequest } from './content-transport'
 import { record } from '@/types/admin'
 
@@ -39,6 +40,12 @@ function array(value: unknown): unknown[] {
   return Array.isArray(value) ? value : invalid()
 }
 
+function optionalCount(value: unknown) {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return invalid()
+  return value
+}
+
 function summary(value: unknown) {
   const row = object(value)
   return {
@@ -55,13 +62,26 @@ function summary(value: unknown) {
 
 function publication(value: unknown) {
   const row = object(value)
-  return { body: text(row['body']), author: text(row['author']), notice: text(row['notice']) }
+  return {
+    body: text(row['body']),
+    author: text(row['author']),
+    notice: text(row['notice']),
+    ...(row['images'] === undefined ? {} : { images: parseContentImages(row['images']) }),
+    ...(row['id'] === undefined ? {} : { id: id(row['id']) }),
+    ...(row['kind'] === undefined ? {} : { kind: text(row['kind']) }),
+    ...(row['root_comment_id'] == null ? {} : { rootId: id(row['root_comment_id']) }),
+    ...(row['reply_to_comment_id'] == null ? {} : { replyToId: id(row['reply_to_comment_id']) }),
+  }
 }
 
 function detail(value: unknown) {
   const row = object(value)
   return {
     ...summary(row),
+    applicationCount: optionalCount(row['application_count']),
+    commentCount: optionalCount(row['comment_count']),
+    viewCount: optionalCount(row['view_count']),
+    expiresAt: row['expires_at'] == null ? null : date(row['expires_at']),
     original: row['original'] === null ? null : publication(row['original']),
     story: row['story'] === null ? null : publication(row['story']),
     comments: array(row['comments']).map(publication),

@@ -12,7 +12,21 @@ export interface Wordlist {
   upstream_version?: string
   upstream_digest?: string
 }
+export const wordlistRuleCategories: Record<string, string> = {
+  internet_slang: '网络用语',
+  insult: '攻击辱骂',
+  negative_expression: '消极表达',
+  abbreviation: '缩写变体',
+}
+export interface WordlistRule {
+  entry: string
+  category: string
+  aliases: string[]
+  match_mode: 'contains' | 'word'
+  action: 'hint' | 'review'
+}
 export interface WordlistDetail extends Wordlist {
+  rules?: WordlistRule[]
   entries: string[]
   disabled_entries?: string[]
 }
@@ -25,6 +39,7 @@ export interface WordlistPage extends CursorPage<Wordlist> {
   heads: WordlistHead[]
 }
 export interface WordlistInput {
+  rules?: WordlistRule[]
   kind: CustomWordlistKind
   entries: string[]
   disabled_entries?: string[]

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
+import WordlistRulesEditor from '@/components/WordlistRulesEditor.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { useWordlists } from '@/composables/useWordlists'
 import { wordlistKinds } from '@/types/wordlists'
@@ -17,6 +18,7 @@ const {
   kind,
   base,
   text,
+  rules,
   confirmation,
   prepare,
   submit,
@@ -66,6 +68,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </p>
             <label for="wordlist-entries">完整词条，每行一条；空输入表示空版本</label>
             <textarea id="wordlist-entries" v-model="text" rows="5"></textarea>
+            <WordlistRulesEditor v-model="rules" :allow-hints="kind === 'ordinary_violation'" />
             <button type="submit">核对草稿</button>
           </fieldset>
         </form>

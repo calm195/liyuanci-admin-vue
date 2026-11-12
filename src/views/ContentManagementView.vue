@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { computed } from 'vue'
+import ContentImages from '@/components/ContentImages.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { useContentManagement } from '@/composables/useContentManagement'
@@ -16,7 +17,7 @@ const states: Record<string, string> = {
   pending_review: '待审核',
   review_pending: '待审核',
   rejected: '已驳回',
-  ready: '待上架',
+  ready: '审核通过（历史待上架）',
   published: '已公开',
   matching: '应愿中',
   realized: '已实现',
@@ -163,6 +164,20 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           <p v-if="wishes">
             许愿人 {{ detail.requester || '—' }}，应愿人 {{ detail.helper || '—' }}
           </p>
+          <p
+            v-if="
+              detail.applicationCount !== undefined ||
+              detail.commentCount !== undefined ||
+              detail.viewCount !== undefined
+            "
+          >
+            <span v-if="detail.applicationCount !== undefined"
+              >应愿 {{ detail.applicationCount }} ·
+            </span>
+            <span v-if="detail.commentCount !== undefined">评论 {{ detail.commentCount }} · </span>
+            <span v-if="detail.viewCount !== undefined">浏览 {{ detail.viewCount }}</span>
+          </p>
+          <p v-if="detail.expiresAt">到期时间 {{ displayBeijingTime(detail.expiresAt) }}</p>
           <p v-if="detail.matchedAt">应愿时间 {{ displayBeijingTime(detail.matchedAt) }}</p>
           <p v-if="detail.publishedAt">公开时间 {{ displayBeijingTime(detail.publishedAt) }}</p>
           <section v-if="detail.original">
@@ -170,6 +185,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             <p v-if="detail.original.author">{{ detail.original.author }}</p>
             <p v-if="detail.original.notice">{{ detail.original.notice }}</p>
             <p class="publication-body">{{ detail.original.body }}</p>
+            <ContentImages v-if="detail.original.images?.length" :images="detail.original.images" />
           </section>
           <p v-else>暂无可公开正文。</p>
           <section v-if="detail.story">
@@ -177,12 +193,21 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             <p v-if="detail.story.notice">{{ detail.story.notice }}</p>
             <p class="publication-body">{{ detail.story.body }}</p>
           </section>
-          <section v-if="!wishes && detail.original">
+          <section v-if="detail.original">
             <h4>公开评论</h4>
             <p v-if="!detail.comments.length">当前页暂无公开评论。</p>
             <ul v-else>
               <li v-for="(item, index) in detail.comments" :key="index">
-                <p>{{ item.author }}</p>
+                <p>
+                  {{
+                    item.kind === 'author_supplement'
+                      ? '作者补充 · '
+                      : item.rootId
+                        ? '楼内回复 · '
+                        : ''
+                  }}{{ item.author }}
+                </p>
+                <p v-if="item.replyToId">回复评论 {{ item.replyToId }}</p>
                 <p v-if="item.notice">{{ item.notice }}</p>
                 <p class="publication-body">{{ item.body }}</p>
               </li>
@@ -218,6 +243,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
 </template>
 
 <style scoped>
+img {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
 .publication-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

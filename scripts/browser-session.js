@@ -61,6 +61,14 @@ export async function handleSessionAndDashboard(route) {
     await route.fulfill({ status: 401, json: { code: 401 } })
     return true
   }
+  if (
+    request.method() === 'GET' &&
+    url.pathname === '/api/v1/admin/content/hot' &&
+    ['wish', 'whisper'].includes(url.searchParams.get('kind'))
+  ) {
+    await route.fulfill({ json: { code: 0, data: { items: [] } } })
+    return true
+  }
   if (url.pathname === '/api/v1/admin/dashboard') {
     const summary = {
       registered_users: 0,

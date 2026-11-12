@@ -1,3 +1,4 @@
+import type { ContentImage } from '@/services/content-images'
 import type { WordlistEvidence } from './wordlists'
 
 export interface ModerationSummary {
@@ -8,6 +9,7 @@ export interface ModerationSummary {
   content_version?: number
 }
 export interface ModerationCase {
+  images?: ContentImage[]
   title?: string
   reward_text?: string
   id: string
@@ -44,7 +46,7 @@ export interface ModerationOutcome {
 export interface ModerationFilters {
   q: string
   status: 'human_required' | 'all' | 'approved' | 'rejected'
-  kind: '' | 'wish' | 'application' | 'message' | 'story'
+  kind: '' | 'wish' | 'application' | 'message' | 'story' | 'wish_comment'
 }
 
 export interface ModerationClient {
