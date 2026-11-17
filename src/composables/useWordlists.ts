@@ -1,4 +1,5 @@
 import { computed, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { ApiError } from '@/services/admin'
 import { createWordlistTransport } from '@/services/content-transport'
 import { useAdminStore } from '@/stores/admin'
@@ -22,6 +23,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
   const detailBusy = ref(false)
   const busy = ref(false)
   const writing = ref(false)
+  const uncertain = ref(false)
   const loaded = ref(false)
   const error = ref('')
   const notice = ref('')
@@ -56,6 +58,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     detailBusy.value = false
     busy.value = false
     writing.value = false
+    uncertain.value = false
     loaded.value = false
     error.value = ''
     notice.value = ''
@@ -66,6 +69,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     attempt = null
   }
   async function load() {
+    if (uncertain.value || writing.value) return
     workspace.cancel()
     clear()
     busy.value = true
@@ -168,6 +172,8 @@ export function useWordlists(detailId?: string, autoLoad = true) {
         return restored
       },
       async (value) => {
+        uncertain.value = false
+        writing.value = false
         const expected = generation + 1
         await load()
         if (generation === expected && workspace.allowed()) {
@@ -176,6 +182,10 @@ export function useWordlists(detailId?: string, autoLoad = true) {
         }
       },
       async (cause) => {
+        uncertain.value = !(
+          cause instanceof ApiError && [400, 401, 403, 404, 409, 422].includes(cause.status)
+        )
+        writing.value = false
         if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) {
           const expected = generation + 1
           await load()
@@ -191,7 +201,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     )
   }
   async function openDetail(id: string | null) {
-    if (busy.value || writing.value) return
+    if (busy.value || writing.value || uncertain.value) return
     workspace.cancel()
     detail.value = null
     detailBusy.value = false
@@ -220,6 +230,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
       )
     )
   }
+  onBeforeRouteLeave(() => !writing.value && !uncertain.value)
   onMounted(() => {
     if (autoLoad) void load()
   })
@@ -231,6 +242,7 @@ export function useWordlists(detailId?: string, autoLoad = true) {
     detailBusy,
     busy,
     writing,
+    uncertain,
     loaded,
     error,
     notice,

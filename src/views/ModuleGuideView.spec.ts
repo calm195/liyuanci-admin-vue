@@ -41,6 +41,7 @@ function button(text: string) {
 }
 describe('模块说明配置与发布', () => {
   it('保存草稿后再发布，预览只展示已发布快照', async () => {
+    await button('编辑说明').trigger('click')
     await wrapper.get('textarea').setValue('更新后的使用说明')
     expect(button('发布当前草稿').attributes('disabled')).toBeDefined()
     vi.mocked(saveModuleGuide).mockResolvedValue({
@@ -76,8 +77,9 @@ describe('模块说明配置与发布', () => {
     )
     expect(wrapper.get('[aria-label="已发布说明预览"]').text()).toContain('填写心愿并等待应愿')
   })
-  it('不明确写入沿用同一请求与幂等键，重新读取后解除输入锁', async () => {
+  it('不明确写入沿用同一请求与幂等键，成功核实后解除输入锁', async () => {
     vi.mocked(saveModuleGuide).mockRejectedValue(new Error('合成网络中断'))
+    await button('编辑说明').trigger('click')
     await wrapper.get('textarea').setValue('保留输入')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -86,7 +88,9 @@ describe('模块说明配置与发布', () => {
     await button('原样重试').trigger('click')
     await flushPromises()
     expect(vi.mocked(saveModuleGuide).mock.calls[1]?.slice(0, 3)).toEqual(first?.slice(0, 3))
-    await button('重新读取草稿与发布内容').trigger('click')
+    expect(button('重新读取草稿与发布内容').attributes('disabled')).toBeDefined()
+    vi.mocked(saveModuleGuide).mockResolvedValue({ ...initial, version: 3 })
+    await button('原样重试').trigger('click')
     await flushPromises()
     expect(wrapper.get('fieldset').attributes('disabled')).toBeUndefined()
   })
@@ -98,4 +102,37 @@ describe('模块说明配置与发布', () => {
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(requestSignal?.aborted).toBe(true)
   })
+})
+
+it('默认阅读已发布版本，动态模块卡片切换后编辑仍提交完整快照', async () => {
+  const all = [...modules, { module: 'custom_module', title: '动态模块', body: '另一份已发布说明' }]
+  vi.mocked(readModuleGuide).mockResolvedValue({
+    version: 4,
+    published_version: 3,
+    modules: all,
+    published_modules: all,
+  })
+  await button('重新读取草稿与发布内容').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('textarea').exists()).toBe(false)
+  const cards = wrapper.findAll('[aria-label="说明模块"] button')
+  expect(cards).toHaveLength(2)
+  await cards[1]?.trigger('click')
+  expect(wrapper.get('[aria-label="已发布说明预览"]').text()).toContain('另一份已发布说明')
+  await button('编辑说明').trigger('click')
+  await wrapper.findAll('textarea')[0]?.setValue('更新第一模块')
+  await wrapper.findAll('[aria-label="说明模块"] button')[1]?.trigger('click')
+  await wrapper.findAll('textarea')[1]?.setValue('更新动态模块')
+  vi.mocked(saveModuleGuide).mockResolvedValue({
+    version: 5,
+    published_version: 3,
+    modules: all,
+    published_modules: all,
+  })
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(vi.mocked(saveModuleGuide).mock.lastCall?.[1].modules).toEqual([
+    { ...modules[0], body: '更新第一模块' },
+    { module: 'custom_module', title: '动态模块', body: '更新动态模块' },
+  ])
 })

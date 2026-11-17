@@ -1,3 +1,6 @@
+vi.mock('@/components/confirmDiscardChanges', () => ({
+  confirmDiscardChanges: vi.fn(() => Promise.resolve(true)),
+}))
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -162,17 +165,21 @@ describe('T010 REQ-018/019 后台账号管理页面', () => {
     await flushPromises()
     expect(wrapper?.text()).toContain('角色已更新')
   })
-  it('网络失败相同输入沿用幂等键，修改输入才生成新键', async () => {
+  it('网络失败冻结原请求与取消，原样重试沿用同一请求和幂等键', async () => {
     await start()
     await edit()
     mocks.replaceRoles.mockRejectedValue(new TypeError('合成断网'))
     await confirm()
     const firstKey: unknown = mocks.replaceRoles.mock.calls[0]?.[2]
-    await confirm()
+    expect(wrapper?.get('fieldset').attributes('disabled')).toBeDefined()
+    expect(button('取消并关闭').attributes('disabled')).toBeDefined()
+    expect(button('返回修改').attributes('disabled')).toBeDefined()
+    await button('原样重试').trigger('click')
+    await flushPromises()
+    expect(mocks.replaceRoles.mock.calls[1]?.slice(0, 3)).toEqual(
+      mocks.replaceRoles.mock.calls[0]?.slice(0, 3),
+    )
     expect(mocks.replaceRoles.mock.calls[1]?.[2]).toBe(firstKey)
-    await wrapper?.get('#account-reason').setValue('修订后的理由')
-    await confirm()
-    expect(mocks.replaceRoles.mock.calls[2]?.[2]).not.toBe(firstKey)
   })
   it('409不自动重放，刷新目标版本后需重新选择和确认', async () => {
     await start()

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed } from 'vue'
@@ -12,6 +13,7 @@ const {
   heads,
   busy,
   writing,
+  uncertain,
   error,
   notice,
   resultId,
@@ -33,7 +35,7 @@ const selected = computed(() =>
 const editingVersion = computed(() =>
   selected.value?.id === head.value?.effective_id ? head.value?.version : undefined,
 )
-onBeforeRouteLeave(() => !writing.value)
+onBeforeRouteLeave(() => !writing.value && !uncertain.value)
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
@@ -44,10 +46,12 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="内置词库管理">
-    <template v-if="workspace.allowed()">
-      <h2>go-swd 内置词库</h2>
-      <p>与自定义词库同时扫描。词条调整保存为草稿，发布后生效。</p>
+  <main class="experience-page workflow wordlist-workspace" aria-label="内置词库管理">
+    <WorkspaceHeading
+      title="内置词库"
+      description="与自定义词库同时扫描；词条调整保存为草稿，发布后生效。"
+    />
+    <section v-if="workspace.allowed()" class="experience-panel">
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取词库版本…</p>
@@ -77,9 +81,10 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           v-if="confirmation"
           :confirmation="confirmation"
           :writing="writing"
+          :uncertain="uncertain"
           :labels="labels"
           @submit="submit"
-          @cancel="confirmation = null"
+          @cancel="!uncertain && (confirmation = null)"
         />
         <BuiltinWordlistEntries
           :id="selected.id"
@@ -98,6 +103,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       >
         刷新内置词库
       </button>
-    </template>
+    </section>
   </main>
 </template>

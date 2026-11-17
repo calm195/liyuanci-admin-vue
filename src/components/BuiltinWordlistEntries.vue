@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirmDiscardChanges } from './confirmDiscardChanges'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
@@ -160,7 +161,9 @@ function save() {
     overrides: Array.from(entries.value.values()),
   })
 }
-onBeforeRouteLeave(() => !changeCount.value || globalThis.confirm('放弃尚未保存的内置词库调整？'))
+onBeforeRouteLeave(
+  async () => !changeCount.value || (await confirmDiscardChanges('将放弃尚未保存的内置词库调整。')),
+)
 onMounted(() => void load(0))
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>

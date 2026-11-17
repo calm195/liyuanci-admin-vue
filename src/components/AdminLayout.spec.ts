@@ -128,11 +128,12 @@ it('REQ-019 词库子路由继承权限，详情保留菜单高亮与列表面�
   login()
   await router.push('/wordlists/example')
   const view = render()
-  expect(document.title).toBe('词单详情 · 鲤源池')
+  expect(document.title).toBe('词库管理 · 鲤源池')
+  expect(router.currentRoute.value.query['version']).toBe('example')
   expect(view.get('nav[aria-label="管理菜单"] a[href="/wordlists"]').classes()).toContain(
     'router-link-active',
   )
-  await view.get('[aria-label="面包屑导航"] a[href="/wordlists"]').trigger('click')
+  await view.get('nav[aria-label="管理菜单"] a[href="/wordlists"]').trigger('click')
   await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/wordlists'))
   const session = useAdminStore().session
   if (!session) throw new Error('缺少合成会话')
@@ -188,7 +189,7 @@ it('登录后默认进入顶层首页，业务分组均默认收起', async () =
   }
 })
 
-it('可收起分组，进入该分组的子页面时重新展开', async () => {
+it('所有分组默认收起，路由变化不覆盖用户折叠选择', async () => {
   login()
   await router.push('/identity')
   const view = render()
@@ -200,14 +201,21 @@ it('可收起分组，进入该分组的子页面时重新展开', async () => {
   const identity = view.get('a[href="/identity"]')
   expect(toggle.attributes('aria-expanded')).toBe('false')
   expect(link.isVisible()).toBe(false)
-  expect(identity.isVisible()).toBe(true)
+  expect(identity.isVisible()).toBe(false)
   await toggle.trigger('click')
   expect(toggle.attributes('aria-expanded')).toBe('true')
   expect(identity.isVisible()).toBe(false)
   await toggle.trigger('click')
   expect(link.isVisible()).toBe(false)
   await router.push('/resources')
-  expect(toggle.attributes('aria-expanded')).toBe('true')
-  expect(link.isVisible()).toBe(true)
-  expect(link.attributes('aria-current')).toBe('page')
+  expect(toggle.attributes('aria-expanded')).toBe('false')
+  expect(link.isVisible()).toBe(false)
+  await view.get(`button[aria-controls="${toggle.attributes('aria-controls')}"]`).trigger('click')
+  expect(
+    view
+      .get(`button[aria-controls="${toggle.attributes('aria-controls')}"]`)
+      .attributes('aria-expanded'),
+  ).toBe('true')
+  expect(view.get('a[href="/resources"]').element.closest('[hidden]')).toBeNull()
+  expect(view.get('a[href="/resources"]').attributes('aria-current')).toBe('page')
 })

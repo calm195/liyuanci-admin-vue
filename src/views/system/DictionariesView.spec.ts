@@ -60,7 +60,8 @@ describe('展示字典管理', () => {
     await flushPromises()
     expect(wrapper.get('form input').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('保存结果尚未确认')
-    await button('原样重试').trigger('submit')
+    expect(button('原样重试').attributes('form')).toBe('dictionary-editor')
+    await wrapper.get('#dictionary-editor').trigger('submit')
     await flushPromises()
     expect(vi.mocked(saveDictionary).mock.calls[1]?.slice(0, 4)).toEqual(
       vi.mocked(saveDictionary).mock.calls[0]?.slice(0, 4),

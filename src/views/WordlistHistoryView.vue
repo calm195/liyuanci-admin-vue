@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import LocalPagination from '@/components/LocalPagination.vue'
@@ -23,13 +24,15 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="词库发布记录">
-    <template v-if="workspace.allowed()">
-      <h2>发布记录</h2>
-      <p>查看草稿、生效版和归档版。可将归档版本恢复为新草稿，试跑并确认发布。</p>
+  <main class="experience-page workflow wordlist-workspace" aria-label="词库发布记录">
+    <WorkspaceHeading
+      title="词库发布历史"
+      description="查看草稿、生效版与归档版；恢复为新草稿后仍需试跑和发布确认。"
+    />
+    <section v-if="workspace.allowed()" class="experience-panel">
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取词库版本…</p>
-      <div class="business-filters">
+      <div class="experience-filters">
         <label>
           词库
           <select v-model="filter">
@@ -60,7 +63,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               <td>{{ status(item.status) }}</td>
               <td>{{ item.version }} · {{ item.id }}</td>
               <td>
-                <RouterLink :to="{ name: 'wordlist-detail', params: { id: item.id } }">
+                <RouterLink :to="{ name: 'wordlist-list', query: { version: item.id } }">
                   {{ item.status === 'archived' ? '查看或恢复' : '查看版本' }}
                 </RouterLink>
               </td>
@@ -74,6 +77,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         :pages="pages"
         :disabled="busy"
       />
-    </template>
+    </section>
   </main>
 </template>

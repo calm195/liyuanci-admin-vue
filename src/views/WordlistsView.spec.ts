@@ -1,3 +1,7 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
+vi.mock('@/components/confirmDiscardChanges', () => ({
+  confirmDiscardChanges: vi.fn(() => Promise.resolve(true)),
+}))
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -42,8 +46,13 @@ const heads: WordlistHead[] = [
 let wrapper: VueWrapper | undefined
 let router: Router
 async function go(path: string) {
+  const previous = router.currentRoute.value.fullPath
   await router.push(path)
   await flushPromises()
+  if (previous === path && path === '/wordlists') {
+    await button('刷新词库').trigger('click')
+    await flushPromises()
+  }
 }
 async function detail(id = draft.id) {
   await go(`/wordlists/${id}`)
@@ -66,11 +75,13 @@ function deferred<T>() {
   }
 }
 async function prepare() {
+  if (!wrapper?.find('#wordlist-entries').exists()) await button('编辑词单').trigger('click')
   await wrapper?.get('#wordlist-entries').setValue(' 合成新词 \n\n 第二条 ')
-  await wrapper?.get('form').trigger('submit')
+  await wrapper?.get('#wordlist-workspace-editor').trigger('submit')
 }
 async function submit() {
-  await button('确认提交').trigger('click')
+  const retry = wrapper?.findAll('button').find((item) => item.text() === '原样重试')
+  await (retry ?? button('确认提交')).trigger('click')
   await flushPromises()
 }
 beforeEach(async () => {
@@ -89,7 +100,7 @@ beforeEach(async () => {
   }
   mocks.list.mockResolvedValue({ items: [published, draft], next_cursor: null, heads })
   mocks.detail.mockImplementation((id: string) =>
-    Promise.resolve({ ...(id === published.id ? published : draft), entries: ['合成只读词'] }),
+    Promise.resolve({ ...(id === published.id ? published : draft), id, entries: ['合成只读词'] }),
   )
   mocks.create.mockResolvedValue({ ...draft, id: 'new-draft', version: 3 })
   mocks.publish.mockResolvedValue({ ...draft, version: 3, status: 'published' })
@@ -97,7 +108,7 @@ beforeEach(async () => {
     history: createMemoryHistory(),
     routes: applicationRouter.options.routes,
   })
-  await router.push('/wordlists/drafts/new')
+  await router.push('/wordlists')
   await router.isReady()
   wrapper = mount(
     { components: { RouterView, AppBreadcrumb }, template: '<AppBreadcrumb /><RouterView />' },
@@ -121,25 +132,26 @@ afterEach(() => {
   wrapper = undefined
 })
 describe('T017 REQ-015/018/019 词库页面', () => {
-  it('列表、草稿和详情使用独立路由，面包屑返回列表且离页丢弃未提交词条', async () => {
-    await go('/wordlists')
-    expect(wrapper?.find('form').exists()).toBe(false)
-    expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
+  it('旧草稿与详情链接进入同一工作区，选库后显式编辑并可取消', async () => {
+    expect(wrapper?.find('#wordlist-entries').exists()).toBe(false)
     await go('/wordlists/drafts/new')
-    await vi.waitFor(() => expect(wrapper?.find('form').exists()).toBe(true))
+    expect(router.currentRoute.value.path).toBe('/wordlists')
+    expect(wrapper?.find('#wordlist-entries').exists()).toBe(false)
+    await button('编辑词单').trigger('click')
     await wrapper?.get('#wordlist-entries').setValue('未提交词条')
-    await wrapper?.get('[aria-label="面包屑导航"] a[href="/wordlists"]').trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/wordlists'))
+    await button('取消编辑').trigger('click')
+    expect(wrapper?.get('[role="dialog"]').text()).toContain('放弃尚未保存')
+    await button('关闭').trigger('click')
+    expect(wrapper?.get('#wordlist-entries').element).toHaveProperty('value', '未提交词条')
+    await button('取消编辑').trigger('click')
+    await button('放弃并继续').trigger('click')
     await flushPromises()
     await detail()
-    await vi.waitFor(() => expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(true))
-    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(router.currentRoute.value.path).toBe('/wordlists')
+    expect(router.currentRoute.value.query['version']).toBe(draft.id)
+    expect(wrapper?.find('#wordlist-entries').exists()).toBe(false)
     expect(wrapper?.text()).not.toContain('未提交词条')
-    expect(wrapper?.get('[aria-current="page"]').text()).toContain('词单详情')
-    await go('/wordlists/drafts/new')
-    expect(wrapper?.get('#wordlist-entries').element).toHaveProperty('value', '')
     expect(mocks.create).not.toHaveBeenCalled()
-    expect(mocks.publish).not.toHaveBeenCalled()
   })
   it('内置词条停用保存为草稿，发布前显示双词库命中差异', async () => {
     const builtin: Wordlist = { ...published, id: 'builtin-live', kind: 'builtin' }
@@ -200,13 +212,13 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     })
     await go('/wordlists/builtin')
     await wrapper?.get('[role="switch"][aria-label="启用词条 内置词"]').trigger('click')
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const confirm = vi.mocked(confirmDiscardChanges).mockResolvedValue(false)
     try {
       await go('/wordlists/history')
       expect(router.currentRoute.value.name).toBe('wordlist-builtin')
       expect(confirm).toHaveBeenCalledOnce()
     } finally {
-      confirm.mockRestore()
+      confirm.mockResolvedValue(true)
     }
     await button('保存内置词库草稿').trigger('click')
     await submit()
@@ -283,7 +295,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     )
     mocks.restore.mockResolvedValue(restored)
     await go('/wordlists/history')
-    await wrapper?.get('a[href="/wordlists/archive"]').trigger('click')
+    await wrapper?.get('a[href="/wordlists?version=archive"]').trigger('click')
     await flushPromises()
     await button('恢复为草稿').trigger('click')
     expect(wrapper?.text()).toContain('当前生效版继续使用')
@@ -294,7 +306,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       expect.any(String),
       expect.any(AbortSignal),
     )
-    expect(router.currentRoute.value.path).toBe('/wordlists/restored')
+    expect(router.currentRoute.value.path).toBe('/wordlists')
     expect(wrapper?.text()).toContain('恢复词')
     expect(mocks.publish).not.toHaveBeenCalled()
   })
@@ -319,25 +331,35 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     expect(wrapper?.text()).toContain('完整词条 2 条')
     await submit()
     expect(mocks.create).toHaveBeenCalledWith(
-      { kind: 'school', entries: ['合成新词', '第二条'], expected_version: 7 },
+      {
+        kind: 'school',
+        entries: ['合成新词', '第二条'],
+        disabled_entries: [],
+        rules: [],
+        expected_version: 7,
+      },
       expect.any(String),
       expect.any(AbortSignal),
     )
     expect(mocks.publish).not.toHaveBeenCalled()
-    expect(wrapper?.get('a[href="/wordlists/new-draft"]').text()).toContain('查看新草稿')
+    expect(wrapper?.find('#wordlist-entries').exists()).toBe(false)
     expect(wrapper?.text()).toContain('尚未发布')
   })
   it('新分类也提交heads基准，空词条按契约允许，返回修改不写入', async () => {
     await flushPromises()
-    await wrapper?.get('#wordlist-kind').setValue('crisis')
-    await wrapper?.get('form').trigger('submit')
-    await button('返回修改').trigger('click')
+    await button('危机').trigger('click')
+    await flushPromises()
+    await button('编辑词单').trigger('click')
+    await wrapper?.get('#wordlist-workspace-editor').trigger('submit')
+    await button('关闭').trigger('click')
     expect(mocks.create).not.toHaveBeenCalled()
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('#wordlist-workspace-editor').trigger('submit')
     await submit()
     expect(mocks.create.mock.calls[0]?.[0]).toEqual({
       kind: 'crisis',
       entries: [],
+      disabled_entries: [],
+      rules: [],
       expected_version: 1,
     })
   })
@@ -368,7 +390,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
       false,
     )
   })
-  it('重复提交只发送一次；不确定失败沿用幂等键，修改输入换键', async () => {
+  it('重复提交只发送一次；不确定失败锁定输入且沿用原幂等键', async () => {
     await flushPromises()
     const pending = deferred<Wordlist>()
     mocks.create.mockReturnValueOnce(pending.promise)
@@ -384,11 +406,9 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     const key: unknown = mocks.create.mock.calls[1]?.[1]
     await submit()
     expect(mocks.create.mock.calls[2]?.[1]).toBe(key)
-    await button('返回修改').trigger('click')
-    await wrapper?.get('#wordlist-entries').setValue('修改后词条')
-    await wrapper?.get('form').trigger('submit')
-    await submit()
-    expect(mocks.create.mock.calls[3]?.[1]).not.toBe(key)
+    expect(button('关闭').attributes('disabled')).toBeDefined()
+    expect(wrapper?.get('#wordlist-entries').attributes('disabled')).toBeDefined()
+    expect(mocks.create.mock.calls[2]?.[1]).toBe(key)
   })
   it('409重读全部分页并清空确认，不自动重提', async () => {
     await flushPromises()
@@ -419,7 +439,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     mocks.list.mockResolvedValue({ items: [published], next_cursor: 'same', heads })
     await submit()
     expect(wrapper?.text()).toContain('重读失败')
-    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(button('保存草稿').attributes('disabled')).toBeDefined()
     expect(mocks.create).toHaveBeenCalledTimes(1)
   })
   it.each([401, 403])('%s清空词条和版本，进入既有会话拒绝流程', async (code) => {
@@ -481,7 +501,7 @@ describe('T017 REQ-015/018/019 词库页面', () => {
     expect(wrapper?.get('[aria-label="词库只读详情"]').text()).toContain('合成只读词')
     expect(wrapper?.text()).not.toContain('旧详情晚到词')
     await go('/wordlists')
-    expect(wrapper?.find('[aria-label="词库只读详情"]').exists()).toBe(false)
+    expect(router.currentRoute.value.query['version']).toBeUndefined()
     mocks.detail.mockResolvedValueOnce({
       ...published,
       status: 'archived',
@@ -564,6 +584,7 @@ describe('词条工作区', () => {
     await button('查看').trigger('click')
     expect(wrapper?.get('[role="dialog"]').text()).toContain('停用示例')
     await button('关闭').trigger('click')
+    await button('编辑词单').trigger('click')
     const disabledEntry = wrapper?.get('[role="switch"][aria-label="启用词条 停用示例"]')
     expect(disabledEntry?.attributes('aria-checked')).toBe('false')
     await disabledEntry?.trigger('click')
@@ -571,7 +592,7 @@ describe('词条工作区', () => {
     await search?.setValue('校园')
     await button('编辑').trigger('click')
     await wrapper?.get('#wordlist-entry-text').setValue('修改后的词')
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('#wordlist-entry-form').trigger('submit')
     await search?.setValue('修改')
     const editedEntry = wrapper?.get('[role="switch"][aria-label="启用词条 修改后的词"]')
     expect(editedEntry?.attributes('aria-checked')).toBe('true')
@@ -583,7 +604,7 @@ describe('词条工作区', () => {
     expect(wrapper?.text()).not.toContain('待删除词')
     await button('新增词条').trigger('click')
     await wrapper?.get('#wordlist-entry-text').setValue('新增词条示例')
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('#wordlist-entry-form').trigger('submit')
     await button('保存草稿').trigger('click')
     expect(mocks.create).not.toHaveBeenCalled()
     mocks.detail.mockResolvedValueOnce({
@@ -599,6 +620,7 @@ describe('词条工作区', () => {
         kind: 'school',
         entries: ['修改后的词', '停用示例', '新增词条示例'],
         disabled_entries: ['修改后的词'],
+        rules: [],
         expected_version: 7,
       },
       expect.any(String),
@@ -617,9 +639,10 @@ describe('词条工作区', () => {
 
   it('切换词库前确认未保存修改，冲突时保留编辑并禁止再次提交', async () => {
     await go('/wordlists')
+    await button('编辑词单').trigger('click')
     await button('新增词条').trigger('click')
     await wrapper?.get('#wordlist-entry-text').setValue('未发布的新词')
-    await wrapper?.get('form').trigger('submit')
+    await wrapper?.get('#wordlist-entry-form').trigger('submit')
     await button('危机').trigger('click')
     expect(wrapper?.get('[role="dialog"]').text()).toContain('放弃尚未保存')
     await button('关闭').trigger('click')

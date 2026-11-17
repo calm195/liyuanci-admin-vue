@@ -3,11 +3,6 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 </script>
 <template>
-  <nav class="workflow-actions wordlist-navigation" aria-label="词库管理导航">
-    <RouterLink :to="{ name: 'wordlist-builtin' }">内置词库</RouterLink>
-    <RouterLink :to="{ name: 'wordlist-list' }">自定义词库</RouterLink>
-    <RouterLink :to="{ name: 'wordlist-history' }">发布记录</RouterLink>
-  </nav>
   <RouterView :key="route.path" />
 </template>
 

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import './dictionary-management.css'
 import { onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
@@ -14,6 +17,8 @@ const draft = ref<ReportTypeItem | null>(null)
 const creating = ref(false)
 const busy = ref(false)
 const uncertain = ref(false)
+const inlineAction = ref(false)
+let originalDraft = ''
 const error = ref('')
 const errorRevision = ref(0)
 const notice = ref('')
@@ -21,6 +26,8 @@ let attempt: { item: ReportTypeItem; version: number; key: string } | null = nul
 const workspace = useAdminWorkspace(() => {
   snapshot.value = { version: 0, items: [] }
   draft.value = null
+  originalDraft = JSON.stringify(draft.value)
+  inlineAction.value = false
   attempt = null
   error.value = ''
   notice.value = ''
@@ -28,7 +35,7 @@ const workspace = useAdminWorkspace(() => {
   uncertain.value = false
 }, 'super_admin')
 async function load(manual = false) {
-  if (busy.value) return
+  if (busy.value || (manual && uncertain.value)) return
   busy.value = true
   error.value = ''
   notice.value = ''
@@ -55,9 +62,19 @@ function edit(item?: ReportTypeItem) {
   if (busy.value || uncertain.value || snapshot.value.version < 1) return
   creating.value = !item
   draft.value = item ? { ...item } : { code: '', label: '', published: false }
+  originalDraft = JSON.stringify(draft.value)
+  inlineAction.value = false
   attempt = null
   error.value = ''
   notice.value = ''
+}
+async function toggleState(item: ReportTypeItem) {
+  if (busy.value || uncertain.value || draft.value) return
+  edit(item)
+  draft.value = { ...item, published: !item.published }
+  inlineAction.value = true
+  await save()
+  if (!uncertain.value) draft.value = null
 }
 async function save() {
   const item = draft.value
@@ -115,68 +132,124 @@ async function save() {
     },
   )
 }
+onBeforeRouteLeave(
+  async () =>
+    !busy.value &&
+    !uncertain.value &&
+    (!draft.value ||
+      inlineAction.value ||
+      JSON.stringify(draft.value) === originalDraft ||
+      (await confirmDiscardChanges('离开将放弃尚未保存的配置。'))),
+)
 onMounted(() => {
   void load()
 })
 </script>
 <template>
-  <main class="panel workflow" aria-label="举报类型管理">
-    <h1>举报类型管理</h1>
-    <RouterLink to="/dictionaries">管理展示字典</RouterLink>
-    <p>新增类型默认未发布。已使用的代码不能改名或删除；停用仅停止新举报选择，保留历史记录。</p>
-    <BusinessToolbar label="举报类型操作"
-      ><button :disabled="busy" @click="load(true)">刷新类型</button>
-      <button :disabled="busy || uncertain || snapshot.version < 1" @click="edit()">
-        新增类型
-      </button></BusinessToolbar
+  <main class="experience-page" aria-label="举报类型管理">
+    <WorkspaceHeading
+      title="举报类型"
+      description="新增类型默认未发布；已使用代码保持稳定，停用保留历史记录。"
     >
-    <FloatingNotice v-if="busy" message="正在处理举报类型…" tone="pending" />
-    <FloatingNotice v-if="error" :message="error" :revision="errorRevision" tone="error" />
-    <FloatingNotice v-if="notice" :message="notice" tone="success" />
-    <div class="business-table dictionary-table" tabindex="0" aria-label="可横向滚动的字典列表">
-      <table>
-        <thead>
-          <tr>
-            <th>代码</th>
-            <th>名称</th>
-            <th>发布状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in snapshot.items" :key="item.code">
-            <td>{{ item.code }}</td>
-            <td>{{ item.label }}</td>
-            <td>{{ item.published ? '已发布' : '未发布' }}</td>
-            <td><button :disabled="busy || uncertain" @click="edit(item)">编辑</button></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <form v-if="draft" class="business-card dictionary-editor" @submit.prevent="save">
-      <h2>{{ creating ? '新增举报类型' : '编辑举报类型' }}</h2>
-      <label
-        >代码<input
-          v-model="draft.code"
-          required
-          maxlength="32"
-          :disabled="!creating || busy || uncertain"
-      /></label>
-      <label
-        >名称<input v-model="draft.label" required maxlength="80" :disabled="busy || uncertain"
-      /></label>
-      <label class="dictionary-toggle"
-        ><input
-          v-model="draft.published"
-          type="checkbox"
-          :disabled="busy || uncertain"
-        />发布供用户选择</label
+      <button
+        class="business-primary"
+        :disabled="busy || uncertain || snapshot.version < 1"
+        @click="edit()"
       >
-      <div class="business-dialog-actions">
-        <button :disabled="busy">{{ busy ? '正在保存…' : uncertain ? '原样重试' : '保存' }}</button>
-        <button type="button" :disabled="busy || uncertain" @click="draft = null">取消</button>
+        新增类型
+      </button>
+    </WorkspaceHeading>
+    <section class="experience-panel experience-table-panel">
+      <div class="experience-toolbar">
+        <button :disabled="busy || uncertain" @click="load(true)">刷新类型</button
+        ><RouterLink to="/dictionaries">管理展示字典</RouterLink
+        ><span class="experience-muted">当前版本：{{ snapshot.version }}</span>
       </div>
-      <p v-if="error">{{ error }}</p>
-    </form>
+      <FloatingNotice v-if="busy" message="正在处理举报类型…" tone="pending" />
+      <FloatingNotice v-if="error" :message="error" :revision="errorRevision" tone="error" />
+      <FloatingNotice v-if="notice" :message="notice" tone="success" />
+      <div class="business-table dictionary-table" tabindex="0" aria-label="可横向滚动的字典列表">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>发布状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in snapshot.items" :key="item.code">
+              <td>{{ item.code }}</td>
+              <td>{{ item.label }}</td>
+              <td>
+                <button
+                  class="inline-switch"
+                  role="switch"
+                  :aria-checked="item.published"
+                  :aria-label="`发布 ${item.label}`"
+                  :disabled="busy || uncertain || !!draft"
+                  @click="toggleState(item)"
+                >
+                  <span aria-hidden="true"></span></button
+                ><span>{{ item.published ? '已发布' : '未发布' }}</span>
+              </td>
+              <td><button :disabled="busy || uncertain" @click="edit(item)">编辑</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section
+      v-if="inlineAction && uncertain"
+      class="experience-panel"
+      aria-label="待核实的状态切换"
+    >
+      <p>状态切换结果尚未确认，请使用原请求核实。</p>
+      <button :disabled="busy" @click="save">原样重试</button>
+    </section>
+    <WorkspaceDrawer
+      :guard-route="false"
+      presentation="dialog"
+      :open="!!draft && !inlineAction"
+      :dirty="!!draft && JSON.stringify(draft) !== originalDraft"
+      :title="creating ? '新增举报类型' : '编辑举报类型'"
+      :busy="busy || uncertain"
+      @close="draft = null"
+    >
+      <p v-if="uncertain" class="experience-inline-error">
+        保存结果尚未确认，请保持原请求重试，取得明确结果后再关闭或离开。
+      </p>
+      <form v-if="draft" id="dictionary-editor" class="experience-editor" @submit.prevent="save">
+        <label
+          >代码<input
+            v-model="draft.code"
+            required
+            maxlength="32"
+            :disabled="!creating || busy || uncertain"
+        /></label>
+        <label
+          >名称<input v-model="draft.label" required maxlength="80" :disabled="busy || uncertain"
+        /></label>
+        <label class="dictionary-toggle"
+          ><input
+            v-model="draft.published"
+            type="checkbox"
+            :disabled="busy || uncertain"
+          />发布供用户选择</label
+        >
+        <p v-if="error">{{ error }}</p>
+      </form>
+      <template #footer
+        ><div class="drawer-actions">
+          <button data-overlay-close :disabled="busy || uncertain" @click="draft = null">
+            取消
+          </button>
+          <button class="business-primary" form="dictionary-editor" type="submit" :disabled="busy">
+            {{ busy ? '正在保存…' : uncertain ? '原样重试' : '保存' }}
+          </button>
+        </div></template
+      >
+    </WorkspaceDrawer>
   </main>
 </template>

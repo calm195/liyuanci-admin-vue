@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { useDictionariesStore } from '@/stores/dictionaries'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import { createAccountsClient } from '@/services/accounts'
@@ -31,6 +31,15 @@ const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 const confirming = ref(false)
+const uncertain = ref(false)
+const formDirty = computed(
+  () =>
+    editorOpen.value &&
+    (!!loginName.value ||
+      !!reason.value ||
+      JSON.stringify([...selectedRoles.value].sort()) !==
+        JSON.stringify([...(selected.value?.roles ?? [])].sort())),
+)
 let attempt: { fingerprint: string; key: string } | null = null
 const dictionaries = useDictionariesStore()
 function resetForm() {
@@ -41,6 +50,7 @@ function resetForm() {
   reason.value = ''
   confirming.value = false
   attempt = null
+  uncertain.value = false
 }
 function clear() {
   items.value = []
@@ -71,19 +81,18 @@ watch(
   { deep: true },
 )
 function create() {
-  if (!canOperate()) return
+  if (!canOperate() || uncertain.value) return
   resetForm()
   editorOpen.value = true
   error.value = ''
   notice.value = ''
 }
-function closeEditor(done: () => void) {
-  if (busy.value) return
+function closeEditor() {
+  if (busy.value || uncertain.value) return
   resetForm()
-  done()
 }
 function edit(account: AdminAccount) {
-  if (!canOperate()) return
+  if (!canOperate() || uncertain.value) return
   resetForm()
   selected.value = { ...account, roles: [...account.roles] }
   selectedRoles.value = [...account.roles]
@@ -92,7 +101,7 @@ function edit(account: AdminAccount) {
   notice.value = ''
 }
 async function load(target: string | null = null, previous: (string | null)[] = []) {
-  if (!canOperate()) return
+  if (!canOperate() || uncertain.value) return
   busy.value = true
   error.value = ''
   resetForm()
@@ -162,7 +171,12 @@ async function submit() {
       refresh = true
     },
     (cause) => {
-      confirming.value = false
+      uncertain.value = !(
+        cause instanceof ApiError &&
+        cause.status < 500 &&
+        ![408, 429].includes(cause.status)
+      )
+      confirming.value = uncertain.value
       if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) {
         error.value =
           '账号版本、状态或操作标识发生冲突；请核对刷新后的列表，重新选择目标并确认，不会自动重试'
@@ -194,6 +208,12 @@ async function submit() {
     }
   }
 }
+onBeforeRouteLeave(
+  async () =>
+    !busy.value &&
+    !uncertain.value &&
+    (!formDirty.value || (await confirmDiscardChanges('离开将放弃尚未保存的账号修改。'))),
+)
 onMounted(() => {
   void load()
 })
@@ -207,26 +227,29 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="后台账号管理">
-    <p>仅超级管理员可创建后台账号或完整替换角色。空角色账号仍可登录和本人改密。</p>
+  <main class="experience-page" aria-label="后台账号管理">
+    <WorkspaceHeading
+      title="后台账号"
+      description="创建后台账号或完整替换角色；空角色账号仍可登录和本人改密。"
+      ><button class="business-primary" :disabled="busy || editorOpen" @click="create">
+        创建后台账号
+      </button></WorkspaceHeading
+    >
     <template v-if="workspace.allowed()">
-      <p class="banner">每次请求由服务端核验当前超管权限。</p>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-      <section aria-labelledby="accounts-title" :aria-busy="busy">
-        <BusinessToolbar label="账号操作栏">
-          <h2 id="accounts-title">后台账号列表</h2>
-          <button class="business-primary" :disabled="busy || editorOpen" @click="create">
-            创建后台账号
-          </button>
-          <template #tools>
-            <button :disabled="busy || editorOpen" @click="runRead(() => load(), '查询已完成')">
-              从首页刷新
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-label="后台账号列表"
+        :aria-busy="busy"
+      >
+        <div class="experience-toolbar">
+          <button :disabled="busy || editorOpen" @click="runRead(() => load(), '查询已完成')">
+            从首页刷新</button
+          ><span class="experience-muted">账号、角色与当前版本</span>
+        </div>
         <p v-if="busy" role="status">正在处理…</p>
-        <p v-else-if="!items.length">暂无后台账号</p>
+        <p v-else-if="!items.length" class="experience-empty">暂无后台账号</p>
         <div v-if="items.length" class="business-table">
           <table>
             <caption>
@@ -278,42 +301,42 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             下一页
           </button>
         </div>
-        <p>列表随账号变化更新；新建后从首页重新读取，不视为冻结快照。</p>
+        <p class="experience-inline-notice experience-muted">
+          列表随账号变化更新；新建后从首页重新读取。
+        </p>
       </section>
-      <ElDialog
-        v-if="editorOpen"
-        v-model="editorOpen"
+      <WorkspaceDrawer
+        :guard-route="false"
+        presentation="dialog"
+        :open="editorOpen"
+        :dirty="formDirty"
         :title="selected ? '修改账号角色' : '创建后台账号'"
-        class="business-dialog"
-        width="min(36rem, calc(100vw - 2rem))"
-        top="2rem"
-        :before-close="closeEditor"
-        :close-on-click-modal="false"
-        :show-close="!busy"
+        :busy="busy || uncertain"
+        @close="closeEditor"
       >
-        <section aria-labelledby="account-form-title">
+        <section aria-label="账号操作表单">
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-          <h2 id="account-form-title">{{ selected ? '修改账号角色' : '创建后台账号' }}</h2>
-          <button :disabled="busy" @click="resetForm">取消并关闭</button>
+          <p v-if="uncertain" class="experience-inline-error">
+            提交结果尚未确认，表单已锁定；请原样重试取得回执。
+          </p>
           <p v-if="selected">
             目标：{{ selected.login_name }} · 版本 {{ selected.version }}；账号名不能在此修改。
           </p>
           <p v-else>初始口令由服务端仓库外策略提供，此页面不设置或显示口令。</p>
-          <form @submit.prevent="confirm">
+          <form id="account-editor" class="experience-editor" @submit.prevent="confirm">
             <fieldset :disabled="busy || confirming">
               <legend>{{ selected ? '完整替换角色' : '新账号资料' }}</legend>
               <template v-if="!selected"
                 ><label for="account-login">后台账号名</label
                 ><input id="account-login" v-model="loginName" autocomplete="off" required
               /></template>
-              <label v-for="role in roles" :key="role"
+              <label v-for="role in roles" :key="role" class="experience-toggle"
                 ><input v-model="selectedRoles" type="checkbox" :value="role" />{{
                   dictionaries.label('admin_role', role)
                 }}</label
               >
               <label for="account-reason">{{ selected ? '角色修改理由' : '创建理由' }}</label>
               <textarea id="account-reason" v-model="reason" required />
-              <button :disabled="!valid">核对并继续</button>
             </fieldset>
           </form>
           <section v-if="confirming" aria-label="确认账号操作">
@@ -329,11 +352,31 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             <p v-if="selected?.id === owner?.account.id">
               正在修改本人角色；移除超管后将立即离开账号管理。
             </p>
-            <button :disabled="busy" @click="submit">确认提交</button>
-            <button :disabled="busy" @click="confirming = false">返回修改</button>
           </section>
         </section>
-      </ElDialog>
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close :disabled="busy || uncertain" @click="closeEditor">
+              取消并关闭
+            </button>
+            <button v-if="confirming" :disabled="busy || uncertain" @click="confirming = false">
+              返回修改
+            </button>
+            <button v-if="confirming" class="business-primary" :disabled="busy" @click="submit">
+              {{ uncertain ? '原样重试' : '确认提交' }}
+            </button>
+            <button
+              v-else
+              class="business-primary"
+              type="submit"
+              form="account-editor"
+              :disabled="busy || !valid"
+            >
+              核对并继续
+            </button>
+          </div></template
+        >
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

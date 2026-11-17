@@ -5,6 +5,7 @@ import type { WordlistConfirmation, WordlistKind } from '@/types/wordlists'
 defineProps<{
   confirmation: WordlistConfirmation
   writing: boolean
+  uncertain?: boolean
   labels: Record<WordlistKind, string>
 }>()
 defineEmits<{ submit: []; cancel: [] }>()
@@ -68,8 +69,8 @@ defineEmits<{ submit: []; cancel: [] }>()
       :disabled="writing"
     />
     <button :disabled="writing" @click="$emit('submit')">
-      {{ writing ? '正在提交…' : '确认提交' }}
+      {{ writing ? '正在提交…' : uncertain ? '原样重试' : '确认提交' }}
     </button>
-    <button :disabled="writing" @click="$emit('cancel')">返回修改</button>
+    <button :disabled="writing || uncertain" @click="$emit('cancel')">返回修改</button>
   </section>
 </template>

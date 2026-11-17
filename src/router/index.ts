@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteLocation } from 'vue-router'
 import { useUserNavigation } from '@/stores/userNavigation'
 import { useAdminStore } from '@/stores/admin'
 import { isRole } from '@/types/admin'
@@ -161,15 +162,15 @@ export const router = createRouter({
         {
           path: 'drafts/new',
           name: 'wordlist-draft',
-          component: () => import('@/views/WordlistDraftView.vue'),
-          meta: { title: '创建词单草稿', parentTitle: '词库管理', parentPath: '/wordlists' },
+          redirect: { name: 'wordlist-list' },
         },
         {
           path: ':id',
           name: 'wordlist-detail',
-          props: true,
-          component: () => import('@/views/WordlistDetailView.vue'),
-          meta: { title: '词单详情', parentTitle: '词库管理', parentPath: '/wordlists' },
+          redirect: (to: RouteLocation) => ({
+            name: 'wordlist-list',
+            query: { version: to.params['id'] },
+          }),
         },
       ],
     },

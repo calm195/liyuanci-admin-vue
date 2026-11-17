@@ -1,16 +1,21 @@
 <script setup lang="ts">
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import LocalPagination from '@/components/LocalPagination.vue'
 import { useLocalPagination } from '@/composables/useLocalPagination'
 import { computed, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRoute } from 'vue-router'
+import WordlistRulesEditor from '@/components/WordlistRulesEditor.vue'
+import BuiltinWordlistEntries from '@/components/BuiltinWordlistEntries.vue'
+import { wordlistRuleCategories } from '@/types/wordlists'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import WordlistPreview from '@/components/WordlistPreview.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { useWordlists } from '@/composables/useWordlists'
-import type { CustomWordlistKind } from '@/types/wordlists'
+import type { CustomWordlistKind, WordlistRule } from '@/types/wordlists'
 
 type Entry = { text: string; enabled: boolean }
 type Dialog =
@@ -21,6 +26,7 @@ type Dialog =
 const {
   busy,
   writing,
+  uncertain,
   error,
   notice,
   workspace,
@@ -36,19 +42,24 @@ const {
   status,
   confirmation,
   publish,
+  prepareRestore,
   submit,
   canPublish,
   openDetail,
   base,
 } = useWordlists(undefined, false)
 
+const route = useRoute()
+const editing = ref(false)
+const editRules = ref<WordlistRule[]>([])
+const editSnapshot = ref('')
 const dialog = ref<Dialog | null>(null)
 const staged = ref<{ entries: Entry[]; headVersion: number; stale: boolean } | null>(null)
 const keyword = ref('')
 const editorText = ref('')
 const editorError = ref('')
 const selectedId = ref<string | null>(null)
-const locked = computed(() => busy.value || writing.value)
+const locked = computed(() => busy.value || writing.value || uncertain.value)
 const rows = computed<Entry[]>(() => {
   if (staged.value) return staged.value.entries
   const disabled = new Set(detail.value?.disabled_entries)
@@ -71,15 +82,50 @@ const conflicted = computed(
     staged.value !== null &&
     (staged.value.stale || staged.value.headVersion !== base.value?.version),
 )
-const editable = computed(() => {
-  if (!loaded.value || locked.value || detailBusy.value || !base.value || conflicted.value)
+const canEdit = computed(() => {
+  if (
+    !loaded.value ||
+    locked.value ||
+    detailBusy.value ||
+    !base.value ||
+    conflicted.value ||
+    kind.value === 'builtin'
+  )
     return false
   if (staged.value) return true
   if (!detail.value) return base.value.effective_id === null && selectedId.value === null
   return detail.value.id === base.value.effective_id || canPublish(detail.value)
 })
+const editable = computed(() => editing.value && canEdit.value)
+const unsaved = computed(
+  () =>
+    editing.value &&
+    JSON.stringify({ entries: rows.value, rules: editRules.value }) !== editSnapshot.value,
+)
+function beginEdit() {
+  if (!canEdit.value || !base.value) return
+  const entries = rows.value.map((entry) => ({ ...entry }))
+  editRules.value = (detail.value?.rules ?? []).map((rule) => ({
+    ...rule,
+    aliases: [...rule.aliases],
+  }))
+  editSnapshot.value = JSON.stringify({ entries, rules: editRules.value })
+  staged.value = { entries, headVersion: base.value.version, stale: false }
+  editing.value = true
+}
+async function cancelEdit() {
+  const id = selectedId.value ?? base.value?.effective_id ?? null
+  await changeContext(async () => {
+    await readVersion(id)
+  })
+}
 const dialogTitle = computed(() => {
-  if (confirmation.value) return 'entries' in confirmation.value ? '保存词库草稿' : '发布词库草稿'
+  if (confirmation.value)
+    return 'entries' in confirmation.value
+      ? '保存词库草稿'
+      : 'restore' in confirmation.value
+        ? '恢复历史版本'
+        : '发布词库草稿'
   if (!dialog.value) return ''
   return {
     add: '新增词条',
@@ -92,6 +138,9 @@ const dialogTitle = computed(() => {
   }[dialog.value.mode]
 })
 function clearEditor() {
+  editing.value = false
+  editRules.value = []
+  editSnapshot.value = ''
   dialog.value = null
   staged.value = null
   editorText.value = ''
@@ -110,19 +159,25 @@ watch(
 async function readVersion(id: string | null) {
   selectedId.value = id
   await openDetail(id)
+  if (detail.value) kind.value = detail.value.kind
 }
 async function refresh() {
   clearEditor()
   await load()
-  if (loaded.value) await readVersion(base.value?.effective_id ?? null)
+  if (loaded.value)
+    await readVersion(
+      typeof route.query['version'] === 'string'
+        ? route.query['version']
+        : (base.value?.effective_id ?? null),
+    )
 }
 async function changeContext(action: () => Promise<void>) {
   if (locked.value) return
-  if (staged.value) {
+  if (unsaved.value) {
     dialog.value = { mode: 'discard', action }
     return
   }
-  dialog.value = null
+  clearEditor()
   await action()
 }
 async function discard() {
@@ -200,12 +255,17 @@ function applyEditor() {
     editorError.value = '词条已存在'
     return
   }
+  if (previous && text !== previous.text)
+    editRules.value = editRules.value.map((rule) =>
+      rule.entry === previous.text ? { ...rule, entry: text } : rule,
+    )
   if (previous)
     stage(rows.value.map((entry) => (entry.text === previous.text ? { ...entry, text } : entry)))
   else stage([...rows.value, { text, enabled: true }])
   closeDialog()
 }
 function deleteEntry(entry: Entry) {
+  editRules.value = editRules.value.filter((rule) => rule.entry !== entry.text)
   stage(rows.value.filter((item) => item.text !== entry.text))
   closeDialog()
 }
@@ -216,6 +276,20 @@ function toggle(entry: Entry) {
     ),
   )
 }
+function replaceEntries(event: Event) {
+  if (!(event.target instanceof HTMLTextAreaElement) || !editable.value) return
+  const texts = [
+    ...new Set(
+      event.target.value
+        .split(/\r?\n/u)
+        .map((text) => text.trim())
+        .filter(Boolean),
+    ),
+  ]
+  const previous = new Map(rows.value.map((entry) => [entry.text, entry.enabled]))
+  stage(texts.map((text) => ({ text, enabled: previous.get(text) ?? true })))
+  editRules.value = editRules.value.filter((rule) => texts.includes(rule.entry))
+}
 function prepareSave() {
   const changes = staged.value
   if (!editable.value || !changes || kind.value === 'builtin') return
@@ -223,22 +297,24 @@ function prepareSave() {
     kind: kind.value,
     entries: changes.entries.map((entry) => entry.text),
     disabled_entries: changes.entries.filter((entry) => !entry.enabled).map((entry) => entry.text),
+    rules: editRules.value.map((rule) => ({ ...rule, aliases: [...rule.aliases] })),
     expected_version: changes.headVersion,
   }
 }
 function closeDialog() {
-  if (writing.value) return
+  if (writing.value || uncertain.value) return
   dialog.value = null
   confirmation.value = null
   editorText.value = ''
   editorError.value = ''
 }
 async function confirmWrite() {
-  if (!confirmation.value || locked.value) return
+  if (!confirmation.value || busy.value || writing.value) return
   await submit()
   if (!workspace.allowed()) return
   if (resultId.value && notice.value) {
     staged.value = null
+    editing.value = false
     if (loaded.value) await readVersion(resultId.value)
   } else if (!confirmation.value) {
     // 冲突后保留待编辑词条，并禁止基于原快照再次提交。
@@ -250,30 +326,40 @@ async function confirmWrite() {
     }
   }
 }
-onBeforeRouteLeave(() => {
+onBeforeRouteLeave(async () => {
   const current = dialog.value
   const previous = current?.mode === 'edit' ? current.entry.text : ''
   const editing = current?.mode === 'add' || current?.mode === 'edit' || current?.mode === 'import'
   return (
     !writing.value &&
-    ((!staged.value && (!editing || editorText.value === previous)) ||
-      globalThis.confirm('放弃尚未保存的自定义词库调整？'))
+    !uncertain.value &&
+    ((!unsaved.value && (!editing || editorText.value === previous)) ||
+      (await confirmDiscardChanges('离开将放弃尚未保存的词库调整。')))
   )
 })
+watch(
+  () => route.query['version'],
+  () => {
+    void changeContext(refresh)
+  },
+)
 onMounted(() => {
   void refresh()
 })
 </script>
 
 <template>
-  <main class="panel workflow" aria-label="词库管理">
+  <main class="experience-page workflow wordlist-workspace" aria-label="词库管理">
+    <WorkspaceHeading
+      title="词库管理"
+      description="编辑完整词条快照，试跑并核对后发布；历史命中依据保持原版本。"
+    />
     <template v-if="workspace.allowed()">
-      <p>词条修改保存为草稿，发布后用于新扫描和正常重提。</p>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在读取词库版本…</p>
       <div class="workflow-grid wordlist-grid">
-        <section class="business-card" aria-labelledby="wordlist-choices">
+        <section class="experience-panel wordlist-kinds" aria-labelledby="wordlist-choices">
           <h2 id="wordlist-choices">选择词库</h2>
           <div class="business-table">
             <table>
@@ -305,11 +391,25 @@ onMounted(() => {
             </table>
           </div>
         </section>
-        <section class="business-card" aria-labelledby="wordlist-detail" :aria-busy="detailBusy">
+        <section
+          class="experience-panel"
+          :aria-label="detail && !editing ? '词库只读详情' : '词库词单'"
+          aria-labelledby="wordlist-detail"
+          :aria-busy="detailBusy"
+        >
           <h2 id="wordlist-detail">{{ labels[kind] }}词库详情</h2>
           <p v-if="detail">{{ status(detail.status) }} · 资源版本 {{ detail.version }}</p>
+          <p class="experience-muted">
+            分类创建基准：{{ base?.version ?? '未读取' }}；发布仅影响后续扫描，不自动全量重扫历史。
+          </p>
+          <p v-if="detail?.status === 'draft' && !canPublish(detail)">
+            创建基准已被替代，请基于当前生效版创建新快照。
+          </p>
           <p v-if="detailBusy" role="status">正在读取词条…</p>
-          <p v-if="staged">有未保存的词条修改。</p>
+          <p v-if="unsaved">有未保存的词条修改。</p>
+          <p v-if="uncertain" role="alert">
+            提交结果尚未确认，请保留原请求核实，不能另建或放弃操作。
+          </p>
           <p v-if="conflicted" role="alert">
             词库基准已变化，请查看当前词库并核对保留的修改。刷新后可基于最新版本重新编辑。
           </p>
@@ -322,13 +422,30 @@ onMounted(() => {
             </ul>
             <p v-if="!detail.entries.length">当前生效版为空。</p>
           </details>
-          <div class="business-filters">
+          <div class="experience-filters">
             <label
               >搜索词条 <input v-model="keyword" type="search" placeholder="输入词条关键词"
             /></label>
           </div>
           <BusinessToolbar label="词条操作栏">
             <button
+              v-if="!editing && kind !== 'builtin'"
+              class="business-primary"
+              :disabled="!canEdit"
+              @click="beginEdit"
+            >
+              编辑词单
+            </button>
+            <button v-if="editing" :disabled="locked" @click="cancelEdit">取消编辑</button>
+            <button
+              v-if="detail?.status === 'archived'"
+              :disabled="locked || editing"
+              @click="prepareRestore(detail)"
+            >
+              恢复为草稿
+            </button>
+            <button
+              v-if="editing"
               class="business-primary"
               type="button"
               :disabled="!editable"
@@ -336,15 +453,22 @@ onMounted(() => {
             >
               新增词条
             </button>
-            <button type="button" :disabled="!editable" @click="openImport">批量导入</button>
-            <button v-if="staged" type="button" :disabled="!editable" @click="prepareSave">
+            <button v-if="editing" type="button" :disabled="!editable" @click="openImport">
+              批量导入
+            </button>
+            <button
+              v-if="editing"
+              type="button"
+              :disabled="!editable || (!unsaved && !!detail)"
+              @click="prepareSave"
+            >
               保存草稿
             </button>
             <button
               v-if="detail && canPublish(detail)"
               class="business-primary"
               type="button"
-              :disabled="locked || !!staged"
+              :disabled="locked || editing"
               @click="publish(detail)"
             >
               发布草稿
@@ -363,7 +487,13 @@ onMounted(() => {
             </template>
           </BusinessToolbar>
           <p v-if="loaded && !detailBusy && !visibleRows.length && !error">暂无匹配词条</p>
-          <div class="business-table">
+          <BuiltinWordlistEntries
+            v-if="detail?.kind === 'builtin'"
+            :id="detail.id"
+            :key="detail.id"
+            :locked="locked"
+          />
+          <div v-else class="business-table">
             <table>
               <caption>
                 词条明细
@@ -381,6 +511,7 @@ onMounted(() => {
                   <td>
                     <div class="wordlist-state">
                       <button
+                        v-if="editing"
                         class="wordlist-switch"
                         type="button"
                         role="switch"
@@ -401,10 +532,16 @@ onMounted(() => {
                       >
                         查看
                       </button>
-                      <button type="button" :disabled="!editable" @click="openEditor(entry)">
+                      <button
+                        v-if="editing"
+                        type="button"
+                        :disabled="!editable"
+                        @click="openEditor(entry)"
+                      >
                         编辑
                       </button>
                       <button
+                        v-if="editing"
                         type="button"
                         :disabled="!editable"
                         class="business-danger"
@@ -418,7 +555,40 @@ onMounted(() => {
               </tbody>
             </table>
           </div>
+          <details v-if="editing">
+            <summary>批量编辑完整词条</summary>
+            <form id="wordlist-workspace-editor" @submit.prevent="prepareSave">
+              <label for="wordlist-entries">完整词条，每行一条；空输入表示空版本</label
+              ><textarea
+                id="wordlist-entries"
+                :value="rows.map((entry) => entry.text).join('\n')"
+                :disabled="!editable"
+                rows="8"
+                @input="replaceEntries"
+              />
+            </form>
+          </details>
+          <details v-if="editing" class="wordlist-rules">
+            <summary>高级匹配与处置规则</summary>
+            <fieldset :disabled="locked || conflicted">
+              <WordlistRulesEditor
+                v-model="editRules"
+                :allow-hints="kind === 'ordinary_violation'"
+              />
+            </fieldset>
+          </details>
+          <section v-else-if="detail?.rules?.length" aria-label="当前词条规则">
+            <h3>匹配与处置</h3>
+            <p v-for="rule in detail.rules" :key="rule.entry">
+              {{ rule.entry }} ·
+              {{ wordlistRuleCategories[rule.category] ?? (rule.category || '未分类') }} ·
+              {{ rule.match_mode === 'word' ? '完整词匹配' : '包含匹配' }} ·
+              {{ rule.action === 'hint' ? '提示' : '人工复核' }} · 变体
+              {{ rule.aliases.join('、') || '无' }}
+            </p>
+          </section>
           <LocalPagination
+            v-if="kind !== 'builtin'"
             v-model:page="page"
             v-model:size="pageSize"
             :pages="pages"
@@ -433,8 +603,8 @@ onMounted(() => {
         width="min(42rem, calc(100vw - 2rem))"
         top="2rem"
         :close-on-click-modal="false"
-        :close-on-press-escape="!writing"
-        :show-close="!writing"
+        :close-on-press-escape="!writing && !uncertain"
+        :show-close="!writing && !uncertain"
         @update:model-value="
           (open) => {
             if (!open) closeDialog()
@@ -444,12 +614,19 @@ onMounted(() => {
         <template v-if="confirmation">
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <p v-if="'entries' in confirmation">
-            共 {{ confirmation.entries.length }} 条词条，{{
+            完整词条 {{ confirmation.entries.length }} 条，{{
               confirmation.disabled_entries?.length ?? 0
             }}
             条停用。保存草稿后可另行发布。
           </p>
+          <p v-else-if="'restore' in confirmation">
+            将此归档版本复制为新草稿，当前生效版继续使用，核对后另行发布。
+          </p>
           <template v-else-if="'item' in confirmation">
+            <p>
+              草稿资源版本 {{ confirmation.input.expected_version }} · 分类基准
+              {{ confirmation.input.expected_head_version }}
+            </p>
             <p>发布将替换{{ labels[kind] }}词库的生效版本，已完成扫描的案件保留原词库快照。</p>
             <WordlistPreview
               :id="confirmation.item.id"
@@ -539,7 +716,9 @@ onMounted(() => {
         </template>
         <template #footer>
           <div class="business-dialog-actions">
-            <button type="button" :disabled="writing" @click="closeDialog">关闭</button>
+            <button type="button" :disabled="writing || uncertain" @click="closeDialog">
+              关闭
+            </button>
             <button
               v-if="confirmation"
               class="business-primary"
@@ -547,7 +726,7 @@ onMounted(() => {
               :disabled="writing"
               @click="confirmWrite"
             >
-              {{ writing ? '正在提交…' : '确认提交' }}
+              {{ writing ? '正在提交…' : uncertain ? '原样重试' : '确认提交' }}
             </button>
             <button
               v-else-if="dialog?.mode === 'add' || dialog?.mode === 'edit'"
@@ -591,7 +770,9 @@ onMounted(() => {
 
 <style scoped>
 .wordlist-grid {
-  grid-template-columns: minmax(12rem, 4fr) minmax(0, 7fr);
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  margin: 0;
   align-items: start;
 }
 .wordlist-grid th button[aria-pressed] {
@@ -640,5 +821,19 @@ button.wordlist-switch[aria-checked='true'] {
   .wordlist-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+</style>
+
+<style scoped>
+.wordlist-kinds .business-table table {
+  min-width: 0;
+}
+.wordlist-kinds .business-table :is(th, td) {
+  padding-inline: 12px;
+}
+.experience-panel > h2 {
+  margin: 0 0 20px;
+  font-size: 16px;
+  line-height: 24px;
 }
 </style>

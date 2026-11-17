@@ -12,7 +12,8 @@ const admin = useAdminStore()
 const route = useRoute()
 const router = useRouter()
 const menuOpen = ref(false)
-const expandedGroup = ref<string | null>(null)
+const expandedGroups = ref(new Set<string>())
+const expandedLeaves = ref(new Set<string>())
 const error = ref('')
 const visibleGroups = computed(() => {
   const visible = menu.filter(canAccessMenu)
@@ -33,16 +34,21 @@ const visibleGroups = computed(() => {
     }))
 })
 function toggleGroup(title: string) {
-  expandedGroup.value = expandedGroup.value === title ? null : title
+  if (expandedGroups.value.has(title)) expandedGroups.value.delete(title)
+  else expandedGroups.value.add(title)
 }
+function toggleLeaf(path: string) {
+  if (expandedLeaves.value.has(path)) expandedLeaves.value.delete(path)
+  else expandedLeaves.value.add(path)
+}
+const wordlistChildren = [
+  { path: '/wordlists/builtin', title: '内置词库' },
+  { path: '/wordlists/history', title: '发布记录' },
+]
 watch(
   () => route.path,
   () => {
     menuOpen.value = false
-    const current = visibleGroups.value.find((group) =>
-      group.items.some(({ path }) => route.path === path || route.path.startsWith(path + '/')),
-    )
-    expandedGroup.value = current?.title ?? null
   },
   { immediate: true },
 )
@@ -76,17 +82,40 @@ async function logout() {
               class="navigation-group-toggle"
               type="button"
               :aria-controls="`navigation-group-${index}`"
-              :aria-expanded="expandedGroup === group.title"
+              :aria-expanded="expandedGroups.has(group.title)"
               @click="toggleGroup(group.title)"
             >
               {{ group.title }}
-              <span aria-hidden="true">{{ expandedGroup === group.title ? '▾' : '▸' }}</span>
+              <span aria-hidden="true">{{ expandedGroups.has(group.title) ? '▾' : '▸' }}</span>
             </button>
           </h2>
-          <div :id="`navigation-group-${index}`" :hidden="expandedGroup !== group.title">
-            <RouterLink v-for="item in group.items" :key="item.path" :to="item.path">
-              {{ item.title }}
-            </RouterLink>
+          <div :id="`navigation-group-${index}`" :hidden="!expandedGroups.has(group.title)">
+            <div v-for="item in group.items" :key="item.path" class="navigation-entry">
+              <div class="navigation-entry-heading">
+                <RouterLink :to="item.path">{{ item.title }}</RouterLink>
+                <button
+                  v-if="item.path === '/wordlists'"
+                  type="button"
+                  class="navigation-leaf-toggle"
+                  aria-label="展开或收起词库子菜单"
+                  aria-controls="wordlist-submenu"
+                  :aria-expanded="expandedLeaves.has(item.path)"
+                  @click="toggleLeaf(item.path)"
+                >
+                  <span aria-hidden="true">{{ expandedLeaves.has(item.path) ? '▾' : '▸' }}</span>
+                </button>
+              </div>
+              <div
+                v-if="item.path === '/wordlists'"
+                id="wordlist-submenu"
+                class="navigation-submenu"
+                :hidden="!expandedLeaves.has(item.path)"
+              >
+                <RouterLink v-for="child in wordlistChildren" :key="child.path" :to="child.path">{{
+                  child.title
+                }}</RouterLink>
+              </div>
+            </div>
           </div>
         </section>
       </nav>
