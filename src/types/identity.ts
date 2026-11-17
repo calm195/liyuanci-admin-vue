@@ -10,6 +10,17 @@ export interface IdentityListItem {
   student_number: string
   status: 'pending' | 'approved' | 'rejected'
   reviewed_at: string | null
+  created_at?: string
+}
+export interface IdentityHistory extends IdentitySummary {
+  status: 'approved' | 'rejected'
+  name: string
+  student_number: string
+  created_at: string
+  reviewed_at: string | null
+  reviewer_id: string | null
+  reason: string | null
+  revision_suggestion: string | null
 }
 export interface IdentityPage {
   items: IdentityListItem[]
@@ -38,6 +49,7 @@ export interface IdentityReceipt {
 export interface IdentityReviewClient {
   list(cursor: string | null, signal: AbortSignal, view: IdentityListView): Promise<IdentityPage>
   detail(id: string, signal: AbortSignal): Promise<IdentityCase>
+  history(id: string, signal: AbortSignal): Promise<IdentityHistory>
   card(id: string, signal: AbortSignal): Promise<Blob>
   decide(
     id: string,

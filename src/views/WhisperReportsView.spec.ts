@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -8,6 +9,7 @@ import { ApiError } from '@/services/admin'
 import type { ContentControl, PenaltyResult, ReportDetail, ReportSummary } from '@/types/whispers'
 import type * as Service from '@/services/whispers'
 
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   whisperAdminReportsList: vi.fn(),
   whisperAdminReportGet: vi.fn(),
@@ -103,6 +105,7 @@ function deferred<T>() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {

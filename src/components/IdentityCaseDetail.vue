@@ -20,17 +20,13 @@ defineEmits<{
 }>()
 </script>
 <template>
-  <section aria-labelledby="case-detail-title" :aria-busy="caseBusy">
-    <h2 id="case-detail-title">案件详情</h2>
+  <section aria-label="身份案件材料" :aria-busy="caseBusy">
     <p v-if="caseBusy" role="status">正在读取案件…</p>
     <FloatingNotice v-if="caseError" :message="caseError" tone="error">{{
       caseError
     }}</FloatingNotice>
     <button v-if="selected && !detail && !caseBusy" @click="$emit('retry')">重试案件</button>
     <template v-if="detail">
-      <div class="review-actions">
-        <button :disabled="locked" @click="$emit('close')">关闭案件</button>
-      </div>
       <dl class="identity-fields">
         <dt>姓名</dt>
         <dd>{{ detail.name }}</dd>
@@ -51,10 +47,8 @@ defineEmits<{
         alt="当前授权案件的学生卡"
         @error="$emit('cardFailed')"
       />
-      <button v-if="detail.status === 'pending'" :disabled="locked" @click="$emit('process')">
-        处理身份审核
-      </button>
-      <p v-else>当前案件不可再次审核。</p>
+      <p>当前版本：{{ detail.version }}</p>
+      <p v-if="detail.status !== 'pending'">当前案件不可再次审核。</p>
     </template>
     <p v-else-if="!caseBusy && !selected">选择一个案件，按需读取身份详情和学生卡。</p>
   </section>

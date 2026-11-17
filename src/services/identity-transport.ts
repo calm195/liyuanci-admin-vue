@@ -2,6 +2,7 @@ import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import {
   parseIdentityCase,
+  parseIdentityHistory,
   parseIdentityPage,
   parseIdentityReceipt,
   validIdentityFeedback,
@@ -47,13 +48,22 @@ export function createIdentityTransport(
   }
   return {
     async list(cursor, signal, view) {
-      const query = new URLSearchParams({ limit: String(pageSize()), view })
+      const query = new URLSearchParams({ limit: String(pageSize()), view, include: 'created_at' })
       if (cursor !== null) query.set('cursor', cursor)
-      return parseIdentityPage(await json(`/api/v1/admin/identity-reviews?${query}`, signal), view)
+      return parseIdentityPage(
+        await json(`/api/v1/admin/identity-reviews?${query}`, signal),
+        view,
+        true,
+      )
     },
     async detail(id, signal) {
       const result = parseIdentityCase(await json(path(id), signal))
       if (result.id !== id) throw new Error('案件响应不匹配')
+      return result
+    },
+    async history(id, signal) {
+      const result = parseIdentityHistory(await json(`${path(id)}/history`, signal))
+      if (result.id !== id) throw new Error('审核历史响应不匹配')
       return result
     },
     async card(id, signal) {

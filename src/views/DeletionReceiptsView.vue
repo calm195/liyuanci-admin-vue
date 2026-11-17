@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
@@ -25,19 +26,27 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="回执查询">
-    <p>查询刚受理的证据清理任务，也可输入已知待办标识或完整匿名回执。查询不会触发删除。</p>
+  <main class="experience-page workflow privacy-workspace" aria-label="回执查询">
+    <WorkspaceHeading
+      title="删除回执查询"
+      description="通过任务 ID 或匿名回执核对结果；查询不会触发删除。"
+    />
+
     <template v-if="workspace.allowed()">
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在查询清理进度…</p>
-      <section class="business-card" aria-label="删除进度查询">
+      <section class="experience-panel" aria-label="删除进度查询">
         <h2>查询清理进度</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
             <button :disabled="busy" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="runRead(() => query('job'), '查询已完成')">
+        <form
+          id="job-query"
+          class="experience-editor"
+          @submit.prevent="runRead(() => query('job'), '查询已完成')"
+        >
           <fieldset :disabled="busy">
             <legend>后台证据删除待办</legend>
             <label for="delete-job-id">删除待办标识</label>
@@ -53,7 +62,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </button>
           </fieldset>
         </form>
-        <form @submit.prevent="runRead(() => query('receipt'), '查询已完成')">
+      </section>
+      <section class="experience-panel" aria-label="匿名删除回执查询">
+        <h2>查询匿名回执</h2>
+        <form
+          id="receipt-query"
+          class="experience-editor"
+          @submit.prevent="runRead(() => query('receipt'), '查询已完成')"
+        >
           <fieldset :disabled="busy">
             <legend>匿名删除回执</legend>
             <label for="delete-receipt">本人主动提供的完整删除回执</label>

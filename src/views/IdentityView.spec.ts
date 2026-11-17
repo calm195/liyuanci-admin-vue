@@ -1,3 +1,5 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, getActivePinia } from 'pinia'
@@ -9,7 +11,13 @@ import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { IdentityCase, IdentityReviewClient } from '@/types/identity'
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), card: vi.fn(), decide: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  detail: vi.fn(),
+  history: vi.fn(),
+  card: vi.fn(),
+  decide: vi.fn(),
+}))
 vi.mock('@/services/identity-transport', () => ({ createIdentityTransport: () => mocks }))
 const first: IdentityCase = {
   id: 'case-a',
@@ -45,7 +53,7 @@ function deferred<T>() {
 function dialogText() {
   return (
     wrapper
-      ?.findAll('.el-dialog')
+      ?.findAll('.el-dialog, .el-drawer')
       .map((dialog) => dialog.text())
       .join(' ') ?? ''
   )
@@ -76,6 +84,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   createUrl.mockReturnValue('blob:synthetic-card')
   vi.stubGlobal('URL', { createObjectURL: createUrl, revokeObjectURL: revokeUrl })
   const pinia = createPinia()
@@ -428,6 +437,86 @@ it('审核历史独立查询已处理案件并仅展示结果和时间', async (
   expect(wrapper.get('tbody').text()).toContain('合成学号甲')
   expect(wrapper.get('tbody').text()).toContain('已驳回')
   expect(wrapper.get('tbody').text()).toContain('09:30:00')
-  expect(wrapper.find('tbody button').exists()).toBe(false)
+  expect(wrapper.get('tbody button').text()).toBe('查看记录')
   expect(mocks.detail).not.toHaveBeenCalled()
+})
+
+it.each([new TypeError('offline'), new ApiError(408), new ApiError(429), new ApiError(503)])(
+  '未知身份决定冻结取消和关闭，重试保持正文、版本与键：%s',
+  async (failure) => {
+    await flushPromises()
+    await open()
+    mocks.decide.mockRejectedValueOnce(failure)
+    await confirm()
+    const original = mocks.decide.mock.calls[0]?.slice(0, 3)
+    expect(wrapper?.text()).toContain('提交结果尚未确认')
+    expect(button('取消处理').attributes('disabled')).toBeDefined()
+    expect(button('返回修改').attributes('disabled')).toBeDefined()
+    await button('取消处理').trigger('click')
+    expect(wrapper?.get('fieldset').attributes('disabled')).toBeDefined()
+    await button('确认提交').trigger('click')
+    await flushPromises()
+    expect(mocks.decide.mock.calls[1]?.slice(0, 3)).toEqual(original)
+    expect(wrapper?.text()).toContain('审核提交已确认')
+  },
+)
+
+it('审核处理的取消与Esc守卫保留未保存意见，明确放弃后才清除', async () => {
+  await flushPromises()
+  await open()
+  await processing()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#reject-reason').setValue('保留的驳回理由')
+  await wrapper?.get('#revision-suggestion').setValue('保留的修改建议')
+  vi.mocked(confirmDiscardChanges).mockResolvedValueOnce(false)
+  await button('取消处理').trigger('click')
+  await flushPromises()
+  expect(confirmDiscardChanges).toHaveBeenCalledOnce()
+  expect(wrapper?.get('#reject-reason').element).toHaveProperty('value', '保留的驳回理由')
+  expect(wrapper?.get('#revision-suggestion').element).toHaveProperty('value', '保留的修改建议')
+  vi.mocked(confirmDiscardChanges).mockResolvedValueOnce(true)
+  await button('取消处理').trigger('click')
+  await flushPromises()
+  expect(wrapper?.find('#reject-reason').exists()).toBe(false)
+  expect(mocks.decide).not.toHaveBeenCalled()
+})
+it('历史详情仅调用历史投影，不展示学生卡或再次审核操作', async () => {
+  wrapper?.unmount()
+  mocks.list.mockResolvedValue({
+    items: [
+      {
+        ...first,
+        status: 'rejected',
+        created_at: '2026-11-01T00:00:00Z',
+        reviewed_at: '2026-11-02T00:00:00Z',
+      },
+    ],
+    next_cursor: null,
+  })
+  mocks.history.mockResolvedValue({
+    id: first.id,
+    version: 2,
+    status: 'rejected',
+    name: first.name,
+    student_number: first.student_number,
+    created_at: '2026-11-01T00:00:00Z',
+    reviewed_at: '2026-11-02T00:00:00Z',
+    reviewer_id: '合成审核编号',
+    reason: '历史驳回理由',
+    revision_suggestion: '历史修改建议',
+  })
+  wrapper = mount(IdentityHistoryView, { global: { plugins: [getActivePinia() ?? createPinia()] } })
+  await flushPromises()
+  await button('查看记录').trigger('click')
+  await flushPromises()
+  expect(mocks.history).toHaveBeenCalledWith(first.id, expect.any(AbortSignal))
+  expect(wrapper.get('[aria-label="只读审核记录"]').text()).toContain('审核员编号')
+  expect(wrapper.text()).toContain('历史驳回理由')
+  expect(mocks.detail).not.toHaveBeenCalled()
+  expect(mocks.card).not.toHaveBeenCalled()
+  expect(
+    wrapper
+      .findAll('button')
+      .some((item) => item.text() === '查看学生卡' || item.text() === '处理身份审核'),
+  ).toBe(false)
 })

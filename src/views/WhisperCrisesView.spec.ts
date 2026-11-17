@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { useDictionariesStore } from '@/stores/dictionaries'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
@@ -9,6 +10,7 @@ import { ApiError } from '@/services/admin'
 import type { CrisisDetail, CrisisSummary } from '@/types/whispers'
 import type * as Service from '@/services/whispers'
 
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   whisperAdminCrisesList: vi.fn(),
   whisperAdminCrisisGet: vi.fn(),
@@ -92,6 +94,10 @@ function hasButton(label: string) {
     .some((item) => item.text() === label)
 }
 async function open(id = first.id) {
+  if (!view().find('.business-table tbody button').exists()) {
+    await button('返回案件列表并清除材料').trigger('click')
+    await flushPromises()
+  }
   const found = view().findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('无案件')
   await found.trigger('click')
@@ -109,6 +115,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   const pinia = createPinia()
   setActivePinia(pinia)
   useDictionariesStore().accept({
@@ -372,7 +379,7 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     expect(view().text()).toContain(second.body)
     expect(view().text()).not.toContain(first.body)
   })
-  it('分页发现版本变化清正文，开始处理时取消在途分页', async () => {
+  it('独立详情返回清正文，重新开案处理时取消在途分页', async () => {
     await flushPromises()
     mocks.whisperAdminCrisesList.mockResolvedValueOnce({
       items: [summary(first)],
@@ -381,6 +388,12 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     await button('刷新列表').trigger('click')
     await flushPromises()
     await open()
+    expect(
+      view()
+        .findAll('button')
+        .some((item) => item.text() === '加载更多危机'),
+    ).toBe(false)
+    await button('返回案件列表并清除材料').trigger('click')
     mocks.whisperAdminCrisesList.mockResolvedValueOnce({
       items: [{ ...summary(first), version: 9 }],
       next_cursor: 'b',
@@ -388,10 +401,10 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     await button('加载更多危机').trigger('click')
     await flushPromises()
     expect(view().find('blockquote').exists()).toBe(false)
-    await open()
     const pending = deferred<{ items: CrisisSummary[]; next_cursor: string | null }>()
     mocks.whisperAdminCrisesList.mockReturnValueOnce(pending.promise)
     await button('加载更多危机').trigger('click')
+    await open()
     await process()
     pending.resolve({ items: [{ ...summary(first), version: 10 }], next_cursor: null })
     await flushPromises()

@@ -1,3 +1,4 @@
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/services/admin'
@@ -61,6 +62,7 @@ export function useCrisisReview() {
   const reason = ref('')
   const confirming = ref(false)
   const writing = ref(false)
+  const uncertain = ref(false)
   const notice = ref('')
   const receipt = ref<CrisisSummary | null>(null)
   let attempt: { fingerprint: string; key: string } | null = null
@@ -104,12 +106,14 @@ export function useCrisisReview() {
     evidenceError.value = ''
   }
   function resetOperation() {
+    uncertain.value = false
     reason.value = ''
     action.value = 'take_over'
     confirming.value = false
     attempt = null
   }
   function startProcessing() {
+    if (uncertain.value) return
     if (!canAct.value || loading.value || writing.value) return
     resetOperation()
     hideEvidence()
@@ -117,11 +121,13 @@ export function useCrisisReview() {
     editorOpen.value = true
   }
   function cancelProcessing() {
+    if (uncertain.value) return
     if (writing.value) return
     editorOpen.value = false
     resetOperation()
   }
   function closeProcessing(done: () => void) {
+    if (uncertain.value) return
     if (writing.value) return
     cancelProcessing()
     done()
@@ -145,6 +151,7 @@ export function useCrisisReview() {
     confirming.value = false
     writing.value = false
     attempt = null
+    uncertain.value = false
     hideEvidence()
   }
   function clearAll() {
@@ -328,6 +335,11 @@ export function useCrisisReview() {
         await loadList()
       },
       async (cause) => {
+        uncertain.value = !(
+          cause instanceof ApiError &&
+          cause.status < 500 &&
+          ![408, 429].includes(cause.status)
+        )
         if (cause instanceof ApiError && cause.status === 409) {
           editorOpen.value = false
           const expected = generation + 1
@@ -365,7 +377,11 @@ export function useCrisisReview() {
     })()
   })
 
+  onBeforeRouteLeave(() => !uncertain.value)
+  onBeforeRouteUpdate(() => !uncertain.value)
+
   return {
+    uncertain,
     pageSize,
     editorOpen,
     startProcessing,

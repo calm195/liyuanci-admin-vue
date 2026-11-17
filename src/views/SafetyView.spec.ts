@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -17,6 +18,7 @@ vi.mock('@/components/CrisisEscalation.vue', () => ({
     template: '<span />',
   },
 }))
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   user: vi.fn(),
   reports: vi.fn(),
@@ -78,6 +80,7 @@ async function submit() {
 }
 beforeEach(async () => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   mocks.user.mockResolvedValue({ id: 'student', account_version: 19 })
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -231,7 +234,7 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(wrapper?.find('form').exists()).toBe(false)
     expect(wrapper?.get('a[href="/safety/penalties?report=report"]').text()).toContain('处罚管理')
   })
-  it('跨页取消详情和写入，旧正文、确认及回执不会进入申诉页', async () => {
+  it('离页取消旧读取；提交中阻止离页，完成后不将回执带入申诉页', async () => {
     let finish: ((value: ReportDetail) => void) | undefined
     mocks.report.mockReturnValueOnce(
       new Promise<ReportDetail>((resolve) => {
@@ -258,10 +261,13 @@ describe('T028 举报、处罚与申诉页面', () => {
     await button('确认提交').trigger('click')
     const writeSignal: unknown = mocks.decideReport.mock.calls[0]?.[3]
     await go('/safety/appeals')
-    expect(writeSignal).toHaveProperty('aborted', true)
+    expect(writeSignal).toHaveProperty('aborted', false)
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
     if (!written) throw new Error('尚未写入')
     written({ id: 'report', version: 8, status: 'resolved' })
     await flushPromises()
+    await go('/safety/appeals')
+    expect(writeSignal).toHaveProperty('aborted', true)
     expect(wrapper?.find('[aria-label="处理回执"]').exists()).toBe(false)
     expect(wrapper?.find('form').exists()).toBe(false)
   })
@@ -567,3 +573,23 @@ it('WA-03 新树洞申诉复用既有页面和判定，不读取胶囊原文', a
     expect.any(AbortSignal),
   )
 })
+
+it.each([new TypeError('offline'), new ApiError(408), new ApiError(429), new ApiError(503)])(
+  '普通安全未知结果阻止取消和离页，重试保留案件、正文与键：%s',
+  async (failure) => {
+    await open()
+    await prepare()
+    mocks.decideReport.mockRejectedValueOnce(failure)
+    await submit()
+    const original = mocks.decideReport.mock.calls[0]?.slice(0, 3)
+    expect(wrapper?.text()).toContain('提交结果尚未确认')
+    expect(button('取消并关闭').attributes('disabled')).toBeDefined()
+    expect(button('返回修改').attributes('disabled')).toBeDefined()
+    await go('/safety/appeals')
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
+    await submit()
+    expect(mocks.decideReport.mock.calls[1]?.slice(0, 3)).toEqual(original)
+    await go('/safety/appeals')
+    expect(router.currentRoute.value.path).toBe('/safety/appeals')
+  },
+)

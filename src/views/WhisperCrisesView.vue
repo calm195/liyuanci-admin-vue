@@ -1,15 +1,13 @@
 <script setup lang="ts">
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { whisperCrisisStatuses, whisperDeliveryLabels } from '@/utils/dictionary-labels'
 
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { useWhisperCrises, whisperCrisisActions } from '@/composables/useWhisperCrises'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { whisperKindLabels } from '@/composables/useWhisperReviews'
@@ -42,7 +40,6 @@ const {
   close,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   check,
   back,
   submit,
@@ -66,7 +63,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="树洞危机">
+  <main class="experience-page workflow" aria-label="树洞危机">
+    <WorkspaceHeading
+      title="树洞危机"
+      description="核对匿名危机案件、投递和处置记录；不提供学生卡或匿名身份反查。"
+      ><button v-if="selectedId" :disabled="editorOpen || writing" @click="close">
+        返回案件列表并清除材料
+      </button></WorkspaceHeading
+    >
     <p>仅供危机岗位及超级管理员按授权案件读取限定正文；不提供学生卡或身份反查。</p>
     <template v-if="workspace.allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
@@ -79,18 +83,22 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         tone="info"
       />
 
-      <section aria-label="树洞危机列表" :aria-busy="listBusy">
-        <BusinessToolbar label="树洞危机操作栏">
-          <h2>危机案件</h2>
-          <template #tools>
-            <button
-              :disabled="listBusy || editorOpen"
-              @click="runRead(() => refresh(), '查询已完成')"
-            >
-              刷新列表
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        v-if="!selectedId"
+        class="experience-panel experience-table-panel"
+        aria-label="树洞危机列表"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">危机案件</h2>
+
+          <button
+            :disabled="listBusy || editorOpen"
+            @click="runRead(() => refresh(), '查询已完成')"
+          >
+            刷新列表
+          </button>
+        </div>
         <p v-if="listBusy" role="status">正在读取危机…</p>
         <FloatingNotice v-if="listError" :message="listError" tone="error"
           >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
@@ -98,7 +106,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
           listNotice
         }}</FloatingNotice>
-        <p v-if="!listBusy && !listError && !items.length">当前页暂无危机</p>
+        <p v-if="!listBusy && !listError && !items.length" class="experience-empty">
+          当前页暂无危机
+        </p>
         <div v-if="items.length" class="business-table">
           <table>
             <thead>
@@ -144,16 +154,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           </button>
         </div>
       </section>
-      <ElDialog
-        v-if="selectedId && !editorOpen"
-        :model-value="true"
-        title="树洞危机详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
-      >
+      <section v-if="selectedId && !editorOpen" class="experience-panel crisis-case-workspace">
         <section aria-label="树洞危机详情" :aria-busy="loading">
           <h2>危机详情（只读）</h2>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
@@ -236,18 +237,15 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           </template>
           <p v-else-if="!selectedId && !loading">选择危机，按需读取授权限定正文。</p>
         </section>
-      </ElDialog>
-      <ElDialog
+      </section>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || uncertain"
         :title="whisperCrisisActions[task]"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
-        :before-close="closeProcessing"
-        :show-close="!writing && !uncertain"
+        @close="cancelProcessing"
       >
         <template v-if="detail">
           <p>案件版本 {{ detail.version }}</p>
@@ -279,9 +277,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </button>
             <button :disabled="writing || uncertain" @click="back">返回修改</button>
           </section>
-          <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="writing || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

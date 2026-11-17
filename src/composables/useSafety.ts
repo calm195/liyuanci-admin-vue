@@ -1,3 +1,4 @@
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useRouter } from 'vue-router'
 import type { CursorPage } from '@/types/moderation'
 import type { CrisisSummary } from '@/types/crisis'
@@ -51,6 +52,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
   const busy = ref(false)
   const loading = ref(false)
   const writing = ref(false)
+  const uncertain = ref(false)
   const listError = ref('')
   const error = ref('')
   const notice = ref('')
@@ -150,6 +152,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     return true
   })
   function resetProcessing() {
+    uncertain.value = false
     preparation++
     editorOpen.value = false
     reason.value = ''
@@ -160,6 +163,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     attempt = null
   }
   function startProcessing(task: 'case' | 'crisis' = 'case') {
+    if (uncertain.value) return
     if (
       !workspace.allowed() ||
       busy.value ||
@@ -182,12 +186,14 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     editorOpen.value = true
   }
   function closeProcessing(done: () => void) {
+    if (uncertain.value) return
     if (writing.value || escalating.value) return
     resetProcessing()
     loading.value = false
     done()
   }
   function cancelProcessing() {
+    if (uncertain.value) return
     if (writing.value || escalating.value) return
     resetProcessing()
     loading.value = false
@@ -453,6 +459,11 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
         await loadList()
       },
       async (cause) => {
+        uncertain.value = !(
+          cause instanceof ApiError &&
+          cause.status < 500 &&
+          ![408, 429].includes(cause.status)
+        )
         if (cause instanceof ApiError && cause.status === 409) {
           const expected = generation + 1
           await readDetail(caseId)
@@ -503,7 +514,11 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     else if (generation === expected && mode === 'appeals' && initialAppeal && workspace.allowed())
       await open(initialAppeal)
   })
+  onBeforeRouteLeave(() => !uncertain.value)
+  onBeforeRouteUpdate(() => !uncertain.value)
+
   return {
+    uncertain,
     pageSize,
     editorOpen,
     editorTask,

@@ -2,10 +2,8 @@
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
-import BusinessToolbar from './BusinessToolbar.vue'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
+import WorkspaceHeading from './WorkspaceHeading.vue'
+import WorkspaceDrawer from './WorkspaceDrawer.vue'
 import { useRoute } from 'vue-router'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useSafety } from '@/composables/useSafety'
@@ -21,6 +19,7 @@ const title = { reports: '举报管理', penalties: '处罚管理', appeals: '�
 const processingTitle = { reports: '举报处理', penalties: '账号处罚', appeals: '申诉处理' }[mode]
 const admin = useAdminStore()
 const {
+  uncertain,
   pageSize,
   editorOpen,
   editorTask,
@@ -59,7 +58,6 @@ const {
   close,
   reloadSelected,
   startProcessing,
-  closeProcessing,
   cancelProcessing,
   prepare,
   submit,
@@ -76,7 +74,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" :aria-label="title">
+  <main class="experience-page workflow" :aria-label="title">
+    <WorkspaceHeading
+      :title="title"
+      description="按授权案件核对正文与举报依据；处理、处罚和危机升级分别确认。"
+    />
     <p v-if="mode === 'penalties'" class="banner">
       本页从已确认举报查询处罚依据；处罚历史可在“用户管理 →
       平台用户”查询。仅显示当前分页中的已确认举报，可继续翻页查询。
@@ -97,22 +99,25 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         >
       </section>
 
-      <section aria-label="案件列表" :aria-busy="busy">
-        <BusinessToolbar label="安全治理操作栏">
-          <h2>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-label="案件列表"
+        :aria-busy="busy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">
             {{
               mode === 'appeals' ? '申诉案件' : mode === 'penalties' ? '本页已确认举报' : '举报案件'
             }}
           </h2>
-          <template #tools>
-            <button
-              :disabled="busy || editorOpen || writing"
-              @click="runRead(() => refresh(), '查询已完成')"
-            >
-              从首页刷新
-            </button>
-          </template>
-        </BusinessToolbar>
+
+          <button
+            :disabled="busy || editorOpen || writing"
+            @click="runRead(() => refresh(), '查询已完成')"
+          >
+            从首页刷新
+          </button>
+        </div>
         <p v-if="busy" role="status">正在读取案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
@@ -123,7 +128,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             重试列表
           </button>
         </FloatingNotice>
-        <p v-else-if="!items.length">
+        <p v-else-if="!items.length" class="experience-empty">
           {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}
         </p>
         <div v-else class="business-table">
@@ -171,23 +176,17 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         </div>
         <p>列表不展示举报说明、申诉正文或学生身份。</p>
       </section>
-      <ElDialog
-        v-if="selected && !editorOpen"
-        :model-value="true"
+      <WorkspaceDrawer
+        :open="!!selected && !editorOpen"
         title="案件详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
+        :busy="writing"
+        @close="close"
       >
         <section aria-label="案件详情" :aria-busy="loading || writing">
-          <h2>案件详情（只读）</h2>
           <p v-if="loading" role="status">正在读取案件详情…</p>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <button v-if="selected && !detail && !loading" @click="open(selected)">重试详情</button>
           <template v-if="detail">
-            <button :disabled="writing || editorOpen" @click="close">关闭案件</button>
             <p>{{ status(detail.status) }} · 案件版本 {{ detail.version }}</p>
             <template v-if="report">
               <dl class="case-fields">
@@ -248,20 +247,32 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
           </template>
           <p v-else-if="!loading && !selected">选择案件，按需读取详情。</p>
         </section>
-      </ElDialog>
-      <ElDialog
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close :disabled="writing" @click="close">关闭案件</button>
+          </div></template
+        >
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || escalating || uncertain"
         :title="editorTask === 'crisis' ? '升级危机' : processingTitle"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :before-close="closeProcessing"
-        :close-on-click-modal="false"
-        :show-close="!writing && !escalating"
+        @close="cancelProcessing"
       >
+        <p v-if="uncertain" class="experience-inline-error">
+          提交结果尚未确认，请保留原请求重试；确认结果前不能修改、关闭或离开。
+        </p>
         <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-        <button :disabled="writing || escalating" @click="cancelProcessing">取消并关闭</button>
+        <button
+          data-overlay-close
+          :disabled="writing || escalating || uncertain"
+          @click="cancelProcessing"
+        >
+          取消并关闭
+        </button>
         <p>案件版本 {{ detail?.version }}</p>
         <CrisisEscalation
           v-if="editorTask === 'crisis' && report"
@@ -275,7 +286,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         />
         <template v-else-if="detail">
           <form v-if="options.length" @submit.prevent="prepare">
-            <fieldset :disabled="writing || loading || !!confirmation">
+            <fieldset :disabled="uncertain || writing || loading || !!confirmation">
               <legend>案件处理</legend>
               <label for="safety-operation">处理方式</label>
               <select id="safety-operation" v-model="operation">
@@ -341,11 +352,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               <button :disabled="writing" @click="submit">
                 {{ writing ? '正在提交…' : '确认提交' }}
               </button>
-              <button :disabled="writing" @click="confirmation = null">返回修改</button>
+              <button :disabled="writing || uncertain" @click="confirmation = null">
+                返回修改
+              </button>
             </div>
           </section>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

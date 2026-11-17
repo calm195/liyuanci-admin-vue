@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createModerationTransport, validModerationFeedback } from '@/services/content-transport'
 import { useAdminStore } from '@/stores/admin'
+import { useModerationCommands } from '@/stores/moderation-commands'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
 import type {
   BusinessOutcome,
@@ -15,6 +16,8 @@ import type {
 } from '@/types/moderation'
 
 export function useModerationReview() {
+  const commands = useModerationCommands()
+  const pending = computed(() => commands.pending)
   const pageSize = ref(10)
   const defaultFilters = (): ModerationFilters => ({ q: '', status: 'human_required', kind: '' })
   const filters = reactive(defaultFilters())
@@ -22,7 +25,7 @@ export function useModerationReview() {
   const editorOpen = ref(false)
   const editorTask = ref<'decision' | 'crisis'>('decision')
   const escalating = ref(false)
-  const canEscalate = computed(() => useAdminStore().can('crisis_operator'))
+  const canEscalate = computed(() => useAdminStore().can('crisis_operator') && !pending.value)
   const items = ref<ModerationSummary[]>([])
   const cursor = ref<string | null>(null)
   const nextCursor = ref<string | null>(null)
@@ -41,7 +44,6 @@ export function useModerationReview() {
   const outcome = ref<ModerationOutcome | null>(null)
   const notice = ref('')
   let editorGeneration = 0
-  let attempt: { fingerprint: string; key: string } | null = null
   const router = useRouter()
   const route = useRoute()
   async function crisisEscalated(value: CrisisSummary) {
@@ -91,14 +93,23 @@ export function useModerationReview() {
     decision.value = 'approved'
     reason.value = ''
     suggestion.value = ''
-    attempt = null
   }
   function startProcessing(task: 'decision' | 'crisis') {
     if (!workspace.allowed() || !detail.value || writing.value || escalating.value) return
-    if (task === 'decision' && detail.value.status !== 'human_required') return
+    if (pending.value && (task !== 'decision' || pending.value.id !== detail.value.id)) {
+      error.value = '有审核结果尚未确认，请先核实原请求。'
+      return
+    }
+    if (task === 'decision' && detail.value.status !== 'human_required' && !pending.value) return
     if (task === 'crisis' && !canEscalate.value) return
     resetDecision()
     editorTask.value = task
+    if (pending.value) {
+      const input = pending.value.body
+      decision.value = input.decision
+      reason.value = input.decision === 'rejected' ? input.reason : ''
+      suggestion.value = input.decision === 'rejected' ? input.revision_suggestion : ''
+    }
     editorOpen.value = true
   }
   function cancelProcessing() {
@@ -127,7 +138,6 @@ export function useModerationReview() {
     error.value = ''
     outcome.value = null
     notice.value = ''
-    attempt = null
   }
   function clearAll() {
     clearEditor()
@@ -212,6 +222,7 @@ export function useModerationReview() {
   }
   function check() {
     if (
+      !pending.value &&
       editorOpen.value &&
       editorTask.value === 'decision' &&
       valid.value &&
@@ -219,7 +230,53 @@ export function useModerationReview() {
     )
       confirming.value = true
   }
+  async function retryPending() {
+    const command = pending.value
+    if (!command || writing.value || escalating.value || loading.value || listBusy.value) return
+    writing.value = true
+    error.value = ''
+    await workspace.run(
+      (signal) => client.decide(command.id, command.body, command.key, signal),
+      async (result) => {
+        commands.clear()
+        clearEditor()
+        outcome.value = result
+        notice.value = '审核决定已确认，请分别核对内容判定与业务结果'
+        await loadList()
+      },
+      async (cause) => {
+        if (
+          cause instanceof ApiError &&
+          cause.status >= 400 &&
+          cause.status < 500 &&
+          cause.status !== 408 &&
+          cause.status !== 429
+        ) {
+          commands.clear()
+          if (cause.status === 409) {
+            const generation = editorGeneration + 1
+            await openCase(command.id)
+            if (editorGeneration === generation && workspace.allowed())
+              error.value = '版本或状态已变化，已重新读取；请重新核对，旧操作不会自动重试'
+          } else if (cause.status === 404) {
+            clearEditor()
+            error.value = reviewErrorMessage(cause)
+          } else {
+            resetDecision()
+            error.value = reviewErrorMessage(cause)
+          }
+        } else error.value = '审核结果尚未确认，原请求已保留，请原样重试核实。'
+      },
+      () => {
+        writing.value = false
+      },
+    )
+  }
   async function submit() {
+    if (pending.value) {
+      await retryPending()
+      return
+    }
     const current = detail.value
     if (
       !current ||
@@ -240,35 +297,8 @@ export function useModerationReview() {
             reason: reason.value.trim(),
             revision_suggestion: suggestion.value.trim(),
           }
-    const fingerprint = JSON.stringify([current.id, input])
-    if (attempt?.fingerprint !== fingerprint)
-      attempt = { fingerprint, key: globalThis.crypto.randomUUID() }
-    const key = attempt.key
-    writing.value = true
-    error.value = ''
-    await workspace.run(
-      (signal) => client.decide(current.id, input, key, signal),
-      async (result) => {
-        clearEditor()
-        outcome.value = result
-        notice.value = '审核决定已确认，请分别核对内容判定与业务结果'
-        await loadList()
-      },
-      async (cause) => {
-        if (cause instanceof ApiError && cause.status === 409) {
-          const generation = editorGeneration + 1
-          await openCase(current.id)
-          if (editorGeneration === generation && workspace.allowed())
-            error.value = '版本或状态已变化，已重新读取；请重新核对，旧操作不会自动重试'
-        } else if (cause instanceof ApiError && cause.status === 404) {
-          clearEditor()
-          error.value = reviewErrorMessage(cause)
-        } else error.value = reviewErrorMessage(cause)
-      },
-      () => {
-        writing.value = false
-      },
-    )
+    if (commands.save({ id: current.id, key: globalThis.crypto.randomUUID(), body: input }))
+      await retryPending()
   }
   onMounted(async () => {
     const target = route.query['case']
@@ -277,6 +307,8 @@ export function useModerationReview() {
   })
 
   return {
+    pending,
+    retryPending,
     pageSize,
     filters,
     search,

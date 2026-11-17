@@ -4,11 +4,9 @@ import { whisperStatusLabels } from '@/utils/dictionary-labels'
 
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import WhisperReviewDetail from '@/components/WhisperReviewDetail.vue'
 import {
   useWhisperReviews,
@@ -46,7 +44,6 @@ const {
   close,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   check,
   back,
   submit,
@@ -63,8 +60,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="树洞审核">
-    <p>仅按当前授权案件读取命中版本，不提供匿名作者查询或私密胶囊全量浏览。</p>
+  <main class="experience-page workflow" aria-label="树洞审核">
+    <WorkspaceHeading
+      title="树洞审核"
+      description="按当前授权案件读取命中版本；匿名身份与私密胶囊保持独立边界。"
+    />
     <template v-if="workspace.allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
@@ -83,18 +83,21 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <p>内容通过不代表必然公开、激活昵称或解锁胶囊。</p>
       </section>
 
-      <section aria-label="树洞案件列表" :aria-busy="listBusy">
-        <BusinessToolbar label="树洞审核操作栏">
-          <h2>审核案件</h2>
-          <template #tools>
-            <button
-              :disabled="listBusy || editorOpen"
-              @click="runRead(() => refresh(), '查询已完成')"
-            >
-              刷新列表
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-label="树洞案件列表"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">审核案件</h2>
+
+          <button
+            :disabled="listBusy || editorOpen"
+            @click="runRead(() => refresh(), '查询已完成')"
+          >
+            刷新列表
+          </button>
+        </div>
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-if="listError" :message="listError" tone="error"
           >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
@@ -102,7 +105,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
           listNotice
         }}</FloatingNotice>
-        <p v-if="!listBusy && !listError && !items.length">当前页暂无审核案件</p>
+        <p v-if="!listBusy && !listError && !items.length" class="experience-empty">
+          当前页暂无审核案件
+        </p>
         <div v-if="items.length" class="business-table">
           <table>
             <thead>
@@ -148,16 +153,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           </button>
         </div>
       </section>
-      <ElDialog
-        v-if="selectedId && !editorOpen"
-        :model-value="true"
-        title="树洞案件详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
-      >
+      <WorkspaceDrawer :open="!!selectedId && !editorOpen" title="树洞案件详情" @close="close">
         <WhisperReviewDetail
           :detail="detail"
           :selected-id="selectedId"
@@ -170,18 +166,24 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           @close="close"
           @process="startProcessing"
         />
-      </ElDialog>
-      <ElDialog
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close @click="close">关闭案件</button
+            ><button v-if="canEscalate" @click="startProcessing('crisis')">升级危机</button
+            ><button v-if="canDecide" class="business-primary" @click="startProcessing('decision')">
+              处理树洞审核
+            </button>
+          </div></template
+        >
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || uncertain"
         :title="task === 'crisis' ? '升级树洞危机' : '处理树洞审核'"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
-        :before-close="closeProcessing"
-        :show-close="!writing && !uncertain"
+        @close="cancelProcessing"
       >
         <template v-if="detail">
           <p>
@@ -257,9 +259,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </button>
             <button :disabled="writing || uncertain" @click="back">返回修改</button>
           </section>
-          <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="writing || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

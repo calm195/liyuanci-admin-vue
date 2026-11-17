@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type * as crisisService from '@/services/crisis'
 import type { VueWrapper } from '@vue/test-utils'
@@ -9,6 +10,7 @@ import type * as VueRouter from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { CrisisDetail, CrisisEvidence, CrisisSummary } from '@/types/crisis'
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   detail: vi.fn(),
@@ -60,6 +62,10 @@ function deferred<T>() {
   }
 }
 async function open(id = 'case-a') {
+  if (!wrapper?.find('.business-table tbody button').exists()) {
+    await button('返回案件列表并清除材料').trigger('click')
+    await flushPromises()
+  }
   const found = wrapper?.findAll('.business-table tbody button')[id === first.id ? 0 : 1]
   if (!found) throw new Error('案件未找到')
   await found.trigger('click')
@@ -80,6 +86,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -287,6 +294,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     await flushPromises()
     await open()
     mocks.list.mockRejectedValueOnce(new ApiError(404))
+    await button('返回案件列表并清除材料').trigger('click')
     await button('从首页刷新').trigger('click')
     await flushPromises()
     expect(wrapper?.text()).toContain('危机接口尚未装配')
@@ -347,7 +355,7 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     const pending = deferred<CrisisSummary>()
     mocks.act.mockReturnValueOnce(pending.promise)
     await confirm()
-    expect(button('从首页刷新').attributes('disabled')).toBeDefined()
+    expect(button('返回案件列表并清除材料').attributes('disabled')).toBeDefined()
     expect(button('取消处理').attributes('disabled')).toBeDefined()
     expect(wrapper?.find('[aria-label="危机案件详情"]').exists()).toBe(false)
     const done = vi.fn()
@@ -363,3 +371,24 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     expect(wrapper?.text()).not.toContain(first.body)
   })
 })
+
+it.each([new TypeError('offline'), new ApiError(408), new ApiError(429), new ApiError(503)])(
+  '普通危机未知结果阻止取消关闭，重试保持原动作和键：%s',
+  async (failure) => {
+    await flushPromises()
+    await open()
+    mocks.act.mockRejectedValueOnce(failure)
+    await confirm()
+    const original = mocks.act.mock.calls[0]?.slice(0, 3)
+    expect(wrapper?.text()).toContain('提交结果尚未确认')
+    expect(button('取消处理').attributes('disabled')).toBeDefined()
+    expect(button('返回修改').attributes('disabled')).toBeDefined()
+    const done = vi.fn()
+    wrapper?.findComponent(ElDialog).props('beforeClose')?.(done)
+    expect(done).not.toHaveBeenCalled()
+    await button('确认提交').trigger('click')
+    await flushPromises()
+    expect(mocks.act.mock.calls[1]?.slice(0, 3)).toEqual(original)
+    expect(wrapper?.text()).toContain('处置已确认')
+  },
+)

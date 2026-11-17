@@ -1,18 +1,18 @@
 <script setup lang="ts">
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { RouterLink } from 'vue-router'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { crisisStatusLabel } from '@/composables/useCrisisReview'
 import { validDeletionId } from '@/services/privacy'
 import { useEvidenceDeletion } from '@/composables/useEvidenceDeletion'
 const {
   editorOpen,
+  uncertain,
   evidenceId,
   target,
   reason,
@@ -29,7 +29,6 @@ const {
   reset,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
 } = useEvidenceDeletion()
 const {
   open: openPrivacy,
@@ -54,20 +53,24 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :revision="readFeedback.revision"
   />
   <FloatingNotice v-if="accepted" message="删除任务已受理，请继续核对清理进度" tone="success" />
-  <main class="panel workflow" aria-label="证据删除">
+  <main class="experience-page workflow privacy-workspace" aria-label="证据删除">
+    <WorkspaceHeading
+      title="证据删除"
+      description="读取并核对证据范围、当前版本与理由；受理后通过回执查询清理结果。"
+    />
     <template v-if="workspace.allowed()">
       <p class="banner">删除作用于该证据所属的整个保留范围，无法撤回。受理不代表物理清理完成。</p>
       <p>可从授权危机案件进入，或输入已知证据条目标识查询元信息。信息仅保留在当前页面内存中。</p>
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理请求…</p>
-      <section class="business-card" aria-label="证据删除">
+      <section class="experience-panel" aria-label="证据删除">
         <h2>读取并核对证据</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
             <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="runRead(loadTarget, '证据元信息已读取')">
+        <form class="experience-editor" @submit.prevent="runRead(loadTarget, '证据元信息已读取')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据条目标识</legend>
             <label for="delete-evidence-id">证据条目标识</label>
@@ -141,22 +144,20 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         privacyError
       }}</FloatingNotice>
       <RouterLink v-if="!accepted" to="/deletion-receipts">前往回执查询</RouterLink>
-      <ElDialog
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="busy || uncertain"
         title="处理证据删除"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :before-close="closeProcessing"
-        :show-close="!busy"
+        @close="cancelProcessing"
       >
         <template v-if="target">
           <p>危机限定证据 · 证据范围版本 {{ target.version }}</p>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-          <form @submit.prevent="prepare">
-            <fieldset :disabled="busy || confirmation">
+          <form class="experience-editor" @submit.prevent="prepare">
+            <fieldset :disabled="busy || confirmation || uncertain">
               <legend>删除理由</legend>
               <label for="delete-reason">理由（最多 2000 个 UTF-8 字节）</label>
               <textarea id="delete-reason" v-model="reason" rows="4" autocomplete="off"></textarea>
@@ -170,11 +171,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             <p class="workflow-body">删除理由：{{ reason }}</p>
             <p>将停止该范围的证据读取并进入异步清理，不能撤回，也不会解除普通内容的危机限制。</p>
             <button :disabled="busy" @click="submit">确认删除证据范围</button>
-            <button :disabled="busy" @click="confirmation = false">返回修改</button>
+            <button :disabled="busy || uncertain" @click="confirmation = false">返回修改</button>
           </section>
-          <button :disabled="busy" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="busy || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

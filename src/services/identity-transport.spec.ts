@@ -16,6 +16,7 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
             name: '合成姓名',
             student_number: '合成学号',
             reviewed_at: '2026-11-05T01:00:00Z',
+            created_at: '2026-11-04T01:00:00Z',
           },
         ],
         next_cursor: null,
@@ -33,10 +34,13 @@ describe('T012 REQ-002/018/019 最新人工认证协议', () => {
         name: '合成姓名',
         student_number: '合成学号',
         reviewed_at: '2026-11-05T01:00:00Z',
+        created_at: '2026-11-04T01:00:00Z',
       },
     ])
     const [url, init] = transport.mock.calls[0] ?? []
-    expect(url).toBe('/api/v1/admin/identity-reviews?limit=10&view=history&cursor=a%2B%2F%3D%26')
+    expect(url).toBe(
+      '/api/v1/admin/identity-reviews?limit=10&view=history&include=created_at&cursor=a%2B%2F%3D%26',
+    )
     expect(init).toMatchObject({
       signal,
       cache: 'no-store',
@@ -143,3 +147,26 @@ it.each(['reason', 'revision_suggestion'] as const)(
     expect(transport).not.toHaveBeenCalled()
   },
 )
+
+it('历史详情使用独立只读端点，响应标识与当前案件必须一致', async () => {
+  const transport = vi.fn<typeof fetch>().mockResolvedValue(
+    envelope({
+      id,
+      version: 2,
+      status: 'approved',
+      name: '合成学生',
+      student_number: 'DEMO-1',
+      created_at: '2026-11-01T00:00:00Z',
+      reviewed_at: null,
+      reviewer_id: null,
+      reason: null,
+      revision_suggestion: null,
+    }),
+  )
+  const client = createIdentityTransport('admin-token', () => true, transport)
+  const history = await client.history(id, signal)
+  expect(transport.mock.calls[0]?.[0]).toBe(`/api/v1/admin/identity-reviews/${id}/history`)
+  expect(history).not.toHaveProperty('asset_id')
+  transport.mockResolvedValue(envelope({ ...history, id: 'another-case' }))
+  await expect(client.history(id, signal)).rejects.toThrow('不匹配')
+})

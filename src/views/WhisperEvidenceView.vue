@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { useWhisperEvidence, validWhisperId } from '@/composables/useWhisperEvidence'
 const {
   evidenceId,
@@ -29,7 +28,6 @@ const {
   loadTarget,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   check,
   back,
   submit,
@@ -53,7 +51,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="树洞证据">
+  <main class="experience-page workflow privacy-workspace" aria-label="树洞证据">
+    <WorkspaceHeading
+      title="树洞证据"
+      description="按证据 ID 读取授权范围；删除任务单独查询，不提供全量证据浏览。"
+    />
     <template v-if="workspace.allowed()">
       <p class="banner">
         删除作用于整个限定证据范围，无法撤回。受理不代表清理完成，也不会恢复普通内容。
@@ -64,14 +66,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理请求…</p>
-      <section class="business-card" aria-label="树洞证据范围">
+      <section class="experience-panel" aria-label="树洞证据范围">
         <h2>读取证据范围</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
             <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form @submit.prevent="runRead(() => loadTarget(), '查询已完成')">
+        <form class="experience-editor" @submit.prevent="runRead(() => loadTarget(), '查询已完成')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据范围</legend>
             <label for="whisper-evidence-id">证据范围标识</label
@@ -111,7 +113,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           </table>
         </div>
       </section>
-      <section class="business-card" aria-label="树洞证据删除进度">
+      <section class="experience-panel" aria-label="树洞证据删除进度">
         <h2>查询删除任务</h2>
         <div v-if="acceptedId" class="workflow-actions">
           <FloatingNotice message="删除任务已受理，待核对清理进度。" tone="info" />
@@ -122,7 +124,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             查询刚受理的任务
           </button>
         </div>
-        <form @submit.prevent="runRead(() => query(), '查询已完成')">
+        <form class="experience-editor" @submit.prevent="runRead(() => query(), '查询已完成')">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知删除任务</legend>
             <label for="whisper-job-id">删除任务标识</label
@@ -162,22 +164,19 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           </div>
         </section>
       </section>
-      <ElDialog
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="busy || uncertain"
         title="处理树洞证据删除"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
-        :before-close="closeProcessing"
-        :show-close="!busy && !uncertain"
+        @close="cancelProcessing"
       >
         <template v-if="target"
           ><p>树洞限定证据 · 范围版本 {{ target.version }}</p>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-          <form @submit.prevent="check">
+          <form class="experience-editor" @submit.prevent="check">
             <fieldset :disabled="busy || confirming || uncertain">
               <legend>删除整个限定证据范围</legend>
               <label for="whisper-delete-reason"
@@ -204,9 +203,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </button>
             <button :disabled="busy || uncertain" @click="back">返回修改</button>
           </section>
-          <button :disabled="busy || uncertain" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="busy || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

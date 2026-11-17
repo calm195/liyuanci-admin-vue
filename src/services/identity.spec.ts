@@ -82,3 +82,36 @@ describe('T012 身份审核响应边界', () => {
     expect(validIdentityFeedback('  ')).toBe(false)
   })
 })
+
+it('历史投影拒绝待审并剔除学生卡，首次申请与审核时间严格校验', async () => {
+  const { parseIdentityHistory } = await import('./identity')
+  const record = {
+    id: 'history',
+    version: 2,
+    status: 'rejected',
+    name: '合成学生',
+    student_number: 'DEMO-1',
+    created_at: '2026-11-01T00:00:00Z',
+    reviewed_at: '2026-11-02T00:00:00Z',
+    reviewer_id: 'reviewer-id',
+    reason: '材料不清晰',
+    revision_suggestion: '重新拍摄',
+    asset_id: '不应保留',
+    account_id: '不应保留',
+  }
+  const result = parseIdentityHistory(record)
+  expect(result).not.toHaveProperty('asset_id')
+  expect(result).not.toHaveProperty('account_id')
+  expect(result.reason).toBe('材料不清晰')
+  expect(() => parseIdentityHistory({ ...record, status: 'pending' })).toThrow()
+  expect(() => parseIdentityHistory({ ...record, created_at: '2026/11/01' })).toThrow()
+  expect(
+    parseIdentityHistory({
+      ...record,
+      reviewer_id: null,
+      reviewed_at: null,
+      reason: null,
+      revision_suggestion: null,
+    }).reason,
+  ).toBeNull()
+})

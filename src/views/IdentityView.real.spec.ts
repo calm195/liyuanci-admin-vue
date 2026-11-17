@@ -20,6 +20,7 @@ it('T012 默认真实身份审核进入页面即读取后台队列，按需读�
             version: 3,
             name: '合成姓名',
             student_number: '合成学号',
+            created_at: '2026-11-04T01:00:00Z',
           },
         ],
         next_cursor: null,
@@ -41,7 +42,9 @@ it('T012 默认真实身份审核进入页面即读取后台队列，按需读�
   }
   const wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
   await flushPromises()
-  expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/identity-reviews?limit=10&view=pending')
+  expect(transport.mock.calls[0]?.[0]).toBe(
+    '/api/v1/admin/identity-reviews?limit=10&view=pending&include=created_at',
+  )
   expect(wrapper.text()).not.toContain('待接口验收后开放')
   transport.mockResolvedValue(
     Response.json({

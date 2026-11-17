@@ -4,11 +4,9 @@ import { whisperReportStatuses } from '@/utils/dictionary-labels'
 
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import {
   useWhisperReports,
   whisperPenaltyLabels,
@@ -48,7 +46,6 @@ const {
   close,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   check,
   back,
   submit,
@@ -64,7 +61,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="树洞举报">
+  <main class="experience-page workflow" aria-label="树洞举报">
+    <WorkspaceHeading
+      title="树洞举报"
+      description="按授权案件核对匿名正文与举报依据；普通限制、处罚和危机升级分别核对。"
+    />
     <p>仅处理当前授权举报及其来源，不提供匿名作者身份查询。</p>
     <template v-if="workspace.allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
@@ -80,18 +81,21 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <p v-else>{{ penaltyReceipt.kind === 'ban' ? '永久封禁' : '无到期时间' }}</p>
       </section>
 
-      <section aria-label="树洞举报列表" :aria-busy="listBusy">
-        <BusinessToolbar label="树洞举报操作栏">
-          <h2>举报案件</h2>
-          <template #tools>
-            <button
-              :disabled="listBusy || editorOpen"
-              @click="runRead(() => refresh(), '查询已完成')"
-            >
-              刷新列表
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-label="树洞举报列表"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">举报案件</h2>
+
+          <button
+            :disabled="listBusy || editorOpen"
+            @click="runRead(() => refresh(), '查询已完成')"
+          >
+            刷新列表
+          </button>
+        </div>
         <p v-if="listBusy" role="status">正在读取举报…</p>
         <FloatingNotice v-if="listError" :message="listError" tone="error"
           >{{ listError }} 请刷新列表或重试加载。</FloatingNotice
@@ -99,7 +103,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <FloatingNotice v-if="listNotice" :message="listNotice" tone="info">{{
           listNotice
         }}</FloatingNotice>
-        <p v-if="!listBusy && !listError && !items.length">当前页暂无举报</p>
+        <p v-if="!listBusy && !listError && !items.length" class="experience-empty">
+          当前页暂无举报
+        </p>
         <div v-if="items.length" class="business-table">
           <table>
             <thead>
@@ -145,18 +151,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           </button>
         </div>
       </section>
-      <ElDialog
-        v-if="selectedId && !editorOpen"
-        :model-value="true"
+      <WorkspaceDrawer
+        :open="!!selectedId && !editorOpen"
         title="树洞举报详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
+        :busy="writing"
+        @close="close"
       >
         <section aria-label="树洞举报详情" :aria-busy="loading">
-          <h2>举报详情（只读）</h2>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <p v-if="loading" role="status">正在读取举报和治理状态…</p>
           <button
@@ -167,7 +168,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             重新读取举报
           </button>
           <template v-if="detail">
-            <button :disabled="editorOpen" @click="close">关闭举报</button>
+            <button data-overlay-close :disabled="editorOpen" @click="close">关闭举报</button>
             <p>
               {{ whisperReportStatuses(detail.status) }} · 举报版本
               {{ detail.version }}
@@ -210,18 +211,20 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           </template>
           <p v-else-if="!selectedId && !loading">选择举报，按需读取授权内容。</p>
         </section>
-      </ElDialog>
-      <ElDialog
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close :disabled="writing" @click="close">关闭案件</button>
+          </div></template
+        >
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || uncertain"
         :title="whisperTaskLabels[task]"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
-        :before-close="closeProcessing"
-        :show-close="!writing && !uncertain"
+        @close="cancelProcessing"
       >
         <template v-if="detail">
           <p>
@@ -298,9 +301,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </button>
             <button :disabled="writing || uncertain" @click="back">返回修改</button>
           </section>
-          <button :disabled="writing || uncertain" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="writing || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

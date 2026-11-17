@@ -1,3 +1,4 @@
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
@@ -5,6 +6,7 @@ import { validIdentityFeedback } from '@/services/identity'
 import { createIdentityTransport } from '@/services/identity-transport'
 import type {
   IdentityCase,
+  IdentityHistory,
   IdentityDecision,
   IdentityReceipt,
   IdentityListItem,
@@ -25,10 +27,12 @@ export function useIdentityReview(view: IdentityListView) {
   const listBusy = ref(false)
   const listError = ref('')
   const detail = ref<IdentityCase | null>(null)
+  const historyDetail = ref<IdentityHistory | null>(null)
   const selected = ref('')
   const caseBusy = ref(false)
   const cardBusy = ref(false)
   const submitting = ref(false)
+  const uncertain = ref(false)
   const cardUrl = ref('')
   const caseError = ref('')
   const notice = ref('')
@@ -64,6 +68,7 @@ export function useIdentityReview(view: IdentityListView) {
     cardUrl.value = ''
   }
   function resetDecision() {
+    uncertain.value = false
     editorOpen.value = false
     confirming.value = false
     reason.value = ''
@@ -72,6 +77,7 @@ export function useIdentityReview(view: IdentityListView) {
     attempt = null
   }
   function startProcessing() {
+    if (uncertain.value) return
     if (!submitting.value && detail.value?.status === 'pending' && allowed()) {
       resetDecision()
       hideCard()
@@ -79,9 +85,11 @@ export function useIdentityReview(view: IdentityListView) {
     }
   }
   function cancelProcessing() {
+    if (uncertain.value) return
     if (!submitting.value) resetDecision()
   }
   function closeProcessing(done: () => void) {
+    if (uncertain.value) return
     if (submitting.value) return
     resetDecision()
     done()
@@ -93,6 +101,7 @@ export function useIdentityReview(view: IdentityListView) {
     caseController = null
     hideCard()
     detail.value = null
+    historyDetail.value = null
     selected.value = ''
     caseBusy.value = false
     cardBusy.value = false
@@ -179,20 +188,25 @@ export function useIdentityReview(view: IdentityListView) {
     items.value = items.value.filter((item) => item.id !== id)
   }
   async function openCase(id: string) {
+    if (uncertain.value) return
     clearCase()
     notice.value = ''
-    if (view !== 'pending' || !allowed()) return
+    if (!allowed()) return
     selected.value = id
     const controller = new AbortController()
     caseController = controller
     const generation = caseGeneration
     caseBusy.value = true
     try {
-      const result = await client.detail(id, controller.signal)
+      const result =
+        view === 'history'
+          ? await client.history(id, controller.signal)
+          : await client.detail(id, controller.signal)
       if (!active || controller.signal.aborted || generation !== caseGeneration || !allowed())
         return
       if (result.id !== id) throw new Error('案件响应不匹配')
-      detail.value = result
+      if ('reviewer_id' in result) historyDetail.value = result
+      else detail.value = result
     } catch (error) {
       if (!active || controller.signal.aborted || generation !== caseGeneration) return
       if (error instanceof ApiError && error.status === 404) removeMissingCase(id)
@@ -283,6 +297,11 @@ export function useIdentityReview(view: IdentityListView) {
       await loadList()
     } catch (error) {
       if (!active || controller.signal.aborted || generation !== caseGeneration) return
+      uncertain.value = !(
+        error instanceof ApiError &&
+        error.status < 500 &&
+        ![408, 429].includes(error.status)
+      )
       if (error instanceof ApiError && error.status === 409) {
         await reloadConflictedCase(current.id)
       } else {
@@ -311,7 +330,11 @@ export function useIdentityReview(view: IdentityListView) {
     clearAll()
   })
 
+  onBeforeRouteLeave(() => !uncertain.value)
+  onBeforeRouteUpdate(() => !uncertain.value)
+
   return {
+    uncertain,
     pageSize,
     editorOpen,
     allowed,
@@ -321,6 +344,7 @@ export function useIdentityReview(view: IdentityListView) {
     listBusy,
     listError,
     detail,
+    historyDetail,
     selected,
     caseBusy,
     cardBusy,

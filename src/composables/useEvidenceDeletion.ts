@@ -1,3 +1,4 @@
+import { onBeforeRouteLeave } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createPrivacyClient, validDeletionId, validDeletionReason } from '@/services/privacy'
@@ -7,6 +8,7 @@ import type { DeletionJob, EvidenceTarget } from '@/types/privacy'
 
 export function useEvidenceDeletion() {
   const editorOpen = ref(false)
+  const uncertain = ref(false)
   const evidenceId = ref('')
   const target = ref<EvidenceTarget | null>(null)
   const reason = ref('')
@@ -23,6 +25,7 @@ export function useEvidenceDeletion() {
   )
   function clearTarget() {
     editorOpen.value = false
+    uncertain.value = false
     target.value = null
     reason.value = ''
     confirmation.value = false
@@ -80,6 +83,11 @@ export function useEvidenceDeletion() {
         accepted.value = value
       },
       (cause) => {
+        uncertain.value = !(
+          cause instanceof ApiError &&
+          cause.status < 500 &&
+          ![408, 429].includes(cause.status)
+        )
         if (cause instanceof ApiError && (cause.status === 404 || cause.status === 409)) {
           clearTarget()
           error.value = '证据版本或状态已变化，请重新读取并核对；不会自动重提'
@@ -108,14 +116,14 @@ export function useEvidenceDeletion() {
     editorOpen.value = true
   }
   function cancelProcessing() {
-    if (busy.value) return
+    if (busy.value || uncertain.value) return
     editorOpen.value = false
     reason.value = ''
     confirmation.value = false
     attempt = null
   }
   function closeProcessing(done: () => void) {
-    if (busy.value) return
+    if (busy.value || uncertain.value) return
     cancelProcessing()
     done()
   }
@@ -126,7 +134,9 @@ export function useEvidenceDeletion() {
     },
     { flush: 'sync' },
   )
+  onBeforeRouteLeave(() => !busy.value && !uncertain.value)
   return {
+    uncertain,
     editorOpen,
     evidenceId,
     target,

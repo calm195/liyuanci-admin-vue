@@ -1,6 +1,7 @@
 import { record } from '@/types/admin'
 import type {
   IdentityCase,
+  IdentityHistory,
   IdentityListItem,
   IdentityListView,
   IdentityPage,
@@ -33,7 +34,11 @@ function summary(value: unknown): IdentitySummary {
   }
 }
 /** 只保留当前列表所需的业务字段，学生卡和内部版本由详情单独读取。 */
-export function parseIdentityPage(value: unknown, view: IdentityListView): IdentityPage {
+export function parseIdentityPage(
+  value: unknown,
+  view: IdentityListView,
+  withCreatedAt = false,
+): IdentityPage {
   if (!record(value) || !Array.isArray(value['items'])) return invalid()
   const cursor = value['next_cursor']
   if (cursor !== null && typeof cursor !== 'string') return invalid()
@@ -50,6 +55,7 @@ export function parseIdentityPage(value: unknown, view: IdentityListView): Ident
       student_number: text(item['student_number']),
       status,
       reviewed_at: reviewedAt ?? null,
+      ...(withCreatedAt ? { created_at: timestamp(item['created_at']) } : {}),
     }
   })
   return { items, next_cursor: cursor }
@@ -76,4 +82,32 @@ export function parseIdentityReceipt(value: unknown): IdentityReceipt {
   if (value['revision_suggestion'] !== undefined)
     result.revision_suggestion = text(value['revision_suggestion'])
   return result
+}
+
+function timestamp(value: unknown): string {
+  const result = text(value)
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(result) ||
+    !Number.isFinite(Date.parse(result))
+  )
+    return invalid()
+  return result
+}
+/** 完成案件仅保留审核结论投影，不携带学生卡与学生账号标识。 */
+export function parseIdentityHistory(value: unknown): IdentityHistory {
+  if (!record(value) || (value['status'] !== 'approved' && value['status'] !== 'rejected'))
+    return invalid()
+  const nullable = (input: unknown) => (input === null ? null : text(input))
+  return {
+    id: text(value['id']),
+    version: version(value['version']),
+    status: value['status'],
+    name: text(value['name']),
+    student_number: text(value['student_number']),
+    created_at: timestamp(value['created_at']),
+    reviewed_at: value['reviewed_at'] === null ? null : timestamp(value['reviewed_at']),
+    reviewer_id: nullable(value['reviewer_id']),
+    reason: nullable(value['reason']),
+    revision_suggestion: nullable(value['revision_suggestion']),
+  }
 }

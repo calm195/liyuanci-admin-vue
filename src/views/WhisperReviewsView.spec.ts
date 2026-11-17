@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -10,6 +11,7 @@ import type { Role } from '@/types/admin'
 import type { ReviewDetail, ReviewOutcome, ReviewSummary } from '@/types/whispers'
 import type * as Service from '@/services/whispers'
 
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   whisperAdminReviewsList: vi.fn(),
   whisperAdminReviewGet: vi.fn(),
@@ -102,6 +104,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   const pinia = createPinia()
   setActivePinia(pinia)
   login()

@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
@@ -9,6 +10,7 @@ import DeletionReceiptsView from './DeletionReceiptsView.vue'
 import { ElDialog } from 'element-plus'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => ({
   evidence: vi.fn(),
   remove: vi.fn(),
@@ -49,6 +51,7 @@ async function prepare() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -97,7 +100,7 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
     expect(wrapper.find('#delete-job-id').exists()).toBe(false)
     showReceipts()
     await wrapper.get('#delete-job-id').setValue(jobId)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
+    await wrapper.get('#job-query').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
   })
@@ -182,16 +185,16 @@ describe('T032 REQ-018/019 后台证据删除与回执', () => {
       })
       .mockRejectedValueOnce(new ApiError(404))
     await wrapper.get('#delete-job-id').setValue(jobId)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
+    await wrapper.get('#job-query').trigger('submit')
     await flushPromises()
     expect(wrapper.text()).toContain('外部清理依赖暂不可用')
     await wrapper.get('#delete-job-id').setValue(evidenceId)
     expect(wrapper.find('[aria-label="清理结果"]').exists()).toBe(false)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
+    await wrapper.get('#job-query').trigger('submit')
     await flushPromises()
     expect(wrapper.text()).toContain('不能据此认定清理完成')
     await wrapper.get('#delete-receipt').setValue(`${jobId}.${'a'.repeat(43)}`)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[1]?.trigger('submit')
+    await wrapper.get('#receipt-query').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[aria-label="清理结果"]').text()).toContain('清理已完成（后端确认）')
     await button('清空页面').trigger('click')
@@ -285,7 +288,7 @@ describe('证据删除与查询隔离', () => {
     )
     const handle = `${jobId}.${'a'.repeat(43)}`
     await wrapper.get('#delete-receipt').setValue(handle)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[1]?.trigger('submit')
+    await wrapper.get('#receipt-query').trigger('submit')
     const signal: unknown = mocks.receipt.mock.calls[0]?.[1]
     showReceipts()
     if (!finish || !(signal instanceof AbortSignal)) throw new Error('请求未准备')
@@ -304,14 +307,14 @@ describe('T032 REQ-018 只读查询反馈回归', () => {
     await wrapper.get('#delete-receipt').setValue('not-a-receipt')
     expect(button('查询匿名删除回执').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('待办 ID 不能代替回执')
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[1]?.trigger('submit')
+    await wrapper.get('#receipt-query').trigger('submit')
     await flushPromises()
     expect(mocks.receipt).not.toHaveBeenCalled()
     expect(wrapper.get('[role="alert"]').text()).toContain('完整的删除回执')
     expect(wrapper.text()).not.toContain('写入结果不明确')
     await wrapper.get('#delete-receipt').setValue(`${jobId}.${'a'.repeat(43)}`)
     expect(button('查询匿名删除回执').attributes('disabled')).toBeUndefined()
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[1]?.trigger('submit')
+    await wrapper.get('#receipt-query').trigger('submit')
     await flushPromises()
     expect(mocks.receipt).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
@@ -322,10 +325,7 @@ describe('T032 REQ-018 只读查询反馈回归', () => {
     await wrapper
       .get(kind === 'job' ? '#delete-job-id' : '#delete-receipt')
       .setValue(kind === 'job' ? jobId : `${jobId}.${'a'.repeat(43)}`)
-    await wrapper
-      .get('[aria-label="删除进度查询"]')
-      .findAll('form')
-      [kind === 'job' ? 0 : 1]?.trigger('submit')
+    await wrapper.get(kind === 'job' ? '#job-query' : '#receipt-query').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[role="alert"] .floating-notice-content').text()).toBe(
       '查询未完成，请稍后重试',
@@ -337,7 +337,7 @@ describe('T032 REQ-018 只读查询反馈回归', () => {
   it('后端拒绝查询参数时要求核对，不称删除已经发生', async () => {
     mocks.job.mockRejectedValue(new ApiError(400))
     await wrapper.get('#delete-job-id').setValue(jobId)
-    await wrapper.get('[aria-label="删除进度查询"]').findAll('form')[0]?.trigger('submit')
+    await wrapper.get('#job-query').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('查询参数无效')
     expect(wrapper.text()).not.toContain('写入结果不明确')

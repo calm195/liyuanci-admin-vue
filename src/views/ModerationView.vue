@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import ModerationCaseDetail from '@/components/ModerationCaseDetail.vue'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useModerationReview } from '@/composables/useModerationReview'
 const {
+  pending,
+  retryPending,
   pageSize,
   filters,
   search,
@@ -47,7 +48,6 @@ const {
   submit,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   reloadSelected,
   crisisEscalated,
 } = useModerationReview()
@@ -72,14 +72,32 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="内容审核">
-    <p>仅搜索授权审核案件的编号，查看详情时展示命中正文；不提供全站私聊或上下文会话搜索。</p>
+  <main class="panel workflow experience-page" aria-label="内容审核">
+    <WorkspaceHeading
+      title="内容审核"
+      description="核对同版本正文与命中依据，清晰记录每一次审核决定。"
+    />
     <template v-if="workspace.allowed()">
-      <p class="banner">仅展示当前授权的审核案件，决定提交后以服务端业务结果为准。</p>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice v-if="error && !selectedId && !editorOpen" :message="error" tone="error">{{
         error
       }}</FloatingNotice>
+      <section v-if="pending && !editorOpen" class="experience-panel" aria-label="待确认审核">
+        <h2>审核结果待确认</h2>
+        <p>
+          原请求已保留。关闭详情或切换页面不会取消已提交的决定，请先核实结果再创建新的审核操作。
+        </p>
+        <p>
+          案件 {{ pending.id }} · 版本 {{ pending.body.expected_version }} ·
+          {{ pending.body.decision === 'approved' ? '通过内容审核' : '驳回内容审核' }}
+        </p>
+        <button :disabled="writing || listBusy || loading" @click="retryPending">
+          {{ writing ? '正在提交…' : '原样重试' }}
+        </button>
+        <button :disabled="writing || listBusy || loading" @click="openCase(pending.id)">
+          查看原案件
+        </button>
+      </section>
       <section v-if="outcome" class="workflow-box" aria-label="审核回执">
         <h2>审核回执</h2>
         <p>内容判定：{{ outcome.content_decision === 'approved' ? '通过' : '驳回' }}</p>
@@ -88,12 +106,12 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <p>内容通过不代表必然公开、送达或恢复交互。</p>
       </section>
 
-      <section aria-label="案件列表" :aria-busy="listBusy">
+      <section class="experience-panel" aria-label="案件列表" :aria-busy="listBusy">
         <BusinessToolbar label="内容审核操作栏">
           <h2>审核案件</h2>
           <template #tools>
             <button
-              :disabled="listBusy || editorOpen"
+              :disabled="listBusy || writing || editorOpen"
               @click="runRead(() => refresh(), '查询已完成')"
             >
               刷新列表
@@ -105,7 +123,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           aria-label="审核案件筛选"
           @submit.prevent="runRead(search, '筛选结果已更新')"
         >
-          <fieldset :disabled="listBusy || writing || editorOpen">
+          <fieldset class="experience-filters" :disabled="listBusy || writing || editorOpen">
             <label
               >搜索案件或内容编号<input
                 v-model="filters.q"
@@ -143,11 +161,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
-          <button :disabled="editorOpen" @click="runRead(() => loadList(), '查询已完成')">
+          <button
+            :disabled="writing || editorOpen"
+            @click="runRead(() => loadList(), '查询已完成')"
+          >
             重试列表
           </button>
         </FloatingNotice>
-        <p v-else-if="!items.length">当前筛选下暂无审核案件</p>
+        <p v-else-if="!items.length" class="experience-empty">当前筛选下暂无审核案件</p>
         <div v-else class="business-table">
           <table>
             <thead>
@@ -171,7 +192,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
                 <td>{{ item.content_version ?? '—' }}</td>
                 <td>
                   <button
-                    :disabled="editorOpen"
+                    :disabled="writing || editorOpen"
                     :aria-label="`查看第 ${index + 1} 条案件`"
                     @click="openCase(item.id)"
                   >
@@ -188,23 +209,26 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             :disabled="listBusy || writing || editorOpen"
             @change="refresh()"
           />
-          <button :disabled="listBusy || editorOpen || !history.length" @click="page('previous')">
+          <button
+            :disabled="listBusy || writing || editorOpen || !history.length"
+            @click="page('previous')"
+          >
             上一页
           </button>
-          <button :disabled="listBusy || editorOpen || !nextCursor" @click="page('next')">
+          <button
+            :disabled="listBusy || writing || editorOpen || !nextCursor"
+            @click="page('next')"
+          >
             下一页
           </button>
         </div>
       </section>
-      <ElDialog
-        v-if="selectedId && !editorOpen"
-        :model-value="true"
+      <WorkspaceDrawer
+        :open="!!selectedId && !editorOpen"
         title="内容审核案件详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
+        description="只读取本案件授权的同版本内容。"
+        :busy="writing || escalating"
+        @close="close"
       >
         <ModerationCaseDetail
           :detail="detail"
@@ -212,23 +236,40 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
           :loading="loading"
           :error="error"
           :status="detail ? stateLabel(detail.status) : ''"
-          :locked="editorOpen"
-          :can-escalate="canEscalate"
           @retry="openCase(selectedId)"
-          @close="close"
-          @process="startProcessing"
         />
-      </ElDialog>
-      <ElDialog
+        <template #footer>
+          <div class="drawer-actions">
+            <button data-overlay-close :disabled="writing || escalating" @click="close">
+              关闭案件
+            </button>
+            <button
+              v-if="canEscalate"
+              :disabled="writing || escalating"
+              @click="startProcessing('crisis')"
+            >
+              升级危机
+            </button>
+            <button
+              v-if="detail && (detail.status === 'human_required' || pending?.id === detail.id)"
+              class="business-primary"
+              :disabled="writing || escalating"
+              @click="startProcessing('decision')"
+            >
+              {{ pending?.id === detail.id ? '核实审核结果' : '处理内容审核' }}
+            </button>
+          </div>
+        </template>
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || escalating"
+        :dirty="pending ? false : undefined"
         :title="editorTask === 'crisis' ? '升级危机' : '处理内容审核'"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :before-close="closeProcessing"
-        :show-close="!writing && !escalating"
+        @close="cancelProcessing"
       >
         <template v-if="detail">
           <p>案件版本 {{ detail.version }} · 正文版本 {{ detail.content_version }}</p>
@@ -243,6 +284,23 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             @escalated="crisisEscalated"
             @conflict="reloadSelected"
           />
+          <template v-else-if="pending">
+            <section aria-label="待确认审核">
+              <h3>审核结果尚未确认</h3>
+              <p>以下原请求已锁定，重试将使用相同内容、版本和操作标识。</p>
+              <p>
+                案件 {{ pending.id }} · 版本 {{ pending.body.expected_version }} ·
+                {{ pending.body.decision === 'approved' ? '通过内容审核' : '驳回内容审核' }}
+              </p>
+              <template v-if="pending.body.decision === 'rejected'">
+                <p>原因：{{ pending.body.reason }}</p>
+                <p>建议：{{ pending.body.revision_suggestion }}</p>
+              </template>
+              <button :disabled="writing" @click="retryPending">
+                {{ writing ? '正在提交…' : '原样重试' }}
+              </button>
+            </section>
+          </template>
           <template v-else>
             <form
               v-if="detail.status === 'human_required'"
@@ -298,9 +356,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
               <button :disabled="writing" @click="confirming = false">返回修改</button>
             </section>
           </template>
-          <button :disabled="writing || escalating" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="writing || escalating" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>

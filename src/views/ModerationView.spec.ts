@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, getActivePinia } from 'pinia'
@@ -6,6 +7,7 @@ import ModerationView from './ModerationView.vue'
 import { ElDialog } from 'element-plus'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useAdminStore } from '@/stores/admin'
+import { useModerationCommands } from '@/stores/moderation-commands'
 import { ApiError } from '@/services/admin'
 import type * as contentService from '@/services/content-transport'
 import type { ModerationCase, ModerationOutcome } from '@/types/moderation'
@@ -17,9 +19,11 @@ vi.mock('@/components/CrisisEscalation.vue', () => ({
   },
 }))
 vi.mock('vue-router', () => ({
+  onBeforeRouteLeave: vi.fn(),
   useRouter: () => ({ push: mocks.push }),
   useRoute: () => ({ query: mocks.query }),
 }))
+vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
 const mocks = vi.hoisted(() => {
   const query: { case?: string } = {}
   return {
@@ -75,7 +79,10 @@ async function open(id = 'case-a') {
 }
 async function processing() {
   if (!wrapper?.find('form[aria-label="审核决定"]').exists()) {
-    await button('处理内容审核').trigger('click')
+    const label = wrapper?.findAll('button').some((item) => item.text() === '核实审核结果')
+      ? '核实审核结果'
+      : '处理内容审核'
+    await button(label).trigger('click')
     await flushPromises()
   }
 }
@@ -87,6 +94,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   delete mocks.query.case
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -249,9 +257,78 @@ describe('T017 真实内容审核页面交互', () => {
     mocks.decide.mockRejectedValueOnce(new Error('offline'))
     await confirm()
     const key: unknown = mocks.decide.mock.calls[1]?.[2]
-    await button('确认提交').trigger('click')
+    await button('原样重试').trigger('click')
     await flushPromises()
     expect(mocks.decide.mock.calls[2]?.[2]).toBe(key)
+  })
+  it.each([new Error('offline'), new ApiError(503), new ApiError(408), new ApiError(429)])(
+    '未知结果关闭重开只用原请求核实，不产生新决定：%s',
+    async (failure) => {
+      await flushPromises()
+      await open()
+      await processing()
+      await wrapper?.get('input[value="rejected"]').setValue()
+      await wrapper?.get('#moderation-reason').setValue('原始审核理由')
+      await wrapper?.get('#moderation-suggestion').setValue('原始修改建议')
+      mocks.decide.mockRejectedValueOnce(failure)
+      await confirm()
+      const original = mocks.decide.mock.calls[0]
+      expect(original).toBeDefined()
+      await button('取消处理').trigger('click')
+      await flushPromises()
+      expect(wrapper?.find('[aria-label="待确认审核"]').exists()).toBe(true)
+      await processing()
+      expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
+      expect(wrapper?.text()).toContain('原始审核理由')
+      expect(wrapper?.text()).toContain('原始修改建议')
+      await button('原样重试').trigger('click')
+      await flushPromises()
+      expect(mocks.decide).toHaveBeenCalledTimes(2)
+      expect(mocks.decide.mock.calls[1]?.slice(0, 3)).toEqual(original?.slice(0, 3))
+      expect(useModerationCommands().pending).toBeNull()
+    },
+  )
+  it('未知结果关闭案件、刷新及路由重入后仍保留原正文和键', async () => {
+    await flushPromises()
+    await open()
+    mocks.decide.mockRejectedValueOnce(new Error('offline'))
+    await confirm()
+    const original = mocks.decide.mock.calls[0]
+    await button('取消处理').trigger('click')
+    await button('关闭案件').trigger('click')
+    await button('刷新列表').trigger('click')
+    await flushPromises()
+    wrapper?.unmount()
+    const pinia = getActivePinia()
+    if (!pinia) throw new Error('缺少会话')
+    wrapper = mount(ModerationView, { global: { plugins: [pinia] } })
+    await flushPromises()
+    expect(wrapper.find('[aria-label="待确认审核"]').exists()).toBe(true)
+    await open('case-b')
+    await processing()
+    expect(wrapper.find('form[aria-label="审核决定"]').exists()).toBe(false)
+    await button('原样重试').trigger('click')
+    await flushPromises()
+    expect(mocks.decide.mock.calls[1]?.slice(0, 3)).toEqual(original?.slice(0, 3))
+    expect(wrapper.text()).toContain('审核回执')
+  })
+  it('未知审核命令在换号后清除，不向新账号恢复理由或原请求', async () => {
+    await flushPromises()
+    await open()
+    mocks.decide.mockRejectedValueOnce(new Error('offline'))
+    await confirm()
+    expect(useModerationCommands().pending).not.toBeNull()
+    const admin = useAdminStore()
+    if (!admin.session) throw new Error('缺少会话')
+    admin.session = {
+      ...admin.session,
+      token: 'another-session',
+      account: { ...admin.session.account, id: 'another-operator' },
+    }
+    await flushPromises()
+    expect(useModerationCommands().pending).toBeNull()
+    expect(wrapper?.find('[aria-label="待确认审核"]').exists()).toBe(false)
+    expect(wrapper?.text()).not.toContain('合成涉校命中正文')
   })
   it('只提供正式审核决定，不显示未交付的下线或解除入口', async () => {
     await flushPromises()
@@ -266,6 +343,7 @@ describe('T017 真实内容审核页面交互', () => {
     await confirm()
     expect(wrapper?.find('blockquote').exists()).toBe(false)
     expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
+    expect(useModerationCommands().pending).toBeNull()
     expect(useAdminStore().authenticated).toBe(status !== 401)
     expect(useAdminStore().forbidden).toBe(status === 403 ? 1 : 0)
   })
@@ -360,7 +438,8 @@ it('处理期间禁用切案和查询，提交期间不能取消，404后关闭�
   await open('case-b')
   expect(wrapper?.text()).not.toContain('合成涉校命中正文')
   expect(wrapper?.text()).not.toContain('另一合成正文')
-  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(true)
+  expect(wrapper?.find('[aria-label="待确认审核"]').exists()).toBe(true)
+  expect(wrapper?.find('form[aria-label="审核决定"]').exists()).toBe(false)
   pending.resolve(Promise.reject(new ApiError(404)))
   await flushPromises()
   expect(wrapper?.find('blockquote').exists()).toBe(false)

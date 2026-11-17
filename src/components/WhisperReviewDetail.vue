@@ -18,14 +18,12 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
 </script>
 <template>
   <section aria-label="树洞案件详情" :aria-busy="loading">
-    <h2>案件详情</h2>
     <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     <p v-if="loading" role="status">正在读取案件…</p>
     <button v-if="selectedId && !loading" :disabled="locked" @click="$emit('retry')">
       重新读取案件
     </button>
     <template v-if="detail">
-      <button :disabled="locked" @click="$emit('close')">关闭案件</button>
       <p>{{ whisperKindLabels[detail.source.kind] }} · {{ whisperStatusLabels(detail.status) }}</p>
       <p>
         案件版本 {{ detail.version }} · 正文版本
@@ -49,14 +47,6 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
         :body="detail.body"
         :title="detail.title"
       />
-      <div class="workflow-actions">
-        <button v-if="canDecide" :disabled="locked" @click="$emit('process', 'decision')">
-          处理树洞审核
-        </button>
-        <button v-if="canEscalate" :disabled="locked" @click="$emit('process', 'crisis')">
-          升级危机
-        </button>
-      </div>
       <p v-if="!canDecide && !canEscalate">当前案件只读，没有可执行的处理动作。</p>
     </template>
     <p v-else-if="!loading && !selectedId">选择案件，按需读取当前命中版本正文。</p>

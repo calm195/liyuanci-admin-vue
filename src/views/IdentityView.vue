@@ -2,17 +2,16 @@
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import IdentityCaseDetail from '@/components/IdentityCaseDetail.vue'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { useIdentityReview } from '@/composables/useIdentityReview'
 import { displayBeijingTime } from '@/utils/admin-time'
 
 const props = defineProps<{ history?: boolean }>()
 const pageTitle = props.history ? '身份审核历史' : '身份审核'
 const {
+  uncertain,
   pageSize,
   editorOpen,
   allowed,
@@ -22,6 +21,7 @@ const {
   listBusy,
   listError,
   detail,
+  historyDetail,
   selected,
   caseBusy,
   cardBusy,
@@ -49,7 +49,6 @@ const {
   submit,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
 } = useIdentityReview(props.history ? 'history' : 'pending')
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
   Boolean(listError.value),
@@ -63,7 +62,15 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" :aria-label="pageTitle">
+  <main class="experience-page workflow" :aria-label="pageTitle">
+    <WorkspaceHeading
+      :title="pageTitle"
+      :description="
+        history
+          ? '查看已处理身份审核的姓名、学号、结论和时间。'
+          : '核对姓名、学号和授权学生卡；处理结论保留完整回执。'
+      "
+    />
     <template v-if="allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice
@@ -79,18 +86,23 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         <p v-if="receipt.revision_suggestion">修改建议：{{ receipt.revision_suggestion }}</p>
       </section>
 
-      <section aria-labelledby="case-list-title" :aria-busy="listBusy">
-        <BusinessToolbar :label="`${pageTitle}操作栏`">
-          <h2 id="case-list-title">{{ history ? '已处理案件' : '待审核案件' }}</h2>
-          <template #tools>
-            <button
-              :disabled="listBusy || editorOpen"
-              @click="runRead(() => refreshList(), '查询已完成')"
-            >
-              刷新列表
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-labelledby="case-list-title"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 id="case-list-title" class="experience-list-title">
+            {{ history ? '已处理案件' : '待审核案件' }}
+          </h2>
+
+          <button
+            :disabled="listBusy || editorOpen"
+            @click="runRead(() => refreshList(), '查询已完成')"
+          >
+            刷新列表
+          </button>
+        </div>
         <p v-if="listBusy" role="status">正在加载案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
@@ -98,7 +110,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             重试列表
           </button>
         </FloatingNotice>
-        <p v-else-if="!items.length">{{ history ? '暂无审核历史' : '暂无待审核案件' }}</p>
+        <p v-else-if="!items.length" class="experience-empty">
+          {{ history ? '暂无审核历史' : '暂无待审核案件' }}
+        </p>
         <div v-else class="business-table">
           <table>
             <thead>
@@ -106,11 +120,12 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
                 <th scope="col">本页序号</th>
                 <th scope="col">姓名</th>
                 <th scope="col">学号</th>
+                <th scope="col">首次申请时间</th>
                 <template v-if="history">
                   <th scope="col">审核结果</th>
                   <th scope="col">审核时间</th>
                 </template>
-                <th v-else scope="col">操作</th>
+                <th scope="col">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -118,17 +133,18 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
                 <th scope="row">{{ index + 1 }}</th>
                 <td>{{ item.name }}</td>
                 <td>{{ item.student_number }}</td>
+                <td>{{ item.created_at ? displayBeijingTime(item.created_at) : '—' }}</td>
                 <template v-if="history">
                   <td>{{ statusLabel(item.status) }}</td>
                   <td>{{ item.reviewed_at ? displayBeijingTime(item.reviewed_at) : '—' }}</td>
                 </template>
-                <td v-else>
+                <td>
                   <button
                     :disabled="editorOpen"
                     :aria-label="`查看第 ${index + 1} 条案件`"
                     @click="openCase(item.id)"
                   >
-                    查看详情
+                    {{ history ? '查看记录' : '查看详情' }}
                   </button>
                 </td>
               </tr>
@@ -149,17 +165,41 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
           </button>
         </div>
       </section>
-      <ElDialog
-        v-if="selected && !editorOpen"
-        :model-value="true"
-        title="身份审核案件详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && clearCase()"
+      <WorkspaceDrawer
+        :open="!!selected && !editorOpen"
+        :title="history ? '身份审核历史' : '身份审核案件详情'"
+        @close="clearCase"
       >
+        <section v-if="history" aria-label="只读审核记录" :aria-busy="caseBusy">
+          <p v-if="caseBusy">正在读取审核记录…</p>
+          <p v-if="caseError" role="alert">{{ caseError }}</p>
+          <button v-if="!historyDetail && !caseBusy" @click="openCase(selected)">重试记录</button>
+          <dl v-if="historyDetail" class="identity-history-fields">
+            <dt>姓名</dt>
+            <dd>{{ historyDetail.name }}</dd>
+            <dt>学号</dt>
+            <dd>{{ historyDetail.student_number }}</dd>
+            <dt>首次申请时间</dt>
+            <dd>{{ displayBeijingTime(historyDetail.created_at) }}</dd>
+            <dt>审核结果</dt>
+            <dd>{{ statusLabel(historyDetail.status) }}</dd>
+            <dt>审核时间</dt>
+            <dd>
+              {{
+                historyDetail.reviewed_at ? displayBeijingTime(historyDetail.reviewed_at) : '未记录'
+              }}
+            </dd>
+            <dt>审核员编号</dt>
+            <dd>{{ historyDetail.reviewer_id ?? '未记录' }}</dd>
+            <dt>处理理由</dt>
+            <dd>{{ historyDetail.reason ?? '未填写' }}</dd>
+            <dt>修改建议</dt>
+            <dd>{{ historyDetail.revision_suggestion ?? '未填写' }}</dd>
+          </dl>
+          <p class="experience-muted">仅展示当前完成案件的审核结论，不提供学生卡或再次审核操作。</p>
+        </section>
         <IdentityCaseDetail
+          v-else
           :detail="detail"
           :selected="selected"
           :case-busy="caseBusy"
@@ -174,25 +214,38 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
           @card-failed="cardFailed"
           @process="startProcessing"
         />
-      </ElDialog>
-      <ElDialog
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close @click="clearCase">关闭案件</button
+            ><button
+              v-if="detail?.status === 'pending' && !history"
+              class="business-primary"
+              @click="startProcessing"
+            >
+              处理身份审核
+            </button>
+          </div></template
+        >
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="submitting || uncertain"
         title="处理身份审核"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :before-close="closeProcessing"
-        :show-close="!submitting"
+        @close="cancelProcessing"
       >
+        <p v-if="uncertain" class="experience-inline-error">
+          提交结果尚未确认，请保留原请求重试；确认结果前不能修改、关闭或离开。
+        </p>
         <template v-if="detail">
           <p>{{ detail.name }} · {{ detail.student_number }}</p>
           <FloatingNotice v-if="caseError" :message="caseError" tone="error">{{
             caseError
           }}</FloatingNotice>
           <form v-if="detail.status === 'pending'" @submit.prevent="confirmDecision">
-            <fieldset :disabled="submitting || confirming">
+            <fieldset :disabled="uncertain || submitting || confirming">
               <legend>审核决定</legend>
               <label
                 ><input
@@ -237,12 +290,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               <button :disabled="submitting" @click="submit">
                 {{ submitting ? '正在提交…' : '确认提交' }}
               </button>
-              <button :disabled="submitting" @click="confirming = false">返回修改</button>
+              <button :disabled="submitting || uncertain" @click="confirming = false">
+                返回修改
+              </button>
             </div>
           </section>
-          <button :disabled="submitting" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="submitting || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>
@@ -276,6 +333,22 @@ textarea {
   border-radius: 12px;
   padding: 1rem;
   margin: 1rem 0;
+  overflow-wrap: anywhere;
+}
+</style>
+
+<style scoped>
+.identity-history-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px 24px;
+}
+.identity-history-fields dt {
+  color: var(--text-secondary);
+}
+.identity-history-fields dd {
+  margin: 0;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 </style>

@@ -1,13 +1,11 @@
 <script setup lang="ts">
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WordlistEvidence from '@/components/WordlistEvidence.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { displayBeijingTime } from '@/utils/admin-time'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
 import { crisisActions } from '@/types/crisis'
 import { useCrisisReview } from '@/composables/useCrisisReview'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
@@ -15,11 +13,11 @@ import { useAdminStore } from '@/stores/admin'
 const { open: openPrivacy, pending: privacyPending, error: privacyError } = usePrivacyHandoff()
 const admin = useAdminStore()
 const {
+  uncertain,
   pageSize,
   editorOpen,
   startProcessing,
   cancelProcessing,
-  closeProcessing,
   items,
   nextCursor,
   history,
@@ -75,7 +73,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="危机工作台">
+  <main class="experience-page workflow" aria-label="危机工作台">
+    <WorkspaceHeading
+      title="危机工作台"
+      description="按授权案件核对风险、投递和处置记录；身份与证据按需读取。"
+      ><button v-if="selected" :disabled="editorOpen || writing" @click="close">
+        返回案件列表并清除材料
+      </button></WorkspaceHeading
+    >
     <p>
       危机隔离和自动待办全天运行；北京时间 8–22
       时为人工窗口，夜间案件按服务端接手时刻交接，不承诺首次响应时限。
@@ -90,18 +95,22 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         <p>{{ status(receipt.status) }} · 案件版本 {{ receipt.version }}</p>
       </section>
 
-      <section aria-label="危机案件列表" :aria-busy="listBusy">
-        <BusinessToolbar label="危机案件操作栏">
-          <h2>危机案件</h2>
-          <template #tools>
-            <button
-              :disabled="listBusy || editorOpen"
-              @click="runRead(() => refresh(), '查询已完成')"
-            >
-              从首页刷新
-            </button>
-          </template>
-        </BusinessToolbar>
+      <section
+        v-if="!selected"
+        class="experience-panel experience-table-panel"
+        aria-label="危机案件列表"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">危机案件</h2>
+
+          <button
+            :disabled="listBusy || editorOpen"
+            @click="runRead(() => refresh(), '查询已完成')"
+          >
+            从首页刷新
+          </button>
+        </div>
         <p v-if="listBusy" role="status">正在读取危机案件…</p>
         <FloatingNotice v-else-if="listError" :message="listError" tone="error">
           <p>{{ listError }}</p>
@@ -109,7 +118,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             重试列表
           </button>
         </FloatingNotice>
-        <p v-else-if="!items.length">暂无危机案件</p>
+        <p v-else-if="!items.length" class="experience-empty">暂无危机案件</p>
         <div v-else class="business-table">
           <table>
             <thead>
@@ -152,16 +161,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
         </div>
         <p>列表不展示身份或正文，材料仅在具体案件授权后读取。</p>
       </section>
-      <ElDialog
-        v-if="selected && !editorOpen"
-        :model-value="true"
-        title="危机案件详情"
-        width="min(56rem, calc(100vw - 2rem))"
-        class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        @update:model-value="!$event && close()"
-      >
+      <section v-if="selected && !editorOpen" class="experience-panel crisis-case-workspace">
         <section aria-label="危机案件详情" :aria-busy="loading || writing">
           <h2>案件详情</h2>
           <p v-if="loading" role="status">正在读取授权案件…</p>
@@ -178,7 +178,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               {{ showIdentity ? '隐藏完整学号' : '显示完整学号' }}
             </button>
             <blockquote class="workflow-body">{{ detail.body }}</blockquote>
-            <section aria-label="危机投递待办" class="workflow-box" :aria-busy="workBusy">
+            <section aria-label="危机投递待办" class="experience-section" :aria-busy="workBusy">
               <h3>关怀与人员通知待办</h3>
               <button
                 :disabled="workBusy || editorOpen"
@@ -213,7 +213,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               </template>
               <p>通知或关怀投递完成不代表人工已接手；资料与通知依赖缺失时以服务端待办状态为准。</p>
             </section>
-            <section aria-label="危机时间线" class="workflow-box" :aria-busy="timelineBusy">
+            <section aria-label="危机时间线" class="experience-section" :aria-busy="timelineBusy">
               <h3>案件时间线</h3>
               <button
                 :disabled="timelineBusy || editorOpen"
@@ -237,7 +237,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               </ol>
               <p v-if="!timelineBusy && !timelineError && !timeline.length">暂无动作记录</p>
             </section>
-            <section aria-label="限定证据" class="workflow-box">
+            <section aria-label="限定证据" class="experience-section">
               <h3>本案限定证据</h3>
               <button
                 v-for="(evidenceRef, index) in evidenceRefs"
@@ -285,23 +285,24 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
           </template>
           <p v-else-if="!loading && !selected">选择案件，按需读取授权材料。</p>
         </section>
-      </ElDialog>
-      <ElDialog
+      </section>
+      <WorkspaceDrawer
         v-if="editorOpen"
-        v-model="editorOpen"
+        presentation="dialog"
+        :open="editorOpen"
+        :busy="writing || uncertain"
         title="处理危机案件"
-        width="min(40rem, calc(100vw - 2rem))"
         class="business-dialog workflow"
-        top="2rem"
-        :close-on-click-modal="false"
-        :before-close="closeProcessing"
-        :show-close="!writing"
+        @close="cancelProcessing"
       >
+        <p v-if="uncertain" class="experience-inline-error">
+          提交结果尚未确认，请保留原请求重试；确认结果前不能修改、关闭或离开。
+        </p>
         <template v-if="detail">
           <p>案件版本 {{ detail.version }}</p>
           <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
           <form v-if="canAct" @submit.prevent="confirm">
-            <fieldset :disabled="writing || confirming || loading">
+            <fieldset :disabled="uncertain || writing || confirming || loading">
               <legend>危机处置</legend>
               <label for="crisis-action">处置动作</label
               ><select id="crisis-action" v-model="action">
@@ -331,12 +332,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             <div class="workflow-actions">
               <button :disabled="writing" @click="submit">
                 {{ writing ? '正在提交…' : '确认提交' }}</button
-              ><button :disabled="writing" @click="confirming = false">返回修改</button>
+              ><button :disabled="writing || uncertain" @click="confirming = false">
+                返回修改
+              </button>
             </div>
           </section>
-          <button :disabled="writing" @click="cancelProcessing">取消处理</button>
+          <button data-overlay-close :disabled="writing || uncertain" @click="cancelProcessing">
+            取消处理
+          </button>
         </template>
-      </ElDialog>
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>
