@@ -2,13 +2,14 @@
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
-import { ElDialog } from 'element-plus'
-import 'element-plus/theme-chalk/el-dialog.css'
-import 'element-plus/theme-chalk/el-overlay.css'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { useResourceCategories } from '@/composables/useResourceCategories'
 const {
   pageSize,
+  inlineAction,
+  formDirty,
+  toggleState,
   enabled,
   items,
   next,
@@ -44,82 +45,109 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" aria-label="资料分类">
-    <template v-if="workspace.allowed()"
-      ><form
-        id="category-filters"
-        class="business-filters"
-        @submit.prevent="runRead(() => search(), '查询已完成')"
+  <main class="experience-page category-page" aria-label="资料分类">
+    <WorkspaceHeading
+      title="资料分类"
+      description="维护分类名称、排序与启用状态；排序数字越小越靠前。"
+    >
+      <button
+        class="business-primary"
+        type="button"
+        :disabled="writing || !!pending"
+        @click="create"
       >
-        <label
-          >启用状态
-          <select v-model="enabled">
-            <option value="">全部</option>
-            <option value="true">启用</option>
-            <option value="false">停用</option>
-          </select></label
+        新建分类
+      </button>
+    </WorkspaceHeading>
+    <template v-if="workspace.allowed()">
+      <section class="experience-panel experience-table-panel">
+        <form
+          id="category-filters"
+          class="experience-filters"
+          @submit.prevent="runRead(() => search(), '查询已完成')"
         >
-      </form>
-      <BusinessToolbar label="资料分类操作栏">
-        <button class="business-primary" type="button" :disabled="writing" @click="create">
-          新建分类
-        </button>
-        <template #tools>
-          <button type="submit" form="category-filters">查询 / 从首页刷新</button>
-        </template>
-      </BusinessToolbar>
-      <p>排序数字越小越靠前；分类为单级结构。</p>
-      <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
-      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
-      <p v-if="busy" role="status">正在读取分类…</p>
-      <p v-else-if="!error && !items.length">暂无符合条件的分类</p>
-      <div v-if="items.length" class="business-table">
-        <table>
-          <caption>
-            资料分类查询结果
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">分类名称</th>
-              <th scope="col">排序</th>
-              <th scope="col">状态</th>
-              <th scope="col">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in items" :key="item.id">
-              <th scope="row">{{ item.name }}</th>
-              <td>{{ item.sort_order }}</td>
-              <td>{{ item.enabled ? '启用' : '停用' }}</td>
-              <td>
-                <button
-                  :disabled="writing"
-                  :aria-label="`编辑分类 ${item.name}`"
-                  @click="open(item.id)"
-                >
-                  编辑分类
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="business-pagination" role="group" aria-label="分页操作">
-        <PageSizeSelect v-model="pageSize" :disabled="busy || writing" @change="search" />
-        <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
-        ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
-      </div>
-      <ElDialog
-        :model-value="!!selected"
+          <label
+            >启用状态
+            <select v-model="enabled">
+              <option value="">全部</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select></label
+          >
+          <button type="submit" :disabled="busy || writing">查询 / 从首页刷新</button>
+        </form>
+        <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
+        <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+        <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+        <p v-if="busy" role="status">正在读取分类…</p>
+        <p v-else-if="!error && !items.length" class="experience-empty">暂无符合条件的分类</p>
+        <div
+          v-if="items.length"
+          class="business-table"
+          tabindex="0"
+          aria-label="可横向滚动的分类列表"
+        >
+          <table>
+            <caption>
+              资料分类查询结果
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">分类名称</th>
+                <th scope="col">排序</th>
+                <th scope="col">状态</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in items" :key="item.id">
+                <td>{{ item.name }}</td>
+                <td>{{ item.sort_order }}</td>
+                <td>
+                  <button
+                    class="inline-switch"
+                    role="switch"
+                    :aria-checked="item.enabled"
+                    :aria-label="`启用分类 ${item.name}`"
+                    :disabled="writing || !!pending || !!selected"
+                    @click="toggleState(item)"
+                  >
+                    <span aria-hidden="true"></span></button
+                  ><span>{{ item.enabled ? '启用' : '停用' }}</span>
+                </td>
+                <td>
+                  <button
+                    :disabled="writing"
+                    :aria-label="`编辑分类 ${item.name}`"
+                    @click="open(item.id)"
+                  >
+                    编辑分类
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect v-model="pageSize" :disabled="busy || writing" @change="search" />
+          <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
+          ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
+        </div>
+      </section>
+      <section v-if="inlineAction && pending" class="experience-panel">
+        <p>{{ detailError || '分类状态切换尚未确认，请使用原请求核实。' }}</p>
+        <button :disabled="writing" @click="runPending">原样重试</button>
+      </section>
+      <WorkspaceDrawer
+        :guard-route="false"
+        presentation="dialog"
+        :open="!!selected && !inlineAction"
+        :dirty="formDirty"
         :title="selected === 'new' ? '新建分类' : '编辑分类'"
-        class="business-dialog"
-        width="min(38rem, calc(100vw - 2rem))"
-        top="2rem"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
-        :show-close="false"
-        ><button :disabled="writing" @click="close">关闭</button>
+        :busy="writing || !!pending"
+        description="单级分类；改名会同步影响引用资料。"
+        @close="close"
+      >
         <p v-if="loading" role="status">正在读取分类…</p>
         <FloatingNotice v-if="detailError" :message="detailError" tone="error">{{
           detailError
@@ -134,7 +162,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           重新读取并核对
         </button>
         <p v-if="conflict">请重新读取，核对当前分类与本地输入后再确认保存。</p>
-        <form @submit.prevent="save">
+        <form id="category-editor" class="experience-editor" @submit.prevent="save">
           <fieldset :disabled="writing || !!pending || loading">
             <label
               >分类名称（1–30字）<input v-model="form.name" required autocomplete="off" /></label
@@ -151,9 +179,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             >
             <p v-else>新分类默认启用。</p>
             <p>改名同步影响引用资料的显示。任意草稿、上架或下架资料仍引用时，不能停用分类。</p>
-            <button type="submit" :disabled="conflict || (selected !== 'new' && !detail)">
-              确认保存
-            </button>
           </fieldset>
         </form>
         <RouterLink
@@ -161,8 +186,25 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           :to="{ path: '/resources', query: { category_id: detail.id } }"
           >查看此分类资料</RouterLink
         >
-      </ElDialog></template
-    >
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close :disabled="writing || !!pending" @click="close">取消</button>
+            <button v-if="pending" class="business-primary" :disabled="writing" @click="runPending">
+              原样重试
+            </button>
+            <button
+              v-else
+              class="business-primary"
+              type="submit"
+              form="category-editor"
+              :disabled="writing || loading || conflict || (selected !== 'new' && !detail)"
+            >
+              确认保存
+            </button>
+          </div></template
+        >
+      </WorkspaceDrawer>
+    </template>
     <p v-else role="alert">当前会话无权管理分类，请重新登录或联系管理员。</p>
   </main>
 </template>

@@ -46,10 +46,21 @@ function optionalCount(value: unknown) {
   return value
 }
 
-function summary(value: unknown) {
+function statistics(value: unknown, kind: ContentKind) {
+  const stats = value === undefined ? {} : object(value)
+  return {
+    supportCount: kind === 'wishes' ? optionalCount(stats['support_count']) : undefined,
+    hugCount: kind === 'whispers' ? optionalCount(stats['hug_count']) : undefined,
+    applicationCount: kind === 'wishes' ? optionalCount(stats['application_count']) : undefined,
+    commentCount: optionalCount(stats['comment_count']),
+    viewCount: optionalCount(stats['view_count']),
+  }
+}
+function summary(value: unknown, kind: ContentKind) {
   const row = object(value)
   return {
     id: id(row['id']),
+    stats: statistics(row['stats'], kind),
     title: text(row['title']),
     state: text(row['state']),
     createdAt: date(row['created_at']),
@@ -74,13 +85,16 @@ function publication(value: unknown) {
   }
 }
 
-function detail(value: unknown) {
+function detail(value: unknown, kind: ContentKind) {
   const row = object(value)
+  const stats = statistics(row['stats'], kind)
   return {
-    ...summary(row),
-    applicationCount: optionalCount(row['application_count']),
-    commentCount: optionalCount(row['comment_count']),
-    viewCount: optionalCount(row['view_count']),
+    ...summary(row, kind),
+    supportCount: stats.supportCount,
+    hugCount: stats.hugCount,
+    applicationCount: stats.applicationCount,
+    commentCount: stats.commentCount,
+    viewCount: stats.viewCount,
     expiresAt: row['expires_at'] == null ? null : date(row['expires_at']),
     original: row['original'] === null ? null : publication(row['original']),
     story: row['story'] === null ? null : publication(row['story']),
@@ -103,7 +117,7 @@ export interface ContentFilters {
 }
 
 function listQuery(filters: ContentFilters, cursor: string | null) {
-  const query = new URLSearchParams()
+  const query = new URLSearchParams({ include: 'stats' })
   for (const key of ['keyword', 'state', 'requester', 'helper'] as const) {
     const value = filters[key].trim()
     if (value) query.set(key, value)
@@ -136,13 +150,13 @@ export function createContentManagementClient(
       const query = listQuery(filters, cursor)
       const data = object(await request(`content/${kind}${query ? '?' + query : ''}`, signal))
       return {
-        items: array(data['items']).map(summary),
+        items: array(data['items']).map((item) => summary(item, kind)),
         next: data['next_cursor'] === null ? null : text(data['next_cursor']),
       }
     },
     async detail(kind: ContentKind, target: string, page: number, signal: AbortSignal) {
-      const query = page > 0 ? `?comments_page=${page}` : ''
-      const result = detail(await request(`content/${kind}/${id(target)}${query}`, signal))
+      const query = `?include=stats${page > 0 ? `&comments_page=${page}` : ''}`
+      const result = detail(await request(`content/${kind}/${id(target)}${query}`, signal), kind)
       if (result.id !== target) return invalid()
       return result
     },

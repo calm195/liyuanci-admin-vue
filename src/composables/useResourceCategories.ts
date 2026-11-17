@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
@@ -14,6 +15,7 @@ const blank = (): CategoryInput => ({ name: '', sort_order: 0, enabled: true })
 type Pending = { key: string; id: string | null; input: CategoryInput; version: number }
 export function useResourceCategories() {
   const pageSize = ref(10)
+  const inlineAction = ref(false)
   const enabled = ref(''),
     submitted = ref(''),
     items = ref<AdminResourceCategory[]>([])
@@ -35,10 +37,25 @@ export function useResourceCategories() {
     detailRequest = new AbortController()
   const workspace = useAdminWorkspace(clear, resourceRoles),
     client = createResourcesClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const formDirty = computed(
+    () =>
+      !!selected.value &&
+      JSON.stringify(form) !==
+        JSON.stringify(
+          detail.value
+            ? {
+                name: detail.value.name,
+                sort_order: detail.value.sort_order,
+                enabled: detail.value.enabled,
+              }
+            : blank(),
+        ),
+  )
   const dirty = computed(() => enabled.value !== submitted.value)
   function resetDetail() {
     detailRequest.abort()
     selected.value = ''
+    inlineAction.value = false
     detail.value = null
     Object.assign(form, blank())
     loading.value = false
@@ -60,19 +77,18 @@ export function useResourceCategories() {
     error.value = ''
     notice.value = ''
   }
-  function canLeave() {
+  async function canLeave() {
+    if (pending.value) {
+      detailError.value = '操作结果尚未确认，请先原样重试，取得明确结果后再关闭或离开。'
+      return false
+    }
     return (
       !writing.value &&
-      (!selected.value ||
-        window.confirm(
-          pending.value
-            ? '操作结果尚未确认，放弃前请核对服务端，避免重复创建。确认关闭？'
-            : '确认放弃当前分类表单？',
-        ))
+      (!formDirty.value || (await confirmDiscardChanges('离开将放弃尚未保存的分类修改。')))
     )
   }
   function close() {
-    if (canLeave()) resetDetail()
+    if (!writing.value && !pending.value) resetDetail()
   }
   onBeforeRouteLeave(canLeave)
   async function load() {
@@ -159,13 +175,13 @@ export function useResourceCategories() {
     )
   }
   async function open(id: string) {
-    if (!canLeave()) return
+    if (!(await canLeave())) return
     resetDetail()
     selected.value = id
     await read(id)
   }
-  function create() {
-    if (!canLeave()) return
+  async function create() {
+    if (!(await canLeave())) return
     resetDetail()
     selected.value = 'new'
   }
@@ -207,7 +223,11 @@ export function useResourceCategories() {
       },
       (cause) => {
         detailError.value = resourceErrorMessage(cause)
-        if (cause instanceof ResourceApiError && cause.status < 500 && cause.status !== 429) {
+        if (
+          cause instanceof ResourceApiError &&
+          cause.status < 500 &&
+          ![408, 429].includes(cause.status)
+        ) {
           pending.value = null
           if (
             ['VERSION_CONFLICT', 'STATE_CONFLICT', 'IDEMPOTENCY_CONFLICT'].includes(cause.errorCode)
@@ -221,8 +241,27 @@ export function useResourceCategories() {
       },
       () => {
         writing.value = false
+        if (inlineAction.value && !pending.value) {
+          const failure = detailError.value
+          resetDetail()
+          if (failure) error.value = failure
+        }
       },
     )
+  }
+  async function toggleState(item: AdminResourceCategory) {
+    if (writing.value || pending.value || selected.value || !workspace.allowed()) return
+    if (item.enabled && !globalThis.confirm(`停用“${item.name}”？存在资料引用时不能停用。`)) return
+    inlineAction.value = true
+    selected.value = item.id
+    detail.value = item
+    pending.value = {
+      id: item.id,
+      version: item.version,
+      input: { name: item.name, sort_order: item.sort_order, enabled: !item.enabled },
+      key: crypto.randomUUID(),
+    }
+    await runPending()
   }
   async function save() {
     if (
@@ -264,6 +303,9 @@ export function useResourceCategories() {
   })
   return {
     pageSize,
+    inlineAction,
+    formDirty,
+    toggleState,
     enabled,
     items,
     next,

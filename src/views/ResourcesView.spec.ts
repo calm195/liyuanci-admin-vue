@@ -1,3 +1,6 @@
+vi.mock('@/components/confirmDiscardChanges', () => ({
+  confirmDiscardChanges: vi.fn(() => Promise.resolve(true)),
+}))
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -125,7 +128,7 @@ async function start(
       stubs: {
         ElDialog: {
           props: ['modelValue'],
-          template: '<section v-if="modelValue"><slot /></section>',
+          template: '<section v-if="modelValue"><slot /><slot name="footer" /></section>',
         },
       },
     },
@@ -206,7 +209,9 @@ describe('资料管理页面行为', () => {
       expect.any(AbortSignal),
     )
     expect(wrapper.text()).toContain('确认保存')
-    await button('关闭').trigger('click')
+    await button(wrapper.find('.resource-editor-panel').exists() ? '返回资料列表' : '关闭').trigger(
+      'click',
+    )
     expect(mocks.publish).not.toHaveBeenCalled()
     expect(mocks.update).not.toHaveBeenCalled()
   })
@@ -231,7 +236,9 @@ describe('资料管理页面行为', () => {
     await down()
     expect(button('关闭').attributes('disabled')).toBeDefined()
     expect(button('查看详情').attributes('disabled')).toBeDefined()
-    await button('关闭').trigger('click')
+    await button(wrapper.find('.resource-editor-panel').exists() ? '返回资料列表' : '关闭').trigger(
+      'click',
+    )
     expect(wrapper.text()).toContain('正在读取详情')
     wait.finish(offline)
     await flushPromises()
@@ -364,4 +371,51 @@ it('资料分页默认10，修改大小重置游标并发送新限制', async ()
   await flushPromises()
   expect(mocks.list.mock.lastCall?.[0].limit).toBe(50)
   expect(mocks.list.mock.lastCall?.[1]).toBeNull()
+})
+
+it.each([408, 429, 503])('分类未知 %s 不因关闭丢失原请求，原键核实后可关闭', async (status) => {
+  await start('category')
+  await button('编辑分类').trigger('click')
+  await flushPromises()
+  mocks.updateCategory.mockRejectedValueOnce(new ResourceApiError(status, 'INTERNAL_ERROR'))
+  await wrapper.get('#category-editor').trigger('submit')
+  await flushPromises()
+  const original = mocks.updateCategory.mock.calls[0]?.slice(0, 3)
+  expect(button('取消').attributes('disabled')).toBeDefined()
+  await button('取消').trigger('click')
+  expect(wrapper.find('#category-editor').exists()).toBe(true)
+  await button('原样重试').trigger('click')
+  await flushPromises()
+  expect(mocks.updateCategory.mock.calls[1]?.slice(0, 3)).toEqual(original)
+})
+
+it('列表下架直接打开理由弹窗，未知结果原样重试且不经过详情抽屉', async () => {
+  await start()
+  await button('下架').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('.el-drawer').exists()).toBe(false)
+  expect(wrapper.find('#inline-offline').exists()).toBe(true)
+  await wrapper.get('#inline-offline textarea').setValue('链接失效，请暂时下架')
+  mocks.offline.mockRejectedValueOnce(new ResourceApiError(503, 'INTERNAL_ERROR'))
+  await wrapper.get('#inline-offline').trigger('submit')
+  await flushPromises()
+  const first = mocks.offline.mock.calls[0]?.slice(0, 4)
+  expect(button('取消').attributes('disabled')).toBeDefined()
+  await button('原样重试').trigger('click')
+  await flushPromises()
+  expect(mocks.offline.mock.calls[1]?.slice(0, 4)).toEqual(first)
+  expect(wrapper.find('#inline-offline').exists()).toBe(false)
+})
+it('分类行内启停使用当前资源版本，不伪造成功且保留未知命令', async () => {
+  await start('category')
+  mocks.updateCategory.mockRejectedValueOnce(new ResourceApiError(503, 'INTERNAL_ERROR'))
+  await wrapper.get('[role="switch"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('#category-editor').exists()).toBe(false)
+  expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true')
+  const first = mocks.updateCategory.mock.calls[0]?.slice(0, 3)
+  expect(first?.[1]).toMatchObject({ expected_version: 1, enabled: false })
+  await button('原样重试').trigger('click')
+  await flushPromises()
+  expect(mocks.updateCategory.mock.calls[1]?.slice(0, 3)).toEqual(first)
 })

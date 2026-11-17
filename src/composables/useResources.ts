@@ -1,3 +1,4 @@
+import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
@@ -68,11 +69,13 @@ export function useResources() {
     categoryRequest = new AbortController()
   const workspace = useAdminWorkspace(clear, resourceRoles)
   const client = createResourcesClient(useAdminStore().session?.token ?? '', workspace.allowed)
+  const inlineAction = ref(false)
   const dirty = computed(() => JSON.stringify(filters) !== JSON.stringify(submitted.value))
   const hasDraft = computed(() => !!selected.value && mode.value !== 'detail')
   function resetDetail() {
     detailRequest.abort()
     selected.value = ''
+    inlineAction.value = false
     detail.value = null
     detailError.value = ''
     mode.value = 'detail'
@@ -103,19 +106,23 @@ export function useResources() {
     Object.assign(filters, defaults())
     submitted.value = defaults()
   }
-  function canLeave() {
+  async function canLeave() {
+    if (pending.value || (uploadPending.value?.key && writing.value)) {
+      detailError.value = '操作结果尚未确认，请先完成原请求核实，再关闭或离开。'
+      return false
+    }
     return (
       !writing.value &&
       (!(hasDraft.value || pending.value) ||
-        window.confirm(
+        (await confirmDiscardChanges(
           pending.value
             ? '操作结果尚未确认，关闭后请先核对服务端结果，避免重复创建。确认放弃？'
             : '放弃尚未保存的输入？已下架的资料不会自动恢复上架。',
-        ))
+        )))
     )
   }
-  function close() {
-    if (canLeave()) resetDetail()
+  async function close(confirmed: unknown = false) {
+    if (confirmed === true ? !writing.value && !pending.value : await canLeave()) resetDetail()
   }
   onBeforeRouteLeave(canLeave)
   async function load() {
@@ -236,13 +243,25 @@ export function useResources() {
     )
   }
   async function open(id: string) {
-    if (!canLeave()) return
+    if (!(await canLeave())) return
     resetDetail()
     selected.value = id
     await read(id)
   }
-  function create() {
-    if (!canLeave()) return
+  async function inlineStatus(id: string, action: 'publish' | 'offline') {
+    if (!(await canLeave()) || writing.value || pending.value) return
+    resetDetail()
+    inlineAction.value = true
+    selected.value = id
+    await read(id)
+    if (!workspace.allowed() || !detail.value) return
+    if (action === 'publish') {
+      await publish()
+      if (!pending.value) resetDetail()
+    } else offline(false)
+  }
+  async function create() {
+    if (!(await canLeave())) return
     resetDetail()
     selected.value = 'new'
     mode.value = 'create'
@@ -270,8 +289,8 @@ export function useResources() {
     reason.value = ''
     afterOfflineEdit.value = editAfter
   }
-  function cancelEditing() {
-    if (writing.value || pending.value || !canLeave()) return
+  async function cancelEditing() {
+    if (writing.value || pending.value || !(await canLeave())) return
     Object.assign(form, blank())
     reason.value = ''
     mode.value = 'detail'
@@ -319,7 +338,11 @@ export function useResources() {
       },
       (cause) => {
         detailError.value = resourceErrorMessage(cause)
-        if (cause instanceof ResourceApiError && cause.status < 500 && cause.status !== 429) {
+        if (
+          cause instanceof ResourceApiError &&
+          cause.status < 500 &&
+          ![408, 429].includes(cause.status)
+        ) {
           pending.value = null
           if (cause.status === 409) conflict.value = true
           if (cause.status === 404) {
@@ -332,6 +355,11 @@ export function useResources() {
       },
       () => {
         writing.value = false
+        if (inlineAction.value && !pending.value) {
+          const failure = detailError.value
+          resetDetail()
+          if (failure) error.value = failure
+        }
       },
     )
   }
@@ -457,6 +485,8 @@ export function useResources() {
   })
   return {
     filters,
+    inlineAction,
+    inlineStatus,
     items,
     categories,
     next,

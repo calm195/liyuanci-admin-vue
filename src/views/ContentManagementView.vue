@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { computed } from 'vue'
-import ContentImages from '@/components/ContentImages.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import PublicationDetail from '@/components/PublicationDetail.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { useContentManagement } from '@/composables/useContentManagement'
 import type { ContentKind } from '@/services/content-management'
@@ -10,7 +11,7 @@ import { displayBeijingTime } from '@/utils/admin-time'
 
 const props = defineProps<{ kind: ContentKind }>()
 const wishes = computed(() => props.kind === 'wishes')
-const title = computed(() => (wishes.value ? '心愿管理' : '悄悄话管理'))
+const title = computed(() => (wishes.value ? '心愿内容' : '悄悄话内容'))
 const states: Record<string, string> = {
   draft: '草稿',
   scanning: '扫描中',
@@ -84,160 +85,130 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="panel workflow" :aria-label="title">
+  <main class="panel workflow experience-page" :aria-label="title">
     <template v-if="workspace.allowed()">
-      <form
-        id="content-management-filters"
-        class="business-filters"
-        @submit.prevent="runRead(() => search(), '查询已完成')"
-      >
-        <label>公开标题或正文<input v-model="draft.keyword" maxlength="80" /></label>
-        <label>
-          状态
-          <select v-model="draft.state">
-            <option value="">全部</option>
-            <option v-for="value in availableStates" :key="value" :value="value">
-              {{ states[value] }}
-            </option>
-          </select>
-        </label>
-        <template v-if="wishes">
-          <label>许愿人昵称<input v-model="draft.requester" maxlength="80" /></label>
-          <label>应愿人昵称<input v-model="draft.helper" maxlength="80" /></label>
-        </template>
-        <label>创建起始日期<input v-model="draft.from" type="date" /></label>
-        <label>创建结束日期<input v-model="draft.until" type="date" /></label>
-      </form>
-      <BusinessToolbar :label="`${title}操作栏`">
-        <template #tools>
-          <button type="submit" form="content-management-filters">查询 / 从首页刷新</button>
-        </template>
-      </BusinessToolbar>
-      <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
-      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-      <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
-      <p v-if="busy" role="status">正在加载内容…</p>
-      <p v-if="!busy && !error && !items.length">
-        {{ next ? '当前页没有符合条件的内容，可继续查看下一页。' : '未找到符合条件的内容。' }}
-      </p>
-      <div v-if="items.length" class="business-table">
-        <table>
-          <caption>
-            查询结果按创建时间倒序，时间均为北京时间
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">公开标题</th>
-              <th scope="col">状态</th>
-              <th v-if="wishes" scope="col">许愿人</th>
-              <th v-if="wishes" scope="col">应愿人</th>
-              <th scope="col">创建时间</th>
-              <th scope="col">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in items" :key="item.id">
-              <td>{{ item.title || '暂无公开标题' }}</td>
-              <td>{{ states[item.state] ?? item.state }}</td>
-              <td v-if="wishes">{{ item.requester || '—' }}</td>
-              <td v-if="wishes">{{ item.helper || '—' }}</td>
-              <td>{{ displayBeijingTime(item.createdAt) }}</td>
-              <td><button type="button" @click="open(item.id)">查看详情</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="history.length || next" class="row">
-        <button type="button" :disabled="busy || dirty || !history.length" @click="page(false)">
-          上一页
-        </button>
-        <button type="button" :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
-      </div>
-      <section v-if="selected" class="workflow" aria-label="内容详情">
-        <div class="row">
-          <h2>{{ wishes ? '心愿故事链路' : '悄悄话详情' }}</h2>
-          <button type="button" @click="close">关闭详情</button>
-        </div>
-        <template v-if="detail">
-          <h3>{{ detail.title || '暂无公开标题' }}</h3>
-          <p>状态 {{ states[detail.state] ?? detail.state }}</p>
-          <p v-if="wishes">
-            许愿人 {{ detail.requester || '—' }}，应愿人 {{ detail.helper || '—' }}
-          </p>
-          <p
-            v-if="
-              detail.applicationCount !== undefined ||
-              detail.commentCount !== undefined ||
-              detail.viewCount !== undefined
-            "
-          >
-            <span v-if="detail.applicationCount !== undefined"
-              >应愿 {{ detail.applicationCount }} ·
-            </span>
-            <span v-if="detail.commentCount !== undefined">评论 {{ detail.commentCount }} · </span>
-            <span v-if="detail.viewCount !== undefined">浏览 {{ detail.viewCount }}</span>
-          </p>
-          <p v-if="detail.expiresAt">到期时间 {{ displayBeijingTime(detail.expiresAt) }}</p>
-          <p v-if="detail.matchedAt">应愿时间 {{ displayBeijingTime(detail.matchedAt) }}</p>
-          <p v-if="detail.publishedAt">公开时间 {{ displayBeijingTime(detail.publishedAt) }}</p>
-          <section v-if="detail.original">
-            <h4>{{ wishes ? '许愿正文' : '正文' }}</h4>
-            <p v-if="detail.original.author">{{ detail.original.author }}</p>
-            <p v-if="detail.original.notice">{{ detail.original.notice }}</p>
-            <p class="publication-body">{{ detail.original.body }}</p>
-            <ContentImages v-if="detail.original.images?.length" :images="detail.original.images" />
-          </section>
-          <p v-else>暂无可公开正文。</p>
-          <section v-if="detail.story">
-            <h4>还愿故事</h4>
-            <p v-if="detail.story.notice">{{ detail.story.notice }}</p>
-            <p class="publication-body">{{ detail.story.body }}</p>
-          </section>
-          <section v-if="detail.original">
-            <h4>公开评论</h4>
-            <p v-if="!detail.comments.length">当前页暂无公开评论。</p>
-            <ul v-else>
-              <li v-for="(item, index) in detail.comments" :key="index">
-                <p>
-                  {{
-                    item.kind === 'author_supplement'
-                      ? '作者补充 · '
-                      : item.rootId
-                        ? '楼内回复 · '
-                        : ''
-                  }}{{ item.author }}
-                </p>
-                <p v-if="item.replyToId">回复评论 {{ item.replyToId }}</p>
-                <p v-if="item.notice">{{ item.notice }}</p>
-                <p class="publication-body">{{ item.body }}</p>
-              </li>
-            </ul>
-            <div v-if="commentsPage > 0 || detail.commentsMore" class="row">
-              <button
-                type="button"
-                :disabled="busy || commentsPage === 0"
-                @click="open(detail.id, commentsPage - 1)"
-              >
-                上一页评论
-              </button>
-              <button
-                type="button"
-                :disabled="busy || !detail.commentsMore"
-                @click="open(detail.id, commentsPage + 1)"
-              >
-                下一页评论
-              </button>
+      <WorkspaceHeading
+        :title="title"
+        :description="
+          wishes
+            ? '查看公开内容与互动上下文，按权限进行处理。'
+            : '查看公开心事与暖心回应，守护匿名表达。'
+        "
+      />
+      <section class="experience-panel experience-table-panel" aria-label="内容查询">
+        <form
+          id="content-management-filters"
+          @submit.prevent="runRead(() => search(), '查询已完成')"
+        >
+          <div class="experience-filters">
+            <label class="content-search"
+              >公开标题或正文<input v-model="draft.keyword" maxlength="80"
+            /></label>
+            <label>
+              状态
+              <select v-model="draft.state">
+                <option value="">全部</option>
+                <option v-for="value in availableStates" :key="value" :value="value">
+                  {{ states[value] }}
+                </option>
+              </select>
+            </label>
+            <button type="submit" class="business-primary">查询 / 从首页刷新</button>
+          </div>
+          <details class="content-advanced">
+            <summary>更多筛选</summary>
+            <div class="experience-filters">
+              <template v-if="wishes">
+                <label>许愿人昵称<input v-model="draft.requester" maxlength="80" /></label>
+                <label>应愿人昵称<input v-model="draft.helper" maxlength="80" /></label>
+              </template>
+              <label>创建起始日期<input v-model="draft.from" type="date" /></label>
+              <label>创建结束日期<input v-model="draft.until" type="date" /></label>
             </div>
-          </section>
-          <div v-if="admin.can('super_admin')">
-            <button type="button" :disabled="busy || !detail.exportable" @click="download">
+          </details>
+        </form>
+        <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
+        <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+        <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
+        <p v-if="busy" role="status">正在加载内容…</p>
+        <p v-if="!busy && !error && !items.length" class="experience-empty">
+          {{ next ? '当前页没有符合条件的内容，可继续查看下一页。' : '未找到符合条件的内容。' }}
+        </p>
+        <div v-if="items.length" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">公开标题</th>
+                <th scope="col">状态</th>
+                <th v-if="wishes" scope="col">许愿人</th>
+                <th v-if="wishes" scope="col">应愿人</th>
+                <th scope="col">创建时间</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in items" :key="item.id">
+                <td>{{ item.title || '暂无公开标题' }}</td>
+                <td>{{ states[item.state] ?? item.state }}</td>
+                <td v-if="wishes">{{ item.requester || '—' }}</td>
+                <td v-if="wishes">{{ item.helper || '—' }}</td>
+                <td>{{ displayBeijingTime(item.createdAt) }}</td>
+                <td><button type="button" @click="open(item.id)">查看详情</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="business-pagination" aria-label="内容分页">
+          <span class="experience-muted">按创建时间倒序 · 北京时间</span>
+          <button type="button" :disabled="busy || dirty || !history.length" @click="page(false)">
+            上一页
+          </button>
+          <span>第 {{ history.length + 1 }} 页</span>
+          <button type="button" :disabled="busy || dirty || !next" @click="page(true)">
+            下一页
+          </button>
+        </div>
+      </section>
+      <WorkspaceDrawer
+        :open="!!selected"
+        :title="wishes ? '心愿详情' : '悄悄话详情'"
+        @close="close"
+      >
+        <p v-if="busy" role="status">正在读取内容…</p>
+        <p v-if="error" role="alert" class="experience-inline-error">{{ error }}</p>
+        <button v-if="selected && !detail && !busy" @click="open(selected)">重试详情</button>
+        <PublicationDetail
+          v-if="detail"
+          :detail="detail"
+          :wishes="wishes"
+          :state-label="states[detail.state] ?? detail.state"
+          :comments-page="commentsPage"
+          :busy="busy"
+          @page="open(detail.id, $event)"
+        />
+        <template #footer
+          ><div class="drawer-actions">
+            <button data-overlay-close @click="close">关闭详情</button>
+            <button
+              v-if="admin.can('super_admin') && detail"
+              class="business-primary"
+              :disabled="busy || !detail.exportable"
+              @click="download"
+            >
               导出公众号草稿（Markdown）
             </button>
-            <p v-if="!detail.exportable">当前状态下暂无可导出的公开素材。</p>
-            <p v-else-if="!wishes">草稿最多包含最早的 250 条公开评论。</p>
           </div>
-        </template>
-      </section>
+          <p
+            v-if="detail && admin.can('super_admin') && !detail.exportable"
+            class="experience-muted"
+          >
+            当前状态下暂无可导出的公开素材。
+          </p>
+          <p v-else-if="detail && !wishes && admin.can('super_admin')" class="experience-muted">
+            草稿最多包含最早的 250 条公开评论。
+          </p></template
+        >
+      </WorkspaceDrawer>
     </template>
   </main>
 </template>
@@ -251,5 +222,22 @@ img {
 .publication-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.content-search {
+  flex: 1;
+  min-width: 180px;
+}
+.content-advanced {
+  margin-top: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.content-advanced summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.content-advanced .experience-filters {
+  margin-top: 16px;
 }
 </style>
