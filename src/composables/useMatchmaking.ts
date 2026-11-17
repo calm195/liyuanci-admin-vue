@@ -1,5 +1,5 @@
-import { computed, onMounted, reactive, ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { useMatchmakingCommands } from '@/stores/matchmaking'
 import { useAutoPairingCommands } from '@/stores/matchmaking-auto'
@@ -65,6 +65,10 @@ const emptyLibraryTask = (): LibraryTaskInput => ({
 })
 
 export function useMatchmaking(libraryOnly = false) {
+  const route = useRoute()
+  const router = useRouter()
+  const initialPage = Number(route.query['page'])
+  const validPage = Number.isSafeInteger(initialPage) && initialPage > 0 ? initialPage : 1
   const libraryOpen = ref(libraryOnly),
     choosingFirst = ref(false),
     libraryTasks = ref<LibraryTask[]>([]),
@@ -74,7 +78,7 @@ export function useMatchmaking(libraryOnly = false) {
     libraryForm = reactive(emptyLibraryTask())
   const activities = ref<Activity[]>([]),
     total = ref(0),
-    listPage = ref(1),
+    listPage = ref(validPage),
     detailPage = ref(1)
   const selected = ref(''),
     detail = ref<Workspace | null>(null),
@@ -318,6 +322,26 @@ export function useMatchmaking(libraryOnly = false) {
     await loadActivities()
     if (workspace.allowed() && selected.value && selected.value !== 'new') await loadDetail()
   }
+  async function rememberLocation(replace = false) {
+    if (libraryOnly) return
+    const query = {
+      ...route.query,
+      page: String(listPage.value),
+      activity: selected.value || undefined,
+    }
+    try {
+      if (replace) await router.replace({ query })
+      else await router.push({ query })
+    } catch {
+      error.value = '页面地址更新失败，请重试或刷新页面。'
+    }
+  }
+  function showList() {
+    if (locked.value) return
+    clearDetail()
+    libraryOpen.value = false
+    void rememberLocation()
+  }
   async function open(id: string) {
     if (locked.value || selected.value === id) return
     libraryOpen.value = false
@@ -326,6 +350,7 @@ export function useMatchmaking(libraryOnly = false) {
     selected.value = id
     detailPage.value = 1
     tab.value = 'activity'
+    await rememberLocation()
     await loadDetail()
   }
   function create() {
@@ -337,12 +362,14 @@ export function useMatchmaking(libraryOnly = false) {
     tab.value = 'activity'
     conflict.value = false
     error.value = ''
+    void rememberLocation()
   }
   async function listTurn(direction: number) {
     if (locked.value) return
     const next = listPage.value + direction
     if (next < 1 || (direction > 0 && listPage.value * 20 >= total.value)) return
     listPage.value = next
+    await rememberLocation(true)
     await loadActivities()
   }
   async function detailTurn(direction: number) {
@@ -407,6 +434,8 @@ export function useMatchmaking(libraryOnly = false) {
         writing.value = false
       },
     )
+    if (!libraryOnly && selected.value && !pending.value && workspace.allowed())
+      await rememberLocation(true)
   }
   async function submit(suffix: string, method: 'POST' | 'PUT', body: CommandBody, title: string) {
     if (locked.value || conflict.value) return
@@ -622,6 +651,20 @@ export function useMatchmaking(libraryOnly = false) {
           '操作结果尚未确认。原请求将保留在当前会话内存，返回后可原样重试。确认离开？',
         )),
   )
+  onBeforeRouteUpdate(
+    () => !writing.value && !autoWriting.value && !pending.value && !autoPending.value,
+  )
+  watch(
+    () => route.query['activity'],
+    async (value) => {
+      if (libraryOnly || locked.value || !workspace.allowed()) return
+      const target = typeof value === 'string' ? value : ''
+      if (target === selected.value) return
+      if (!target) clearDetail()
+      else if (target === 'new') create()
+      else if (/^[0-9a-f-]{36}$/u.test(target)) await open(target)
+    },
+  )
   onMounted(async () => {
     if (libraryOnly) {
       const command = pending.value
@@ -640,7 +683,13 @@ export function useMatchmaking(libraryOnly = false) {
       await loadDetail()
       return
     }
-    if (!workspace.allowed() || !pending.value || pendingOnOtherPage.value) return
+    if (!workspace.allowed()) return
+    if (!pending.value || pendingOnOtherPage.value) {
+      const target = route.query['activity']
+      if (target === 'new') create()
+      else if (typeof target === 'string' && /^[0-9a-f-]{36}$/u.test(target)) await open(target)
+      return
+    }
     const command = pending.value
     selected.value = command.activityID || 'new'
     if (command.activityID) await loadDetail()
@@ -682,6 +731,7 @@ export function useMatchmaking(libraryOnly = false) {
     canPair,
     canEditTemplates,
     refresh,
+    showList,
     open,
     create,
     listTurn,

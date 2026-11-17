@@ -1,7 +1,10 @@
 import { record } from '@/types/admin'
 import { ApiError } from './admin'
 import { MatchmakingError } from './matchmaking'
+import { traitCategories } from '@/types/matchmaking-traits'
 import type {
+  TraitCategory,
+  TraitCommand,
   Trait,
   TraitDetail,
   TraitFilters,
@@ -40,10 +43,23 @@ function word(value: unknown): TraitWord {
   const v = object(value)
   return { id: id(v['id']), name: text(v['name']), heat: count(v['heat']) }
 }
+function category(value: unknown): TraitCategory {
+  if (value === undefined) return 'uncategorized'
+  const result = traitCategories.find((item) => item === value)
+  if (!result) throw invalid()
+  return result
+}
+function enabled(value: unknown): boolean {
+  if (value === undefined) return true
+  if (typeof value !== 'boolean') throw invalid()
+  return value
+}
 function trait(value: unknown): Trait {
   const v = object(value)
   return {
     ...word(v),
+    category: category(v['category']),
+    enabled: enabled(v['enabled']),
     version: count(v['version']),
     status: status(v['status']),
     male_count: count(v['male_count']),
@@ -95,6 +111,8 @@ export function traitQuery(filters: TraitFilters, page?: number): string {
   const params = new URLSearchParams()
   params.set('status', filters.status)
   params.set('purpose', filters.purpose)
+  if (filters.category) params.set('category', filters.category)
+  if (filters.enabled) params.set('enabled', filters.enabled)
   params.set('sort', filters.sort)
   if (filters.q.trim()) params.set('q', filters.q.trim())
   if (filters.gender) params.set('gender', filters.gender)
@@ -119,11 +137,11 @@ export function createTraitClient(
   allowed: () => boolean,
   transport: typeof fetch = fetch,
 ) {
-  async function request(suffix: string, signal: AbortSignal, command?: TraitReviewCommand) {
+  async function request(suffix: string, signal: AbortSignal, command?: TraitCommand) {
     if (!allowed()) throw new ApiError(403)
     const response = await transport(`/api/v1/admin/matchmaking/traits${suffix}`, {
       signal,
-      method: command ? 'POST' : 'GET',
+      method: command?.action === 'update' ? 'PUT' : command ? 'POST' : 'GET',
       cache: 'no-store',
       credentials: 'omit',
       redirect: 'error',
@@ -147,7 +165,18 @@ export function createTraitClient(
     if (root['code'] !== 0) throw invalid()
     return root['data']
   }
+  async function execute(command: TraitCommand, signal: AbortSignal) {
+    const suffix =
+      command.action === 'create'
+        ? ''
+        : `/${id(command.id)}${command.action === 'update' ? '' : '/review'}`
+    const result = object(await request(suffix, signal, command))
+    const resultID = id(result['id'])
+    if (command.action !== 'create' && resultID !== command.id) throw invalid()
+    return resultID
+  }
   return {
+    execute,
     async list(filters: TraitFilters, page: number, signal: AbortSignal) {
       return parseTraitPage(await request(`?${traitQuery(filters, page)}`, signal))
     },

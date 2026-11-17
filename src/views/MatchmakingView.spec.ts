@@ -82,6 +82,26 @@ function writes() {
 }
 
 describe('包分配工作台', () => {
+  it('活动详情具有独立地址，返回列表保留页码，深链可恢复资料', async () => {
+    await openActivity()
+    expect(router.currentRoute.value.query['activity']).toBe(fixture.workspace.data.activity.id)
+    expect(wrapper.find('[aria-label="活动列表"]').exists()).toBe(false)
+    await button('← 返回活动列表').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query['activity']).toBeUndefined()
+    expect(wrapper.find('[aria-label="活动列表"]').exists()).toBe(true)
+    await router.push('/other')
+    await router.push(`/matchmaking?page=2&activity=${fixture.workspace.data.activity.id}`)
+    await flushPromises()
+    expect(wrapper.get('input[name="title"]').element).toHaveProperty(
+      'value',
+      fixture.workspace.data.activity.title,
+    )
+    await button('← 返回活动列表').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query['page']).toBe('2')
+    expect(wrapper.text()).toContain('第 2 页')
+  })
   it('详情回填后只提交可写字段，并按北京时间保存', async () => {
     await openActivity()
     expect(wrapper.get('input[name="starts_at"]').element).toHaveProperty(
@@ -146,7 +166,7 @@ describe('包分配工作台', () => {
           : response(fixture.list),
     )
     await openActivity()
-    await button('报名与配对').trigger('click')
+    await button('报名审核').trigger('click')
     await button('查看与审核').trigger('click')
     expect(button('通过报名').attributes('disabled')).toBeUndefined()
     await button('通过报名').trigger('click')
@@ -225,6 +245,8 @@ describe('包分配工作台', () => {
     expect(wrapper.get('h1').text()).toBe('每日任务库')
     expect(wrapper.find('.match-activities').exists()).toBe(false)
     const library = wrapper.get('section[aria-label="每日任务库"]')
+    expect(library.find('textarea').exists()).toBe(false)
+    await button('新建任务').trigger('click')
     await library.get('textarea').setValue('另一个合成任务')
     await library.get('form').trigger('submit')
     await flushPromises()
@@ -238,7 +260,7 @@ describe('包分配工作台', () => {
     })
     await router.push('/matchmaking')
     await flushPromises()
-    expect(wrapper.get('h1').text()).toBe('活动维护')
+    expect(wrapper.get('h1').text()).toBe('活动管理')
     await openActivity()
     await button('每日任务').trigger('click')
     await button('选择固定首日任务').trigger('click')
@@ -288,7 +310,7 @@ describe('包分配工作台', () => {
     await flushPromises()
     expect(wrapper.get('input[name="title"]').element).toHaveProperty('value', '待确认的新活动')
     expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
-    expect(button('新建活动').attributes('disabled')).toBeDefined()
+    expect(button('← 返回活动列表').attributes('disabled')).toBeDefined()
     await button('原样重试').trigger('click')
     await flushPromises()
     expect(writes()).toHaveLength(2)
@@ -325,7 +347,7 @@ describe('包分配工作台', () => {
     await router.push('/matchmaking')
     await flushPromises()
     expect(wrapper.find('[aria-label="待确认操作"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('选择一场活动')
+    expect(wrapper.text()).toContain('全部活动')
   })
   it('结束必须晚于最后一天北京时间零点，跨年日历规则一致', async () => {
     await openActivity()
@@ -360,11 +382,11 @@ describe('包分配工作台', () => {
           : response(fixture.list),
       )
       await openActivity()
-      await button('报名与配对').trigger('click')
+      await button('报名审核').trigger('click')
       await button('查看与审核').trigger('click')
       expect(button('通过报名').attributes('disabled')).toBeDefined()
       expect(button('驳回报名').attributes('disabled')).toBeDefined()
-      await button('配对记录').trigger('click')
+      await button('配对结果').trigger('click')
       expect(button('发布全部待发布结果').attributes('disabled')).toBeDefined()
       await button('每日任务').trigger('click')
       expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()

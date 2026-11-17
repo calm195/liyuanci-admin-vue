@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import FloatingNotice from '@/components/FloatingNotice.vue'
+import { ref } from 'vue'
+import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
+import type { LibraryTask } from '@/types/matchmaking'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import MatchmakingProfile from '@/components/MatchmakingProfile.vue'
 import MatchmakingScore from '@/components/MatchmakingScore.vue'
 import MatchmakingAutoPairing from '@/components/MatchmakingAutoPairing.vue'
@@ -38,6 +42,7 @@ const {
   canPair,
   canEditTemplates,
   refresh,
+  showList,
   open,
   create,
   listTurn,
@@ -68,13 +73,38 @@ const {
   addTemplate,
   saveTemplates,
 } = useMatchmaking(libraryOnly)
+const libraryEditorOpen = ref(false)
+function openLibraryEditor(task?: LibraryTask) {
+  if (locked.value) return
+  editLibraryTask(task)
+  libraryEditorOpen.value = true
+}
+async function toggleLibraryTask(task: LibraryTask) {
+  if (locked.value || libraryEditorOpen.value) return
+  editLibraryTask(task)
+  libraryForm.enabled = !task.enabled
+  await saveLibraryTask()
+}
+function closeLibraryEditor() {
+  if (locked.value) return
+  libraryEditorOpen.value = false
+  editLibraryTask()
+}
 const { feedback, run: runRead } = useOperationFeedback(() => !!error.value)
 const tabs = [
   { key: 'activity', label: '活动设置' },
-  { key: 'enrollments', label: '报名与配对' },
-  { key: 'pairs', label: '配对记录' },
+  { key: 'enrollments', label: '报名审核' },
+  { key: 'pairs', label: '配对结果' },
   { key: 'tasks', label: '每日任务' },
 ] as const
+function shortTime(value: string, withTime = false) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    month: 'long',
+    day: 'numeric',
+    ...(withTime ? ({ hour: '2-digit', minute: '2-digit', hour12: false } as const) : {}),
+  }).format(new Date(value))
+}
 function time(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
@@ -88,26 +118,57 @@ function time(value: string) {
 }
 </script>
 <template>
-  <main class="panel matchmaking-workspace" :aria-label="libraryOnly ? '每日任务库' : '活动维护'">
+  <main
+    class="panel matchmaking-workspace experience-page"
+    :aria-label="libraryOnly ? '每日任务库' : '活动维护'"
+  >
     <template v-if="workspace.allowed()">
-      <div class="match-heading">
-        <div>
-          <h1>{{ libraryOnly ? '每日任务库' : '活动维护' }}</h1>
-          <p v-if="libraryOnly">维护活动共用的每日任务与最早可分配日。</p>
-          <p v-else>审核报名，安排配对，让每一次相遇都有准备。</p>
-        </div>
-        <div class="match-actions">
-          <button
-            v-if="!libraryOnly && !libraryOpen"
-            class="business-primary"
-            :disabled="locked"
-            @click="create"
-          >
-            新建活动
-          </button>
-          <button :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">重新读取</button>
-        </div>
-      </div>
+      <WorkspaceHeading
+        :title="
+          libraryOnly
+            ? '每日任务库'
+            : selected === 'new'
+              ? '新建活动'
+              : detail
+                ? detail.activity.title
+                : '活动管理'
+        "
+        :description="
+          libraryOnly
+            ? '维护活动共用的每日任务与最早可分配日。'
+            : selected
+              ? '管理报名、配对与每日任务，跟进每一场相遇。'
+              : '安排每一次相遇，清楚掌握报名与活动进展。'
+        "
+      >
+        <template v-if="selected && !libraryOnly" #back>
+          <button class="match-back" :disabled="locked" @click="showList">← 返回活动列表</button>
+        </template>
+        <template v-if="detail && !libraryOnly" #status>
+          <span class="experience-badge" :data-status="detail.activity.phase">{{
+            phaseLabels[detail.activity.phase]
+          }}</span>
+        </template>
+        <button
+          v-if="!libraryOnly && !selected"
+          class="business-primary"
+          :disabled="locked"
+          @click="create"
+        >
+          新建活动
+        </button>
+        <button
+          v-else-if="libraryOnly"
+          class="business-primary"
+          :disabled="locked"
+          @click="openLibraryEditor()"
+        >
+          新建任务
+        </button>
+        <button v-else :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">
+          重新读取
+        </button>
+      </WorkspaceHeading>
       <FloatingNotice v-if="error" :message="error" tone="error" />
       <FloatingNotice v-if="notice" :message="notice" tone="success" />
       <FloatingNotice
@@ -131,7 +192,7 @@ function time(value: string) {
       <p v-if="busy || writing" role="status">
         {{ writing ? '正在提交，请稍候…' : '正在读取数据…' }}
       </p>
-      <section v-if="libraryOpen" aria-label="每日任务库" class="match-section">
+      <section v-if="libraryOpen" aria-label="每日任务库" class="experience-panel">
         <div class="match-heading">
           <div>
             <h2 v-if="choosingFirst">选择固定首日任务</h2>
@@ -142,66 +203,122 @@ function time(value: string) {
             返回活动
           </button>
         </div>
-        <form v-if="libraryOnly" @submit.prevent="saveLibraryTask">
-          <fieldset :disabled="locked || conflict">
-            <legend>{{ libraryEditID ? '编辑任务' : '新建任务' }}</legend>
-            <div class="match-form-grid">
+        <div v-if="libraryOnly" class="experience-toolbar">
+          <button :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">刷新任务</button
+          ><span class="experience-muted">共 {{ libraryTotal }} 项任务</span>
+        </div>
+        <WorkspaceDrawer
+          presentation="dialog"
+          :open="libraryEditorOpen"
+          :title="libraryEditID ? '编辑任务' : '新建任务'"
+          :busy="locked"
+          @close="closeLibraryEditor"
+        >
+          <form id="library-editor" class="experience-editor" @submit.prevent="saveLibraryTask">
+            <fieldset :disabled="locked || conflict">
+              <legend>{{ libraryEditID ? '编辑任务' : '新建任务' }}</legend>
+              <div class="match-form-grid">
+                <label
+                  >任务类型
+                  <select v-model="libraryForm.kind">
+                    <option value="online">线上</option>
+                    <option value="offline">线下</option>
+                  </select>
+                </label>
+                <label
+                  >最早可分配日
+                  <input
+                    v-model.number="libraryForm.min_day"
+                    type="number"
+                    min="0"
+                    max="30"
+                    required
+                  />
+                </label>
+              </div>
               <label
-                >任务类型
-                <select v-model="libraryForm.kind">
-                  <option value="online">线上</option>
-                  <option value="offline">线下</option>
-                </select>
+                >任务内容
+                <textarea v-model="libraryForm.body" required maxlength="1000" rows="3" />
               </label>
-              <label
-                >最早可分配日
-                <input
-                  v-model.number="libraryForm.min_day"
-                  type="number"
-                  min="0"
-                  max="30"
-                  required
-                />
-              </label>
-            </div>
-            <label
-              >任务内容
-              <textarea v-model="libraryForm.body" required maxlength="1000" rows="3" />
-            </label>
-            <label class="match-check"
-              ><input v-model="libraryForm.enabled" type="checkbox" />启用任务</label
-            >
-            <div class="match-actions">
-              <button type="submit" class="business-primary">保存任务</button>
-              <button v-if="libraryEditID" type="button" @click="editLibraryTask()">
-                新建任务
+              <label class="match-check"
+                ><input v-model="libraryForm.enabled" type="checkbox" />启用任务</label
+              >
+            </fieldset>
+          </form>
+          <template #footer
+            ><div class="drawer-actions">
+              <button data-overlay-close :disabled="locked" @click="closeLibraryEditor">取消</button
+              ><button
+                v-if="pending"
+                class="business-primary"
+                :disabled="writing || busy"
+                @click="runPending"
+              >
+                原样重试</button
+              ><button
+                v-else
+                class="business-primary"
+                type="submit"
+                form="library-editor"
+                :disabled="locked || conflict"
+              >
+                保存任务
               </button>
-            </div>
-          </fieldset>
-        </form>
+            </div></template
+          >
+        </WorkspaceDrawer>
         <p v-if="!busy && !libraryTasks.length">暂无任务，请先新建。</p>
-        <article v-for="task in libraryTasks" :key="task.id" class="match-card">
-          <p class="match-task-body">{{ task.body }}</p>
-          <p>
-            {{ task.kind === 'online' ? '线上' : '线下' }} ·
-            {{ task.min_day ? `第 ${task.min_day} 天起` : '无天数限制' }} ·
-            {{ task.enabled ? '已启用' : '已停用' }}
-          </p>
-          <div class="match-actions">
-            <button v-if="libraryOnly" :disabled="locked" @click="editLibraryTask(task)">
-              编辑任务
-            </button>
-            <button
-              v-if="choosingFirst"
-              :disabled="
-                locked || conflict || !canEditTemplates || !task.enabled || task.min_day > 1
-              "
-              @click="chooseFirstTask(task)"
-            >
-              设为固定首日任务
-            </button>
-          </div>
-        </article>
+        <div
+          v-if="libraryTasks.length"
+          class="business-table"
+          tabindex="0"
+          aria-label="每日任务列表"
+        >
+          <table>
+            <thead>
+              <tr>
+                <th>任务内容</th>
+                <th>类型</th>
+                <th>最早可分配日</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="task in libraryTasks" :key="task.id">
+                <td class="match-task-body">{{ task.body }}</td>
+                <td>{{ task.kind === 'online' ? '线上' : '线下' }}</td>
+                <td>{{ task.min_day ? `第 ${task.min_day} 天起` : '无天数限制' }}</td>
+                <td>
+                  <button
+                    v-if="libraryOnly"
+                    class="inline-switch"
+                    role="switch"
+                    :aria-checked="task.enabled"
+                    :aria-label="`启用任务 ${task.body}`"
+                    :disabled="locked || libraryEditorOpen"
+                    @click="toggleLibraryTask(task)"
+                  >
+                    <span aria-hidden="true"></span></button
+                  ><span>{{ task.enabled ? '已启用' : '已停用' }}</span>
+                </td>
+                <td>
+                  <button v-if="libraryOnly" :disabled="locked" @click="openLibraryEditor(task)">
+                    编辑任务</button
+                  ><button
+                    v-if="choosingFirst"
+                    :disabled="
+                      locked || conflict || !canEditTemplates || !task.enabled || task.min_day > 1
+                    "
+                    @click="chooseFirstTask(task)"
+                  >
+                    设为固定首日任务
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <div class="match-pagination" aria-label="每日任务库分页">
           <button :disabled="locked || libraryPage <= 1" @click="runRead(() => libraryTurn(-1))">
             上一页
@@ -216,24 +333,59 @@ function time(value: string) {
         </div>
       </section>
       <div v-else class="match-layout">
-        <aside class="match-activities" aria-label="活动列表">
-          <h2>
-            活动列表 <small>{{ total }}</small>
-          </h2>
-          <p v-if="!activities.length && !busy">暂无活动，可先创建草稿。</p>
-          <button
-            v-for="activity in activities"
-            :key="activity.id"
-            class="match-activity"
-            :disabled="locked"
-            :aria-current="selected === activity.id ? 'true' : undefined"
-            @click="runRead(() => open(activity.id), '活动详情已读取')"
-          >
-            <strong>{{ activity.title }}</strong
-            ><span>{{ phaseLabels[activity.phase] }}</span
-            ><small>报名截止 {{ time(activity.registration_closes_at) }}</small>
-          </button>
-          <div class="match-pagination" aria-label="活动列表分页">
+        <section v-if="!selected" class="experience-panel activity-list" aria-label="活动列表">
+          <div class="match-list-heading">
+            <div>
+              <h2>
+                全部活动 <span class="experience-muted">{{ total }}</span>
+              </h2>
+              <p class="experience-muted">按当前页展示，进入详情管理活动。</p>
+            </div>
+            <button :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">刷新列表</button>
+          </div>
+          <div v-if="activities.length" class="business-table">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">活动</th>
+                  <th scope="col">阶段</th>
+                  <th scope="col">报名截止</th>
+                  <th scope="col">活动时间</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="activity in activities" :key="activity.id">
+                  <td>
+                    <strong>{{ activity.title }}</strong
+                    ><small class="experience-muted">{{ activity.days }} 天 · 每日任务</small>
+                  </td>
+                  <td>
+                    <span class="experience-badge" :data-status="activity.phase">{{
+                      phaseLabels[activity.phase]
+                    }}</span>
+                  </td>
+                  <td>{{ shortTime(activity.registration_closes_at, true) }}</td>
+                  <td>{{ shortTime(activity.starts_at) }} — {{ shortTime(activity.ends_at) }}</td>
+                  <td>
+                    <button
+                      class="match-activity"
+                      :disabled="locked"
+                      @click="runRead(() => open(activity.id), '活动详情已读取')"
+                    >
+                      管理活动
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else-if="!busy" class="experience-empty">
+            <h2>暂无活动</h2>
+            <p>新建一场活动，开始准备下一次相遇。</p>
+          </div>
+          <div class="business-pagination" aria-label="活动列表分页">
+            <span class="experience-muted">共 {{ total }} 场 · 每页 20 场</span>
             <button :disabled="locked || listPage <= 1" @click="runRead(() => listTurn(-1))">
               上一页
             </button>
@@ -245,23 +397,9 @@ function time(value: string) {
               下一页
             </button>
           </div>
-        </aside>
-        <div class="match-main">
-          <div v-if="!selected" class="match-empty">
-            <h2>选择一场活动</h2>
-            <p>从左侧查看报名和配对，或新建下一场活动。</p>
-          </div>
-          <template v-else>
-            <header v-if="detail" class="match-summary">
-              <div>
-                <h2>{{ detail.activity.title }}</h2>
-                <span class="match-badge">{{ phaseLabels[detail.activity.phase] }}</span>
-              </div>
-              <p>
-                {{ detail.total }} 份报名 · {{ detail.pair_total }} 条配对记录 ·
-                {{ detail.activity.days }} 天任务
-              </p>
-            </header>
+        </section>
+        <div v-else class="match-main experience-panel">
+          <template v-if="selected">
             <nav v-if="detail" class="match-tabs" aria-label="活动工作台分页">
               <button
                 v-for="item in tabs"
@@ -279,7 +417,10 @@ function time(value: string) {
             >
               <h2>{{ selected === 'new' ? '新建活动草稿' : '活动设置' }}</h2>
               <p>所有时间均为北京时间。活动发布后，名称、说明和时间安排将冻结。</p>
-              <form @submit.prevent="saveActivity">
+              <form
+                v-if="selected === 'new' || detail?.activity.status === 'draft'"
+                @submit.prevent="saveActivity"
+              >
                 <fieldset
                   :disabled="
                     locked ||
@@ -332,6 +473,18 @@ function time(value: string) {
                   </button>
                 </fieldset>
               </form>
+              <dl v-else-if="detail" class="activity-information">
+                <dt>活动名称</dt>
+                <dd>{{ detail.activity.title }}</dd>
+                <template v-for="field in activityDateFields" :key="field.key"
+                  ><dt>{{ field.label }}</dt>
+                  <dd>{{ time(detail.activity[field.key]) }}</dd></template
+                >
+                <dt>活动天数</dt>
+                <dd>{{ detail.activity.days }} 天</dd>
+                <dt>活动说明</dt>
+                <dd class="match-task-body">{{ detail.activity.description }}</dd>
+              </dl>
               <div v-if="detail" class="match-actions match-section">
                 <button
                   v-if="detail.activity.status === 'draft'"
@@ -355,7 +508,9 @@ function time(value: string) {
               </div>
             </section>
             <section v-if="tab === 'enrollments' && detail" aria-label="报名与配对">
-              <h2>报名审核</h2>
+              <h2>
+                报名审核 <small class="experience-muted">{{ detail.total }} 份报名</small>
+              </h2>
               <p>学生认证和本活动资料审核分别管理。通过审核且当前资格有效的报名者才能配对。</p>
               <div class="business-table">
                 <table>
@@ -467,7 +622,9 @@ function time(value: string) {
                 @applied="autoApplied"
               />
               <div class="match-heading">
-                <h2>配对记录</h2>
+                <h2>
+                  配对记录 <small class="experience-muted">{{ detail.pair_total }} 条记录</small>
+                </h2>
                 <button
                   class="business-primary"
                   :disabled="locked || conflict || !canPair"
@@ -622,71 +779,146 @@ function time(value: string) {
   align-items: center;
   gap: 0.6rem;
 }
-.match-layout {
+.activity-list {
+  padding: 0;
+  overflow: hidden;
+}
+.activity-list .match-list-heading {
+  padding: 24px;
+  margin: 0;
+}
+.activity-list .business-table {
+  border-inline: 0;
+  border-radius: 0;
+}
+.activity-list .business-table :is(th, td) {
+  padding-inline: 24px;
+}
+.activity-list .business-table table {
+  table-layout: fixed;
+  min-width: 960px;
+}
+.activity-list th:nth-child(1) {
+  width: 32%;
+}
+.activity-list th:nth-child(2) {
+  width: 12%;
+}
+.activity-list th:nth-child(3) {
+  width: 18%;
+}
+.activity-list th:nth-child(4) {
+  width: 26%;
+}
+.activity-list th:nth-child(5) {
+  width: 12%;
+}
+.activity-list .business-table td small {
+  display: block;
+  margin-top: 0;
+  line-height: 18px;
+  font-size: 12px;
+}
+.activity-list .business-pagination {
+  padding: 18px 24px;
+  margin: 0;
+}
+.activity-information {
   display: grid;
-  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 20px 24px;
 }
-.match-activities {
-  display: grid;
-  gap: 0.7rem;
-}
-.match-activities h2 {
-  font-size: 1rem;
-  margin: 0 0 0.3rem;
-}
-.match-activities small {
+.activity-information dt {
   color: var(--text-secondary);
 }
-.match-activity {
-  display: grid;
-  gap: 0.4rem;
-  padding: 1rem;
-  text-align: left;
-  width: 100%;
+.activity-information dd {
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.match-activity[aria-current='true'] {
-  border-color: var(--accent-color);
-  background: var(--surface-muted);
-  color: var(--text-primary);
+.match-layout {
+  min-width: 0;
 }
 .match-main {
   min-width: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 0.8rem;
-  padding: 1.5rem;
 }
-.match-empty {
-  text-align: center;
-  padding: 4rem 1rem;
+.match-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.match-list-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.match-list-heading p {
+  margin: 6px 0 0;
+  line-height: 20.8px;
+}
+.match-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.match-summary > div {
+  border-right: 1px solid var(--border-color);
+}
+.match-summary > div:last-child {
+  border-right: 0;
+}
+.match-summary span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.match-summary strong {
+  display: block;
+  font-size: 24px;
+  margin-top: 4px;
+}
+.match-summary small {
+  font-size: 13px;
+  font-weight: 400;
   color: var(--text-secondary);
 }
-.match-summary h2 {
-  margin-top: 0;
-  display: inline;
-  margin-right: 0.7rem;
+.match-detail-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
 }
-.match-badge {
-  display: inline-block;
-  border-radius: 1rem;
-  background: var(--surface-muted);
-  border: 1px solid var(--border-color);
-  padding: 0.2rem 0.7rem;
-  font-size: 0.85rem;
+.experience-page button.match-back {
+  padding: 0;
+  min-height: 22.4px;
+  line-height: 22.4px;
+  margin-bottom: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
 }
 .match-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  overflow-x: auto;
+  gap: 28px;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  margin: -24px -24px 24px;
+  padding: 0 24px;
 }
-.match-tabs [aria-current='page'] {
-  font-weight: 700;
-  border-color: var(--accent-color);
+.experience-page .match-tabs button {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 18px 0;
+  white-space: nowrap;
+}
+.experience-page .match-tabs [aria-current='page'] {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+  font-weight: 600;
 }
 .match-card,
 .match-alert {
@@ -761,25 +993,28 @@ th,
 td {
   overflow-wrap: anywhere;
 }
-@media (max-width: 960px) {
-  .match-layout {
+@media (max-width: 640px) {
+  .match-form-grid {
     grid-template-columns: 1fr;
   }
-  .match-activities {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .match-summary {
+    gap: 12px;
   }
-  .match-activities h2,
-  .match-activities .match-pagination {
-    grid-column: 1 / -1;
+  .match-summary strong {
+    font-size: 20px;
   }
 }
-@media (max-width: 640px) {
-  .match-main {
-    padding: 1rem;
-  }
-  .match-form-grid,
-  .match-activities {
-    grid-template-columns: 1fr;
-  }
+
+.match-main > section > h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+}
+.match-main > section > p {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.activity-information {
+  margin: 24px 0;
 }
 </style>

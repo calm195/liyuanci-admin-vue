@@ -5,11 +5,19 @@ import { useAdminWorkspace } from './useAdminWorkspace'
 import { createTraitClient } from '@/services/matchmaking-traits'
 import { MatchmakingError, matchmakingErrorMessage } from '@/services/matchmaking'
 import { matchmakingRoles } from '@/types/matchmaking'
-import type { Trait, TraitDetail, TraitFilters, TraitWord } from '@/types/matchmaking-traits'
+import type {
+  Trait,
+  TraitCategory,
+  TraitDetail,
+  TraitFilters,
+  TraitWord,
+} from '@/types/matchmaking-traits'
 
 export function useMatchmakingTraits() {
   const filters = reactive<TraitFilters>({
     q: '',
+    category: '',
+    enabled: '',
     purpose: 'all',
     gender: '',
     status: 'approved',
@@ -26,6 +34,13 @@ export function useMatchmakingTraits() {
   const mode = ref<'list' | 'cloud'>('list'),
     detail = ref<TraitDetail | null>(null),
     reason = ref('')
+  const editorOpen = ref(false)
+  const management = reactive<{
+    name: string
+    category: TraitCategory
+    enabled: boolean
+    reason: string
+  }>({ name: '', category: 'personality', enabled: true, reason: '' })
   const busy = ref(false),
     writing = ref(false),
     error = ref(''),
@@ -39,6 +54,7 @@ export function useMatchmakingTraits() {
     rows.value = []
     cloud.value = []
     detail.value = null
+    editorOpen.value = false
     total.value = 0
     cloudTotal.value = 0
     busy.value = false
@@ -125,16 +141,17 @@ export function useMatchmakingTraits() {
     error.value = ''
     notice.value = ''
     await workspace.run(
-      (signal) => client.review(command, signal),
+      (signal) => client.execute(command, signal),
       async () => {
         commands.clear()
         detail.value = null
+        editorOpen.value = false
         reason.value = ''
         await load()
         if (workspace.allowed())
           notice.value = error.value
-            ? '审核已提交，列表刷新失败，请重新查询核对。'
-            : '审核已完成，统计已刷新。'
+            ? '操作已完成，列表刷新失败，请重新查询核对。'
+            : '操作已完成，词条与统计已刷新。'
       },
       (cause) => {
         if (
@@ -145,8 +162,9 @@ export function useMatchmakingTraits() {
         ) {
           commands.clear()
           detail.value = null
+          editorOpen.value = false
           error.value = matchmakingErrorMessage(cause)
-        } else error.value = '审核结果尚未确认，原请求已保留，请原样重试。'
+        } else error.value = '操作结果尚未确认，原请求已保留，请原样重试。'
       },
       () => {
         writing.value = false
@@ -169,10 +187,67 @@ export function useMatchmakingTraits() {
     )
       await retry()
   }
+  function create() {
+    if (locked.value) return
+    detail.value = null
+    Object.assign(management, { name: '', category: 'personality', enabled: true, reason: '' })
+    editorOpen.value = true
+    error.value = ''
+  }
+  function edit() {
+    if (locked.value || !detail.value) return
+    Object.assign(management, {
+      name: detail.value.name,
+      category: detail.value.category ?? 'uncategorized',
+      enabled: detail.value.enabled ?? true,
+      reason: '',
+    })
+    editorOpen.value = true
+    error.value = ''
+  }
+  function close() {
+    if (busy.value || writing.value) return
+    editorOpen.value = false
+    detail.value = null
+  }
+  async function save() {
+    if (locked.value) return
+    const message = management.reason.trim()
+    const name = management.name.trim()
+    if (!message || [...message].length > 500 || !name || [...name].length > 20) {
+      error.value = '请填写1～20字的词条及不超过500字的维护理由。'
+      return
+    }
+    const current = detail.value
+    const command = current
+      ? {
+          action: 'update' as const,
+          id: current.id,
+          key: crypto.randomUUID(),
+          body: {
+            expected_version: current.version,
+            category: management.category,
+            enabled: management.enabled,
+            reason: message,
+          },
+        }
+      : {
+          action: 'create' as const,
+          key: crypto.randomUUID(),
+          body: { name, category: management.category, reason: message },
+        }
+    if (commands.save(command)) await retry()
+  }
   onMounted(() => {
     if (!pending.value) void load()
   })
   return {
+    editorOpen,
+    management,
+    create,
+    edit,
+    close,
+    save,
     filters,
     rows,
     cloud,
