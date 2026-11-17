@@ -38,7 +38,7 @@ export const useThemeStore = defineStore('appearance', () => {
       document.documentElement.style.colorScheme = value ? 'dark' : 'light'
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', value ? '#111827' : '#f4f6f9')
+        ?.setAttribute('content', value ? '#0f1117' : '#f6f7fb')
     },
     { immediate: true },
   )

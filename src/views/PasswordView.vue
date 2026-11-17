@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -64,31 +65,45 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main class="panel workflow" aria-label="本人修改口令">
-    <p>当前账号：{{ admin.session?.account.login_name }}</p>
-    <p>核验当前口令后修改；成功后全部旧会话撤销并重新登录，不自动续期。</p>
-    <form @submit.prevent="submit">
-      <fieldset :disabled="busy">
-        <legend>本人改密</legend>
-        <label for="current-password">当前口令</label>
-        <input
-          id="current-password"
-          v-model="currentPassword"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
-        <label for="new-password">新口令</label>
-        <input
-          id="new-password"
-          v-model="newPassword"
-          type="password"
-          autocomplete="new-password"
-          required
-        />
-        <button :disabled="!valid">{{ busy ? '正在提交…' : '确认改密并重新登录' }}</button>
-      </fieldset>
-      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-    </form>
+  <main class="experience-page" aria-label="本人修改口令">
+    <WorkspaceHeading
+      title="修改口令"
+      description="核验当前口令后修改；成功后全部旧会话撤销并重新登录。"
+    />
+    <section class="experience-panel password-panel">
+      <p>当前账号：{{ admin.session?.account.login_name }}</p>
+
+      <form class="experience-editor" @submit.prevent="submit">
+        <fieldset :disabled="busy">
+          <legend>本人改密</legend>
+          <label for="current-password">当前口令</label>
+          <input
+            id="current-password"
+            v-model="currentPassword"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+          <label for="new-password">新口令</label>
+          <input
+            id="new-password"
+            v-model="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+          <button class="business-primary" :disabled="!valid">
+            {{ busy ? '正在提交…' : '确认改密并重新登录' }}
+          </button>
+        </fieldset>
+        <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      </form>
+    </section>
   </main>
 </template>
+
+<style scoped>
+.password-panel {
+  max-width: 680px;
+}
+</style>

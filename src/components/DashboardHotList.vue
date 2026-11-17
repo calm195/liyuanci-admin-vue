@@ -48,7 +48,7 @@ watch(() => props.revision, load)
 </script>
 
 <template>
-  <section class="hot-list" :aria-label="title">
+  <section class="hot-list experience-panel" :aria-label="title">
     <h2>{{ title }}</h2>
     <p v-if="busy" role="status">正在读取热点…</p>
     <p v-else-if="error" role="alert">{{ error }}</p>
@@ -71,7 +71,7 @@ watch(() => props.revision, load)
 <style scoped>
 .hot-list {
   min-width: 0;
-  padding: 1rem;
+  padding: 24px;
   border: 1px solid var(--line, #ddd);
   border-radius: 0.75rem;
 }

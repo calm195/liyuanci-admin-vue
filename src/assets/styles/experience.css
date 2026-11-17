@@ -1,0 +1,445 @@
+/* 页面骨架以显式类限定，旧模块继续保留自身布局与信息层级。 */
+.experience-page {
+  --focus-color: var(--accent-color);
+  --control-border: var(--border-color);
+  font-size: 12px;
+  line-height: 1.6;
+  min-width: 0;
+}
+.experience-page:not(.el-drawer) {
+  display: grid;
+  gap: 22px;
+}
+.workspace-content > .experience-page.panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.experience-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.experience-page button:not(.el-button, .el-dialog__headerbtn, .el-drawer__close-btn) {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.experience-page button.business-primary {
+  background: var(--accent-color);
+  color: var(--on-accent);
+  border-color: var(--accent-color);
+}
+.experience-page button.business-danger {
+  color: var(--danger-color);
+}
+.experience-page button:not(:disabled):hover {
+  border-color: var(--accent-color);
+}
+.experience-page :is(input, select) {
+  min-height: 40px;
+}
+.experience-page :is(input, textarea, select) {
+  border-radius: 8px;
+  border-color: var(--border-color);
+}
+.experience-page .experience-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  margin: 0;
+}
+.experience-page .experience-filters label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.experience-page .experience-filters :is(input, select) {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  width: 100%;
+}
+.experience-page .experience-result-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 24px 0 16px;
+}
+.experience-page .experience-result-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.experience-page .business-table {
+  border-radius: 8px;
+}
+.experience-page .business-table :is(th, td) {
+  padding: 12px 24px;
+  height: 64px;
+  line-height: 20px;
+}
+.experience-page .business-table th {
+  height: auto;
+  padding-block: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--page-background);
+}
+.experience-page .business-table button:not(.business-primary) {
+  background: transparent;
+  color: var(--accent-color);
+  border-color: transparent;
+  min-height: 32px;
+  padding: 4px 0;
+}
+.experience-page .business-pagination {
+  margin: 20px 0 0;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.experience-page .experience-muted {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.experience-page .experience-empty {
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.experience-page .experience-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  background: var(--selected-surface);
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.experience-page .experience-badge[data-status='pending'],
+.experience-page .experience-badge[data-status='pending_review'],
+.experience-page .experience-badge[data-status='human_required'] {
+  color: var(--warning-text);
+  background: var(--warning-surface);
+}
+.experience-page .experience-badge[data-status='rejected'] {
+  color: var(--danger-color);
+}
+.experience-page .experience-inline-error {
+  padding: 12px 16px;
+  border: 1px solid var(--danger-color);
+  border-radius: 8px;
+}
+.experience-page .experience-section {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.experience-page .experience-section:first-child {
+  padding-top: 0;
+}
+.experience-page .experience-section:last-child {
+  border-bottom: 0;
+}
+.experience-page .experience-section h3 {
+  font-size: 16px;
+  margin: 0 0 16px;
+}
+.experience-page .experience-section p {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .experience-panel {
+    padding: 20px;
+  }
+  .experience-page .experience-filters label {
+    flex: 1 1 160px;
+  }
+}
+
+.experience-page .business-pagination > .experience-muted:first-child {
+  margin-right: auto;
+}
+.experience-page .business-pagination button:not(.el-button) {
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.experience-page .experience-table-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.experience-table-panel > form {
+  padding: 20px;
+}
+.experience-page .experience-table-panel > .business-table {
+  border-inline: 0;
+  border-radius: 0;
+}
+.experience-page .experience-table-panel > .business-pagination {
+  margin: 0;
+  padding: 18px 24px;
+}
+.experience-page .experience-filters label:not(.trait-search, .content-search) {
+  min-width: 140px;
+}
+.experience-page .experience-table-panel > .experience-empty {
+  margin: 0;
+}
+
+.experience-page .business-table table {
+  min-width: 800px;
+}
+
+/* 维护表单和独立工作区共用尺寸，业务字段仍由各页面声明。 */
+.experience-editor {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.experience-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+}
+.experience-editor label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.experience-editor :is(input, select, textarea) {
+  width: 100%;
+  margin: 0;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+}
+.experience-editor :is(input[type='checkbox'], input[type='radio']) {
+  width: auto;
+  min-height: 0;
+}
+.experience-page .experience-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.experience-panel > .experience-panel-heading {
+  margin: 0 0 20px;
+}
+.experience-panel-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.experience-panel-heading p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.experience-page .experience-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.experience-page
+  .experience-table-panel
+  > :is(.experience-toolbar, .experience-panel-heading, .experience-inline-notice) {
+  padding: 20px 24px;
+  margin: 0;
+}
+.experience-page .experience-table-panel > .experience-filters {
+  padding: 20px;
+}
+.experience-page .experience-table-panel caption {
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.experience-page .experience-table-panel .business-table {
+  margin: 0;
+}
+.experience-page .business-table tbody th {
+  font-size: 12px;
+  font-weight: 400;
+  background: var(--surface);
+  height: 64px;
+}
+
+.experience-page .business-pagination .page-size-select,
+.experience-page .business-pagination select {
+  margin: 0;
+}
+
+.experience-page .experience-list-title {
+  margin: 0 auto 0 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.experience-page .resource-editor-panel {
+  max-width: 960px;
+}
+.experience-page .business-table td p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.experience-definition {
+  display: grid;
+  grid-template-columns: minmax(100px, auto) minmax(0, 1fr);
+  gap: 16px 24px;
+  margin: 0;
+}
+.experience-definition dt {
+  color: var(--text-secondary);
+}
+.experience-definition dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.experience-primary-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--on-accent);
+  text-decoration: none;
+}
+.experience-page .business-toolbar {
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.experience-page .business-toolbar :is(h2, h3) {
+  font-size: 16px;
+  line-height: 24px;
+}
+.experience-page.wordlist-workspace > nav {
+  margin: 0;
+}
+.experience-page .workflow-box {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--surface);
+  margin: 0;
+}
+.experience-page .business-table {
+  max-width: 100%;
+}
+.experience-page .business-table :is(td, th) {
+  overflow-wrap: anywhere;
+}
+.experience-page .experience-filters input {
+  min-width: 0;
+}
+.experience-page .experience-panel > h2 {
+  font-size: 16px;
+  line-height: 24px;
+}
+.experience-page > .banner {
+  margin: 0;
+  border-radius: 8px;
+}
+
+.experience-page.privacy-workspace .experience-editor {
+  max-width: 760px;
+}
+.experience-page.privacy-workspace .experience-panel > h2 {
+  margin-top: 0;
+}
+.experience-page .crisis-case-workspace > section > h2 {
+  margin-top: 0;
+  font-size: 20px;
+  line-height: 28px;
+}
+.experience-page .business-table[tabindex] {
+  outline-offset: 3px;
+}
+.experience-page :is(.workflow-body, .case-text, .crisis-text, .guide-body) {
+  overflow-wrap: anywhere;
+}
+
+.experience-page .experience-table-panel > p:not(.experience-empty) {
+  padding: 12px 24px;
+  margin: 0;
+}
+
+.experience-page :is(.business-toolbar, .business-dialog-actions) button:not(.el-button) {
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.experience-page.resource-workspace .experience-filters input,
+.experience-page.wordlist-workspace .experience-filters input {
+  width: 220px;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .experience-page.resource-workspace .experience-filters input,
+  .experience-page.wordlist-workspace .experience-filters input {
+    width: 100%;
+  }
+}
+
+.experience-page button.inline-switch {
+  display: inline-flex;
+  width: 34px;
+  height: 20px;
+  min-height: 20px;
+  padding: 2px;
+  border: 1px solid var(--control-border);
+  border-radius: 20px;
+  background: var(--surface-muted);
+  vertical-align: middle;
+  margin-right: 8px;
+  align-items: center;
+}
+.experience-page button.inline-switch > span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 120ms;
+}
+.experience-page button.inline-switch[aria-checked='true'] {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+.experience-page button.inline-switch[aria-checked='true'] > span {
+  background: var(--on-accent);
+  transform: translateX(14px);
+}

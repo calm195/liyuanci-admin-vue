@@ -3,7 +3,7 @@
 :root {
   --page-background: #f6f7fb;
   --surface: #ffffff;
-  --surface-muted: #fafbfe;
+  --surface-muted: #faf9fd;
   --text-primary: #111827;
   --text-secondary: #545d70;
   --border-color: #dce3eb;
@@ -19,13 +19,13 @@
 html.dark {
   --page-background: #0f1117;
   --surface: #171a24;
-  --surface-muted: #202432;
+  --surface-muted: #202431;
   --text-primary: #e4ebf4;
   --text-secondary: #a5b5c9;
   --border-color: #34445b;
   --control-border: #647891;
   --accent-color: #c4a7ff;
-  --on-accent: #21143d;
+  --on-accent: #21143c;
   --selected-surface: #30244b;
   --warning-surface: #44381d;
   --warning-text: #f4d47e;

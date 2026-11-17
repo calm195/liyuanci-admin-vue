@@ -9,6 +9,7 @@ import { useAdminStore } from '@/stores/admin'
 import AdminLayout from '@/components/AdminLayout.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import './assets/styles/layout.css'
+import './assets/styles/experience.css'
 
 const dictionaries = useDictionariesStore()
 let lastDictionaryRefresh = 0

@@ -39,12 +39,13 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main class="login panel">
+  <main class="login panel experience-page login-workspace">
+    <p class="eyebrow">鲤源池 · 管理端</p>
     <h1 id="admin-login-title">后台登录</h1>
     <FloatingNotice v-if="admin.notice" :message="admin.notice" tone="info">{{
       admin.notice
     }}</FloatingNotice>
-    <form aria-labelledby="admin-login-title" @submit.prevent="login">
+    <form class="experience-editor" aria-labelledby="admin-login-title" @submit.prevent="login">
       <fieldset :disabled="busy">
         <label for="login-name">后台账号</label>
         <input id="login-name" v-model="loginName" autocomplete="username" required />
@@ -56,9 +57,28 @@ onBeforeUnmount(() => {
           autocomplete="current-password"
           required
         />
-        <button :disabled="!valid">{{ busy ? '正在登录…' : '登录后台' }}</button>
+        <button class="business-primary" :disabled="!valid">
+          {{ busy ? '正在登录…' : '登录后台' }}
+        </button>
       </fieldset>
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
     </form>
   </main>
 </template>
+
+<style scoped>
+.login-workspace {
+  width: min(460px, calc(100vw - 32px));
+  border-radius: 12px;
+  padding: 32px;
+  margin: clamp(40px, 12vh, 120px) auto;
+}
+.login-workspace h1 {
+  font-size: 26px;
+  line-height: 36px;
+  margin: 0;
+}
+.login-workspace .eyebrow {
+  margin: 0;
+}
+</style>
