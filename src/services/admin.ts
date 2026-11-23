@@ -1,4 +1,5 @@
 import type { AdminSession, AdminLoginInput, AdminPasswordInput } from '@/types/admin'
+import { validateAdminPath } from './admin-path'
 
 export class ApiError extends Error {
   constructor(public status: number) {
@@ -20,13 +21,7 @@ export async function adminRequest(
   init: RequestInit = {},
   transport: typeof fetch = fetch,
 ): Promise<unknown> {
-  if (
-    !path.startsWith('/admin/') ||
-    path.includes('?') ||
-    path.includes('#') ||
-    path.includes('..')
-  )
-    throw new Error('非法后台路径')
+  validateAdminPath(`/api/v1${path}`, false)
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
   if (init.method && init.method !== 'GET' && !headers.has('Idempotency-Key'))

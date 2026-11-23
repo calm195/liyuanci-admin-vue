@@ -34,6 +34,11 @@ describe('后台会话传输边界', () => {
     '/api/v1/me',
     '/api/v1/admin/../me',
     '/api/v1/admin/%2e%2e/me',
+    '/api/v1/admin/%2e%2e%2fme',
+    '/api/v1/admin/%2e%2e%5cme',
+    '/api/v1/admin/%252e%252e%252fme',
+    '/api/v1/admin/users/%00',
+    '/api/v1/admin/users/%',
     '/api/v1/admin/.\t./me',
     '/api/v1/admin/.. ',
     '/api/v1/admin/..\u0000',
@@ -55,6 +60,15 @@ describe('后台会话传输边界', () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response())
     await createSessionTransport('token', () => true, transport).request(
       '/api/v1/admin/users?cursor=opaque..%2F%2B%3D%20',
+      new AbortController().signal,
+    )
+    expect(transport).toHaveBeenCalledOnce()
+  })
+
+  it('允许路径中的普通编码标识符', async () => {
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response())
+    await createSessionTransport('token', () => true, transport).request(
+      '/api/v1/admin/users/%E5%90%8D%E7%A7%B0-1',
       new AbortController().signal,
     )
     expect(transport).toHaveBeenCalledOnce()

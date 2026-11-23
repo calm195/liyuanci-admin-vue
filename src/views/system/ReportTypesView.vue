@@ -35,7 +35,8 @@ const workspace = useAdminWorkspace(() => {
   uncertain.value = false
 }, 'super_admin')
 async function load(manual = false) {
-  if (busy.value || (manual && uncertain.value)) return
+  if (busy.value) return
+  const checkingUnknown = manual && uncertain.value
   busy.value = true
   error.value = ''
   notice.value = ''
@@ -43,7 +44,10 @@ async function load(manual = false) {
     (signal) => readReportTypes(admin.session?.token ?? '', signal),
     (value) => {
       snapshot.value = value
-      if (manual) {
+      if (checkingUnknown) {
+        // 查询新快照仅供核对，不能据此丢弃结果未知的原请求。
+        notice.value = '已读取当前举报类型，原请求仍待确认，请继续原样重试'
+      } else if (manual) {
         draft.value = null
         attempt = null
         uncertain.value = false
@@ -90,7 +94,11 @@ async function save() {
     error.value = '代码须为1至32位字母、数字、下划线或连字符，名称须为1至80个字符'
     return
   }
-  if (creating.value && snapshot.value.items.some((existing) => existing.code === item.code)) {
+  if (
+    !uncertain.value &&
+    creating.value &&
+    snapshot.value.items.some((existing) => existing.code === item.code)
+  ) {
     error.value = '该代码已存在，请编辑已有类型'
     return
   }
@@ -161,7 +169,7 @@ onMounted(() => {
     </WorkspaceHeading>
     <section class="experience-panel experience-table-panel">
       <div class="experience-toolbar">
-        <button :disabled="busy || uncertain" @click="load(true)">刷新类型</button
+        <button :disabled="busy" @click="load(true)">刷新类型</button
         ><RouterLink to="/dictionaries">管理展示字典</RouterLink
         ><span class="experience-muted">当前版本：{{ snapshot.version }}</span>
       </div>

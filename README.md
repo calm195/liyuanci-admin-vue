@@ -80,6 +80,8 @@ Vue 3.5.44 的属性校验器声明通过 `patches/` 中的单行补丁兼容 El
 
 使用 `<script setup lang="ts">`，遵循严格类型与现有格式、lint 规则，不使用 `any`、不安全断言或抑制注释绕过检查。外部数据在 services 边界校验；瞬时 UI 状态留在组件，共享状态才进入 store；行为测试与实现相邻存放。
 
+规范参考 [Vue 风格指南](https://vuejs.org/style-guide/)、[Vue 安全指南](https://vuejs.org/guide/best-practices/security.html)、[Vue 测试指南](https://vuejs.org/guide/scaling-up/testing.html)、[TypeScript 配置参考](https://www.typescriptlang.org/tsconfig/)及 [Prettier 与 Linter 配合指南](https://prettier.io/docs/integrating-with-linters.html)。项目沿用类型严格检查（包括索引访问和可选属性）、Prettier 格式化及 ESLint 质量规则；组件明确输入和事件，避免渲染不可信模板，测试关注用户可观察的行为。具体配置与本项目会话、安全及业务约束优先，调整规则前先核对兼容性和现有检查结果。
+
 `services/session-transport.ts` 统一后台 Bearer 请求的路径、取消、授权、缓存、Cookie 与重定向策略。各业务模块继续独立校验状态码、响应头和正文，并在异步读取正文后重新调用 `guard`；`content-request.ts` 只负责标准内容响应封装，不依赖审核或词库客户端。新增接口优先复用传输边界，保留模块协议差异。
 
 业务源码修改后依次运行 `pnpm format`、`pnpm check`、`pnpm build`；需要自动 lint 修复时使用 `pnpm lint:fix`。纯文档整理执行格式、链接、固定输入及差异检查。准确记录验证结果与未完成依赖。

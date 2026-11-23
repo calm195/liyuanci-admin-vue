@@ -52,6 +52,17 @@ describe('T010 REQ-018/019 请求与会话边界', () => {
     expect(headers.get('Authorization')).toBe('Bearer admin-only')
     expect(headers.get('Idempotency-Key')).toBeTruthy()
   })
+  it.each([
+    '/admin/%2e%2e/me',
+    '/admin/%2e%2e%2fme',
+    '/admin/%252e%252e%252fme',
+    '/admin/..\\me',
+    '/admin/users?role=admin',
+  ] as const)('请求拒绝越界路径 %s', async (path) => {
+    const transport = vi.fn<typeof fetch>()
+    await expect(adminRequest(path, 'token', {}, transport)).rejects.toThrow('非法后台路径')
+    expect(transport).not.toHaveBeenCalled()
+  })
   it.each([401, 403, 404, 429, 503])('HTTP %s 保留状态且不回显后端正文', async (status) => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response('sensitive', { status }))
     await expect(adminRequest('/admin/session', 'x', {}, transport)).rejects.toEqual(

@@ -52,7 +52,11 @@ describe('受控内容图片', () => {
     await flushPromises()
     expect(fetcher).toHaveBeenCalledWith(
       '/api/v1/admin/wish-images/image?case_id=case&variant=preview',
-      expect.objectContaining({ headers: { Authorization: 'Bearer test-admin' } }),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-admin' },
+        credentials: 'omit',
+        redirect: 'error',
+      }),
     )
     expect(wrapper.find('img').attributes('src')).toBe('blob:test-preview')
     await wrapper.get('button').trigger('click')
@@ -65,6 +69,28 @@ describe('受控内容图片', () => {
     await flushPromises()
     expect(wrapper.find('img').exists()).toBe(false)
     expect(revoke).toHaveBeenCalledWith('blob:test-preview')
+    wrapper.unmount()
+  })
+  it('拒绝规范化后可能越出接口范围的图片地址', async () => {
+    const { pinia } = setup()
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+    vi.stubGlobal('fetch', fetcher)
+    const wrapper = mount(ContentImages, {
+      props: {
+        images: [
+          {
+            id: 'image',
+            url: '/api/v1/%2e%2e%2fprivate',
+            position: 0,
+            scan_state: 'approved',
+          },
+        ],
+      },
+      global: { plugins: [pinia] },
+    })
+    await flushPromises()
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="alert"]').text()).toContain('图片地址格式异常')
     wrapper.unmount()
   })
   it('没有图片读取权限时触发统一撤权并清除预览', async () => {

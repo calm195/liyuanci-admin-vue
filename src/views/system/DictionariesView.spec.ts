@@ -61,6 +61,13 @@ describe('展示字典管理', () => {
     expect(wrapper.get('form input').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('保存结果尚未确认')
     expect(button('原样重试').attributes('form')).toBe('dictionary-editor')
+    vi.mocked(readAdminDictionaries).mockResolvedValue({
+      version: 4,
+      items: [{ ...snapshot.items[0]!, label: '确有帮助' }],
+    })
+    await button('刷新字典').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('原请求仍待确认')
     await wrapper.get('#dictionary-editor').trigger('submit')
     await flushPromises()
     expect(vi.mocked(saveDictionary).mock.calls[1]?.slice(0, 4)).toEqual(

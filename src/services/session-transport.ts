@@ -1,4 +1,5 @@
 import { ApiError } from './admin'
+import { validateAdminPath } from './admin-path'
 
 /** 统一后台 Bearer 的传输边界；具体状态码、响应头和正文仍由所属协议校验。 */
 export function createSessionTransport(
@@ -13,17 +14,7 @@ export function createSessionTransport(
   }
   async function request(url: string, signal: AbortSignal, init: RequestInit = {}) {
     guard(signal)
-    // 拒绝浏览器会裁剪的原始空白和控制符；游标等查询参数须编码，且不参与路径检查。
-    const path = url.split('?')[0] ?? ''
-    if (
-      !path.startsWith('/api/v1/admin/') ||
-      /[\\#\s\p{Cc}]/u.test(url) ||
-      path.split('/').some((part) => {
-        const decoded = decodeURIComponent(part)
-        return decoded === '.' || decoded === '..'
-      })
-    )
-      throw new Error('非法后台路径')
+    validateAdminPath(url, true)
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${token}`)
     const response = await transport(url, {

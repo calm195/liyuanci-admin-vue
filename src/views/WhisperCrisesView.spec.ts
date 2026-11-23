@@ -307,24 +307,27 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     await confirm()
     expect(mocks.whisperAdminCrisisAct.mock.calls[1]?.[1]).toMatchObject({ expected_version: 19 })
   })
-  it('未知写结果原键原体重试并防双击，禁止取消和修改', async () => {
-    await flushPromises()
-    await open()
-    await process()
-    mocks.whisperAdminCrisisAct.mockRejectedValueOnce(new TypeError('offline'))
-    await confirm()
-    const original = mocks.whisperAdminCrisisAct.mock.calls[0]
-    expect(button('取消处理').attributes('disabled')).toBeDefined()
-    expect(button('返回修改').attributes('disabled')).toBeDefined()
-    const pending = deferred<CrisisDetail>()
-    mocks.whisperAdminCrisisAct.mockReturnValueOnce(pending.promise)
-    await button('使用原请求重试').trigger('click')
-    await button('正在提交…').trigger('click')
-    expect(mocks.whisperAdminCrisisAct).toHaveBeenCalledTimes(2)
-    expect(mocks.whisperAdminCrisisAct.mock.calls[1]?.slice(0, 3)).toEqual(original?.slice(0, 3))
-    pending.resolve({ ...first, version: 5 })
-    await flushPromises()
-  })
+  it.each([new TypeError('offline'), new ApiError(503)])(
+    '未知写结果原键原体重试 %s',
+    async (failure) => {
+      await flushPromises()
+      await open()
+      await process()
+      mocks.whisperAdminCrisisAct.mockRejectedValueOnce(failure)
+      await confirm()
+      const original = mocks.whisperAdminCrisisAct.mock.calls[0]
+      expect(button('取消处理').attributes('disabled')).toBeDefined()
+      expect(button('返回修改').attributes('disabled')).toBeDefined()
+      const pending = deferred<CrisisDetail>()
+      mocks.whisperAdminCrisisAct.mockReturnValueOnce(pending.promise)
+      await button('使用原请求重试').trigger('click')
+      await button('正在提交…').trigger('click')
+      expect(mocks.whisperAdminCrisisAct).toHaveBeenCalledTimes(2)
+      expect(mocks.whisperAdminCrisisAct.mock.calls[1]?.slice(0, 3)).toEqual(original?.slice(0, 3))
+      pending.resolve({ ...first, version: 5 })
+      await flushPromises()
+    },
+  )
   it('误报结果未知也只能重试原请求，不转成普通危机动作', async () => {
     await flushPromises()
     await open()
@@ -339,7 +342,7 @@ describe('WA-04 REQ-017/018/019 树洞危机', () => {
     )
     expect(mocks.whisperAdminCrisisAct).not.toHaveBeenCalled()
   })
-  it.each([400, 429, 503])('%s明确失败可修改，不保留旧幂等键', async (status) => {
+  it.each([400, 429])('%s明确失败可修改，不保留旧幂等键', async (status) => {
     await flushPromises()
     await open()
     await process()

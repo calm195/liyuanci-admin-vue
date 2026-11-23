@@ -198,28 +198,31 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
       expected_version: 48,
     })
   })
-  it('受理结果未知原键原体重试，锁定表单关闭与其他查询，双击只提交一次', async () => {
-    await load()
-    await process()
-    mocks.whisperAdminEvidenceDelete.mockRejectedValueOnce(new TypeError('offline'))
-    await confirm()
-    const original = mocks.whisperAdminEvidenceDelete.mock.calls[0]
-    expect(button('返回修改').attributes('disabled')).toBeDefined()
-    expect(button('取消处理').attributes('disabled')).toBeDefined()
-    expect(view().get('#whisper-delete-reason').element.closest('fieldset')?.disabled).toBe(true)
-    expect(view().get('#whisper-job-id').element.closest('fieldset')?.disabled).toBe(true)
-    const pending = deferred<DeletionJob>()
-    mocks.whisperAdminEvidenceDelete.mockReturnValueOnce(pending.promise)
-    await button('使用原请求重试').trigger('click')
-    await button('正在提交…').trigger('click')
-    expect(mocks.whisperAdminEvidenceDelete).toHaveBeenCalledTimes(2)
-    expect(mocks.whisperAdminEvidenceDelete.mock.calls[1]?.slice(0, 3)).toEqual(
-      original?.slice(0, 3),
-    )
-    pending.resolve(job)
-    await flushPromises()
-  })
-  it.each([400, 429, 503])('%s明确未执行可修改理由并生成新键', async (status) => {
+  it.each([new TypeError('offline'), new ApiError(503)])(
+    '受理结果未知原键原体重试 %s',
+    async (failure) => {
+      await load()
+      await process()
+      mocks.whisperAdminEvidenceDelete.mockRejectedValueOnce(failure)
+      await confirm()
+      const original = mocks.whisperAdminEvidenceDelete.mock.calls[0]
+      expect(button('返回修改').attributes('disabled')).toBeDefined()
+      expect(button('取消处理').attributes('disabled')).toBeDefined()
+      expect(view().get('#whisper-delete-reason').element.closest('fieldset')?.disabled).toBe(true)
+      expect(view().get('#whisper-job-id').element.closest('fieldset')?.disabled).toBe(true)
+      const pending = deferred<DeletionJob>()
+      mocks.whisperAdminEvidenceDelete.mockReturnValueOnce(pending.promise)
+      await button('使用原请求重试').trigger('click')
+      await button('正在提交…').trigger('click')
+      expect(mocks.whisperAdminEvidenceDelete).toHaveBeenCalledTimes(2)
+      expect(mocks.whisperAdminEvidenceDelete.mock.calls[1]?.slice(0, 3)).toEqual(
+        original?.slice(0, 3),
+      )
+      pending.resolve(job)
+      await flushPromises()
+    },
+  )
+  it.each([400, 429])('%s明确未执行可修改理由并生成新键', async (status) => {
     await load()
     await process()
     mocks.whisperAdminEvidenceDelete.mockRejectedValueOnce(new ApiError(status))

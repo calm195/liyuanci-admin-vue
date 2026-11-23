@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import type { ContentImage } from '@/services/content-images'
+import { validateImagePath } from '@/services/admin-path'
 const props = defineProps<{ images: ContentImage[] }>()
 const admin = useAdminStore()
 const previews = ref<{ id: string; url: string; position: number; state: string }[]>([])
@@ -38,6 +39,7 @@ watch(
       for (const image of images) {
         let url = image.url
         if (url.startsWith('/api/v1/')) {
+          validateImagePath(url)
           // 审核列表先读取有相同权限约束的展示图，需要核对细节时再取原图。
           if (!original.value && url.startsWith('/api/v1/admin/wish-images/')) {
             url += `${url.includes('?') ? '&' : '?'}variant=preview`
@@ -45,8 +47,9 @@ watch(
           const response = await globalThis.fetch(url, {
             headers: { Authorization: `Bearer ${token}` },
             signal: abort.signal,
-            credentials: 'same-origin',
+            credentials: 'omit',
             cache: 'no-store',
+            redirect: 'error',
           })
           if (current !== generation) return
           if (!response.ok) {

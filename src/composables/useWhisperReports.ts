@@ -404,7 +404,7 @@ export function useWhisperReports() {
           items.value = items.value.filter((item) => item.id !== pending.reportId)
           error.value =
             '举报或治理对象已失效或换版，已清除正文和表单，请重新读取核对，不会自动重提。'
-        } else if (cause instanceof ApiError && [400, 429, 503].includes(cause.status)) {
+        } else if (cause instanceof ApiError && [400, 429].includes(cause.status)) {
           attempt = null
           confirming.value = false
           uncertain.value = false

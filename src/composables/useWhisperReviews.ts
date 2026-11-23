@@ -308,7 +308,7 @@ export function useWhisperReviews() {
             cause.status === 404
               ? '案件已不可访问，已清除正文和处理表单。'
               : '案件版本或状态已变化，已清除旧正文和表单，请重新读取后核对。'
-        } else if (cause instanceof ApiError && [400, 429, 503].includes(cause.status)) {
+        } else if (cause instanceof ApiError && [400, 429].includes(cause.status)) {
           attempt = null
           confirming.value = false
           uncertain.value = false

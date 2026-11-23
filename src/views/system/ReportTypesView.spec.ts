@@ -92,4 +92,30 @@ describe('举报类型运营', () => {
     )
     expect(wrapper.text()).toContain('未发布')
   })
+  it('新增结果未知后读取到同名代码，仍用原请求确认', async () => {
+    await flushPromises()
+    await button('新增类型').trigger('click')
+    const inputs = wrapper.findAll('form input')
+    await inputs[0]?.setValue('abuse')
+    await inputs[1]?.setValue('不当内容')
+    const updated = {
+      version: 4,
+      items: [...snapshot.items, { code: 'abuse', label: '不当内容', published: false }],
+    }
+    vi.mocked(saveReportType)
+      .mockRejectedValueOnce(new Error('断网'))
+      .mockResolvedValueOnce(updated)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    vi.mocked(readReportTypes).mockResolvedValue(updated)
+    await button('刷新类型').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('原请求仍待确认')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(saveReportType).mock.calls[1]?.slice(0, 4)).toEqual(
+      vi.mocked(saveReportType).mock.calls[0]?.slice(0, 4),
+    )
+    expect(wrapper.text()).toContain('举报类型已保存')
+  })
 })

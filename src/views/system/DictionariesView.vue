@@ -53,7 +53,8 @@ const items = computed(() =>
     .sort((a, b) => a.sort_order - b.sort_order || a.code.localeCompare(b.code)),
 )
 async function load(manual = false) {
-  if (busy.value || (manual && uncertain.value)) return
+  if (busy.value) return
+  const checkingUnknown = manual && uncertain.value
   busy.value = true
   error.value = ''
   notice.value = ''
@@ -61,7 +62,10 @@ async function load(manual = false) {
     (signal) => readAdminDictionaries(admin.session?.token ?? '', signal),
     (value) => {
       dictionaries.accept(value)
-      if (manual) {
+      if (checkingUnknown) {
+        // 查询新快照仅供核对，不能据此丢弃结果未知的原请求。
+        notice.value = '已读取当前字典，原请求仍待确认，请继续原样重试'
+      } else if (manual) {
         draft.value = null
         attempt = null
         uncertain.value = false
@@ -169,7 +173,7 @@ onMounted(() => {
     />
     <section class="experience-panel experience-table-panel">
       <div class="experience-toolbar">
-        <button :disabled="busy || uncertain" @click="load(true)">刷新字典</button
+        <button :disabled="busy" @click="load(true)">刷新字典</button
         ><RouterLink to="/report-types">管理举报类型</RouterLink>
       </div>
       <FloatingNotice v-if="dictionaries.error" :message="dictionaries.error" tone="error" />

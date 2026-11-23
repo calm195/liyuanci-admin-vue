@@ -343,25 +343,28 @@ describe('WA-03 树洞举报与治理', () => {
       expected_report_version: 19,
     })
   })
-  it('结果未知锁表单、原键原体重试，并阻止双击', async () => {
-    await flushPromises()
-    mocks.whisperAdminReportGet.mockResolvedValueOnce({ ...first, status: 'confirmed' })
-    await open()
-    await processing('给予处罚')
-    mocks.whisperAdminPenaltyCreate.mockRejectedValueOnce(new TypeError('offline'))
-    await confirm()
-    const old = mocks.whisperAdminPenaltyCreate.mock.calls[0]
-    expect(button('返回修改').attributes('disabled')).toBeDefined()
-    expect(button('取消处理').attributes('disabled')).toBeDefined()
-    const pending = deferred<PenaltyResult>()
-    mocks.whisperAdminPenaltyCreate.mockReturnValueOnce(pending.promise)
-    await button('使用原请求重试').trigger('click')
-    await button('正在提交…').trigger('click')
-    expect(mocks.whisperAdminPenaltyCreate).toHaveBeenCalledTimes(2)
-    expect(mocks.whisperAdminPenaltyCreate.mock.calls[1]?.slice(0, 4)).toEqual(old?.slice(0, 4))
-    pending.resolve({ id: 'penalty', kind: 'warning', ends_at: null })
-    await flushPromises()
-  })
+  it.each([new TypeError('offline'), new ApiError(503)])(
+    '结果未知锁表单并原键重试 %s',
+    async (failure) => {
+      await flushPromises()
+      mocks.whisperAdminReportGet.mockResolvedValueOnce({ ...first, status: 'confirmed' })
+      await open()
+      await processing('给予处罚')
+      mocks.whisperAdminPenaltyCreate.mockRejectedValueOnce(failure)
+      await confirm()
+      const old = mocks.whisperAdminPenaltyCreate.mock.calls[0]
+      expect(button('返回修改').attributes('disabled')).toBeDefined()
+      expect(button('取消处理').attributes('disabled')).toBeDefined()
+      const pending = deferred<PenaltyResult>()
+      mocks.whisperAdminPenaltyCreate.mockReturnValueOnce(pending.promise)
+      await button('使用原请求重试').trigger('click')
+      await button('正在提交…').trigger('click')
+      expect(mocks.whisperAdminPenaltyCreate).toHaveBeenCalledTimes(2)
+      expect(mocks.whisperAdminPenaltyCreate.mock.calls[1]?.slice(0, 4)).toEqual(old?.slice(0, 4))
+      pending.resolve({ id: 'penalty', kind: 'warning', ends_at: null })
+      await flushPromises()
+    },
+  )
   it('空页继续、去重和循环游标停止，失败可重试', async () => {
     await flushPromises()
     mocks.whisperAdminReportsList

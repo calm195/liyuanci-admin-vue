@@ -170,7 +170,7 @@ export function useWhisperEvidence() {
           target.value = null
           resetForm()
           error.value = '证据范围已不可访问或版本已变化，已清除表单，请重新读取后核对。'
-        } else if (cause instanceof ApiError && [400, 429, 503].includes(cause.status)) {
+        } else if (cause instanceof ApiError && [400, 429].includes(cause.status)) {
           attempt = null
           uncertain.value = false
           confirming.value = false
