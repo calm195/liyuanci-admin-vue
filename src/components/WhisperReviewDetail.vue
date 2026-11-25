@@ -40,6 +40,7 @@ defineEmits<{ retry: []; close: []; process: [task: 'decision' | 'crisis'] }>()
         本案件需要隐私复核，内容通过不能替代隐私屏障检查。
       </p>
       <h3 v-if="detail.title">{{ detail.title }}</h3>
+      <p v-if="detail.profile_nickname">待审核署名 {{ detail.profile_nickname }}</p>
       <blockquote class="workflow-body">{{ detail.body }}</blockquote>
       <WordlistEvidence
         v-if="detail.wordlist_evidence"

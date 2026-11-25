@@ -385,6 +385,7 @@ export function parseReviewDetail(value: unknown): T.ReviewDetail {
     'title',
     'school_related',
     'privacy_recheck',
+    'profile_nickname',
     'wordlist_evidence',
   ])
   return {
@@ -410,6 +411,15 @@ export function parseReviewDetail(value: unknown): T.ReviewDetail {
     ...(data['title'] === undefined
       ? {}
       : { title: text(data['title'], { minLength: 1, maxLength: 40, pattern: '\\S' }) }),
+    ...(data['profile_nickname'] === undefined
+      ? {}
+      : {
+          profile_nickname: text(data['profile_nickname'], {
+            minLength: 1,
+            maxLength: 40,
+            pattern: '\\S',
+          }),
+        }),
     body: text(data['body'], { minLength: 1, maxLength: 500, pattern: '\\S' }),
     school_related: boolean(data['school_related']),
     privacy_recheck: boolean(data['privacy_recheck']),

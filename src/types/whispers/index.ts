@@ -189,6 +189,7 @@ export interface ReviewCommand {
 export interface ReviewDetail {
   wordlist_evidence?: WordlistEvidence
   title?: string
+  profile_nickname?: string
   id: string
   version: number
   source: ContentRef
