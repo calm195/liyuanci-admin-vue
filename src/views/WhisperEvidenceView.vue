@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
@@ -43,6 +44,36 @@ onMounted(() => {
   }
 })
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+
+let activeLookup: 'first' | 'second' = 'first'
+
+const autoSearch = useAutoSearch(
+  () => {
+    if (activeLookup === 'first') {
+      if (validWhisperId(evidenceId.value)) return loadTarget()
+    } else {
+      if (validWhisperId(jobId.value)) return query()
+    }
+  },
+  () => workspace.allowed() && !busy.value && !editorOpen.value,
+)
+
+function scheduleLookup(kind: typeof activeLookup, event: Event) {
+  activeLookup = kind
+  autoSearch.input(event)
+}
+function clearSearch() {
+  autoSearch.cancel()
+  void reset()
+}
+function submitEvidenceSearch() {
+  autoSearch.cancel()
+  void runRead(() => loadTarget(), '查询已完成')
+}
+function submitJobSearch() {
+  autoSearch.cancel()
+  void runRead(() => query(), '查询已完成')
+}
 </script>
 <template>
   <FloatingNotice
@@ -70,10 +101,10 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         <h2>读取证据范围</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
-            <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
+            <button :disabled="busy || editorOpen" @click="clearSearch">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form class="experience-editor" @submit.prevent="runRead(() => loadTarget(), '查询已完成')">
+        <form class="experience-editor" @submit.prevent="submitEvidenceSearch">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据范围</legend>
             <label for="whisper-evidence-id">证据范围标识</label
@@ -83,6 +114,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               type="password"
               autocomplete="off"
               spellcheck="false"
+              @input="scheduleLookup('first', $event)"
+              @compositionstart="autoSearch.start"
+              @compositionend="autoSearch.end"
             />
             <button type="submit" :disabled="!validWhisperId(evidenceId)">读取证据范围</button>
           </fieldset>
@@ -124,7 +158,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             查询刚受理的任务
           </button>
         </div>
-        <form class="experience-editor" @submit.prevent="runRead(() => query(), '查询已完成')">
+        <form class="experience-editor" @submit.prevent="submitJobSearch">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知删除任务</legend>
             <label for="whisper-job-id">删除任务标识</label
@@ -134,6 +168,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               type="password"
               autocomplete="off"
               spellcheck="false"
+              @input="scheduleLookup('second', $event)"
+              @compositionstart="autoSearch.start"
+              @compositionend="autoSearch.end"
             />
             <button type="submit" :disabled="!validWhisperId(jobId)">查询删除进度</button>
           </fieldset>

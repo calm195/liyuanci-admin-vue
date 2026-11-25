@@ -1,3 +1,4 @@
+import { parseNumberedPage } from './numbered-page'
 import { createSessionTransport } from './session-transport'
 import { ApiError } from './admin'
 import { isRole, record } from '@/types/admin'
@@ -35,7 +36,12 @@ export function parseAccountPage(value: unknown): AccountPage {
     (value['next_cursor'] !== null && typeof value['next_cursor'] !== 'string')
   )
     throw new Error('后台账号分页响应格式不符合契约')
-  return { items: value['items'].map(parseAccount), next_cursor: value['next_cursor'] }
+  const items = value['items'].map(parseAccount)
+  return {
+    items,
+    next_cursor: value['next_cursor'],
+    ...parseNumberedPage(value, items.length, value['next_cursor']),
+  }
 }
 function commandRoles(roles: Role[], reason: string, key: string) {
   if (!Array.isArray(roles) || !roles.every(isRole) || !reason.trim() || !key.trim())
@@ -67,9 +73,10 @@ export function createAccountsClient(
     return value['data']
   }
   return {
-    async list(cursor, signal) {
+    async list(cursor, signal, page = 1) {
       const query = new URLSearchParams({ limit: String(pageSize()) })
       if (cursor !== null) query.set('cursor', cursor)
+      else query.set('page', String(page))
       return parseAccountPage(await request(`/api/v1/admin/accounts?${query}`, 200, signal))
     },
     async create(input: AccountInput, key, signal) {

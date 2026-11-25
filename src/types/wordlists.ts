@@ -55,7 +55,7 @@ export interface WordlistMatch {
   source: 'builtin' | 'custom'
   kind: WordlistKind
   label?: string
-  field?: 'body' | 'title' | 'reward_text'
+  field?: 'body' | 'title' | 'reward_text' | 'nickname'
   disposition: MatchDisposition
   start: number
   end: number

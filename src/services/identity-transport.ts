@@ -47,9 +47,10 @@ export function createIdentityTransport(
     return data(value)
   }
   return {
-    async list(cursor, signal, view) {
+    async list(cursor, signal, view, page = 1) {
       const query = new URLSearchParams({ limit: String(pageSize()), view, include: 'created_at' })
       if (cursor !== null) query.set('cursor', cursor)
+      else query.set('page', String(page))
       return parseIdentityPage(
         await json(`/api/v1/admin/identity-reviews?${query}`, signal),
         view,

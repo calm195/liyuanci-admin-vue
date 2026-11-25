@@ -35,7 +35,7 @@ beforeEach(async () => {
     const url = requestURL(input)
     if (url.includes('/candidates/')) return response(fixture.candidates)
     if (url.includes(`${fixture.workspace.data.activity.id}?`)) return response(fixture.workspace)
-    return response(fixture.list)
+    return response({ ...fixture.list, data: { ...fixture.list.data, total: 21 } })
   })
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -100,7 +100,7 @@ describe('包分配工作台', () => {
     await button('← 返回活动列表').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.query['page']).toBe('2')
-    expect(wrapper.text()).toContain('第 2 页')
+    expect(wrapper.text()).toContain('第 2 / 2 页')
   })
   it('详情回填后只提交可写字段，并按北京时间保存', async () => {
     await openActivity()

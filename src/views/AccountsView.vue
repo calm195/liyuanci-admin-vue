@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { useDictionariesStore } from '@/stores/dictionaries'
@@ -28,6 +29,8 @@ const loginName = ref('')
 const selectedRoles = ref<Role[]>([])
 const reason = ref('')
 const busy = ref(false)
+const pageNumber = ref(1)
+const total = ref<number | null>(null)
 const error = ref('')
 const notice = ref('')
 const confirming = ref(false)
@@ -100,7 +103,7 @@ function edit(account: AdminAccount) {
   error.value = ''
   notice.value = ''
 }
-async function load(target: string | null = null, previous: (string | null)[] = []) {
+async function load(target: string | null = null, previous: (string | null)[] = [], numbered = 1) {
   if (!canOperate() || uncertain.value) return
   busy.value = true
   error.value = ''
@@ -108,9 +111,12 @@ async function load(target: string | null = null, previous: (string | null)[] = 
   items.value = []
   nextCursor.value = null
   await workspace.run(
-    (signal) => client.list(target, signal),
+    (signal) =>
+      numbered > 1 ? client.list(target, signal, numbered) : client.list(target, signal),
     (page) => {
       items.value = page.items
+      total.value = page.total ?? null
+      pageNumber.value = page.page ?? previous.length + 1
       cursor.value = target
       nextCursor.value = page.next_cursor
       history.value = previous
@@ -122,6 +128,13 @@ async function load(target: string | null = null, previous: (string | null)[] = 
       busy.value = false
     },
   )
+}
+function turn(target: number) {
+  return load(null, [], target)
+}
+function resizePage(size: number) {
+  pageSize.value = size
+  return load()
 }
 async function nextPage() {
   if (nextCursor.value !== null) await load(nextCursor.value, [...history.value, cursor.value])
@@ -292,7 +305,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="busy || editorOpen"
+          @turn="turn"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect v-model="pageSize" :disabled="busy || editorOpen" @change="load()" />
           <button :disabled="busy || editorOpen || !history.length" @click="previousPage">
             上一页
@@ -301,9 +323,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             下一页
           </button>
         </div>
-        <p class="experience-inline-notice experience-muted">
-          列表随账号变化更新；新建后从首页重新读取。
-        </p>
       </section>
       <WorkspaceDrawer
         :guard-route="false"
@@ -322,7 +341,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           <p v-if="selected">
             目标：{{ selected.login_name }} · 版本 {{ selected.version }}；账号名不能在此修改。
           </p>
-          <p v-else>初始口令由服务端仓库外策略提供，此页面不设置或显示口令。</p>
+          <p v-else>初始口令通过既有渠道另行提供。</p>
           <form id="account-editor" class="experience-editor" @submit.prevent="confirm">
             <fieldset :disabled="busy || confirming">
               <legend>{{ selected ? '完整替换角色' : '新账号资料' }}</legend>

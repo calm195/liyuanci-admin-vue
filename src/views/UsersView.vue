@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
+import PageSizeSelect from '@/components/PageSizeSelect.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { useDictionariesStore } from '@/stores/dictionaries'
 import FloatingNotice from '@/components/FloatingNotice.vue'
@@ -16,6 +19,9 @@ const {
   items,
   next,
   history,
+  pageNumber,
+  total,
+  turn,
   busy,
   error,
   notice,
@@ -36,6 +42,11 @@ watch(
   { flush: 'sync' },
 )
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+const automaticSearch = useAutoSearch(search, () => workspace.allowed())
+function resizePage(size: number) {
+  draft.limit = size
+  return search()
+}
 </script>
 <template>
   <FloatingNotice
@@ -45,15 +56,17 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
     :revision="readFeedback.revision"
   />
   <main class="experience-page" aria-label="平台用户">
-    <WorkspaceHeading
-      title="平台用户"
-      description="按当前普通资料查询；认证、限制与注册时间使用当前授权投影。"
-    />
+    <WorkspaceHeading title="平台用户" description="按账号 ID、昵称或状态查询。" />
     <template v-if="workspace.allowed()">
       <section class="experience-panel experience-table-panel">
         <form
           id="user-filters"
           class="experience-filters"
+          @input="automaticSearch.input"
+          @change="automaticSearch.change"
+          @compositionstart="automaticSearch.start"
+          @compositionend="automaticSearch.end"
+          @submit="automaticSearch.cancel"
           @submit.prevent="runRead(() => search(), '查询已完成')"
         >
           <label>用户 ID<input v-model="draft.user_id" type="password" autocomplete="off" /></label>
@@ -74,16 +87,8 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               </option>
             </select></label
           >
-          <label
-            >每页数量<select v-model.number="draft.limit" :disabled="busy" @change="search">
-              <option :value="10">10</option>
-              <option :value="20">20</option>
-              <option :value="50">50</option>
-            </select></label
-          >
-          <button type="submit" :disabled="busy">查询 / 从首页刷新</button>
+          <button type="submit" :disabled="busy">刷新</button>
         </form>
-        <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
         <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
         <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
         <p v-if="busy" role="status">正在查询用户…</p>
@@ -130,7 +135,17 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :total="total"
+          :page-size="draft.limit"
+          :disabled="busy || dirty"
+          @turn="turn"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
+          <PageSizeSelect v-model="draft.limit" :disabled="busy" @change="search" />
           <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
           ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>
         </div>
@@ -138,7 +153,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       <WorkspaceDrawer
         :open="!!selected"
         :title="selected?.display_name ?? '用户资料'"
-        description="本页已读取的普通资料快照；不关联匿名内容身份。"
         @close="selected = null"
       >
         <dl v-if="selected" class="experience-definition">

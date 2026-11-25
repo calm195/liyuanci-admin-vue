@@ -66,6 +66,8 @@ export function useResourceCategories() {
   }
   function clear() {
     listRequest.abort()
+    pageNumber.value = 1
+    total.value = null
     resetDetail()
     items.value = []
     next.value = null
@@ -91,6 +93,13 @@ export function useResourceCategories() {
     if (!writing.value && !pending.value) resetDetail()
   }
   onBeforeRouteLeave(canLeave)
+  const pageNumber = ref(1)
+  const total = ref<number | null>(null)
+  function turn(target: number) {
+    if (busy.value || target === pageNumber.value) return
+    pageNumber.value = target
+    return load()
+  }
   async function load() {
     listRequest.abort()
     const request = new AbortController()
@@ -106,11 +115,14 @@ export function useResourceCategories() {
           cursor.value,
           AbortSignal.any([signal, request.signal]),
           pageSize.value,
+          cursor.value === null ? pageNumber.value : undefined,
         ),
       (result) => {
         if (!request.signal.aborted) {
           items.value = [...new Map(result.items.map((item) => [item.id, item])).values()]
           next.value = result.next_cursor
+          total.value = result.total ?? null
+          pageNumber.value = result.page ?? history.value.length + 1
         }
       },
       (cause) => {
@@ -125,6 +137,7 @@ export function useResourceCategories() {
     submitted.value = enabled.value
     cursor.value = null
     history.value = []
+    pageNumber.value = 1
     await load()
   }
   async function page(forward: boolean) {
@@ -325,6 +338,9 @@ export function useResourceCategories() {
     workspace,
     search,
     page,
+    pageNumber,
+    total,
+    turn,
     open,
     create,
     close,

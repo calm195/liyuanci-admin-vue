@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
@@ -44,6 +45,21 @@ onMounted(() => {
   }
 })
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+
+const autoSearch = useAutoSearch(
+  () => {
+    if (validDeletionId(evidenceId.value.trim())) return loadTarget()
+  },
+  () => workspace.allowed() && !busy.value && !editorOpen.value,
+)
+function clearSearch() {
+  autoSearch.cancel()
+  void reset()
+}
+function submitEvidenceSearch() {
+  autoSearch.cancel()
+  void runRead(loadTarget, '证据元信息已读取')
+}
 </script>
 <template>
   <FloatingNotice
@@ -67,10 +83,10 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         <h2>读取并核对证据</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
-            <button :disabled="busy || editorOpen" @click="reset">清空页面</button>
+            <button :disabled="busy || editorOpen" @click="clearSearch">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form class="experience-editor" @submit.prevent="runRead(loadTarget, '证据元信息已读取')">
+        <form class="experience-editor" @submit.prevent="submitEvidenceSearch">
           <fieldset :disabled="busy || editorOpen">
             <legend>已知证据条目标识</legend>
             <label for="delete-evidence-id">证据条目标识</label>
@@ -80,6 +96,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               type="password"
               autocomplete="off"
               spellcheck="false"
+              @input="autoSearch.input"
+              @compositionstart="autoSearch.start"
+              @compositionend="autoSearch.end"
             />
             <button :disabled="!validDeletionId(evidenceId.trim())" type="submit">
               读取证据元信息

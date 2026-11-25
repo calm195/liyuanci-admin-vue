@@ -40,6 +40,8 @@ export function useWhisperReviews() {
   const items = ref<ReviewSummary[]>([])
   const pagination = useCursorProgress()
   const { nextCursor, listNotice } = pagination
+  const currentPage = ref(1)
+  const total = ref<number | null>(null)
   const listBusy = ref(false)
   const listError = ref('')
   const selectedId = ref('')
@@ -125,6 +127,8 @@ export function useWhisperReviews() {
     items.value = []
     nextCursor.value = null
     pagination.reset()
+    currentPage.value = 1
+    total.value = null
     listBusy.value = false
     listError.value = ''
     listNotice.value = ''
@@ -136,13 +140,17 @@ export function useWhisperReviews() {
     loading.value = false
     listBusy.value = false
   }
-  async function loadList(cursor: string | null) {
+  async function loadList(cursor: string | null, target = 1) {
     listBusy.value = true
     listError.value = ''
     await workspace.run(
-      (signal) => client.whisperAdminReviewsList(cursor, signal),
+      (signal) => client.whisperAdminReviewsList(cursor, signal, target),
       (page) => {
-        const merged = new Map(items.value.map((item) => [item.id, item]))
+        const merged = new Map(
+          cursor === null ? [] : items.value.map((item) => [item.id, item] as const),
+        )
+        currentPage.value = page.page ?? 1
+        total.value = page.total ?? null
         for (const item of page.items) {
           if (
             detail.value?.id === item.id &&
@@ -177,6 +185,15 @@ export function useWhisperReviews() {
     cancelReads()
     clearAll()
     await loadList(null)
+  }
+  async function changePage(target: number) {
+    if (listBusy.value || writing.value || editorOpen.value) return
+    clearDetail()
+    await loadList(null, target)
+  }
+  async function resizePage(size: number) {
+    pageSize.value = size
+    await refresh()
   }
   async function more() {
     if (listBusy.value || editorOpen.value || nextCursor.value === null) return
@@ -293,11 +310,11 @@ export function useWhisperReviews() {
           ),
         }
       },
-      (result) => {
+      async (result) => {
         clearDetail()
-        items.value = items.value.filter((item) => item.id !== pending.id)
         if (result.kind === 'decision') outcome.value = result.value
         else notice.value = `已升级危机，案件标识：${result.value.id}。请按危机处置流程跟进。`
+        await loadList(null, currentPage.value)
       },
       (cause) => {
         if (cause instanceof ApiError && (cause.status === 404 || cause.status === 409)) {
@@ -340,6 +357,10 @@ export function useWhisperReviews() {
     pageSize,
     items,
     nextCursor,
+    currentPage,
+    total,
+    changePage,
+    resizePage,
     listBusy,
     listError,
     listNotice,

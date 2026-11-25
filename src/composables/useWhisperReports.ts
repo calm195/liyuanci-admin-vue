@@ -48,6 +48,8 @@ export function useWhisperReports() {
   const items = ref<ReportSummary[]>([])
   const pagination = useCursorProgress()
   const { nextCursor, listNotice } = pagination
+  const currentPage = ref(1)
+  const total = ref<number | null>(null)
   const listBusy = ref(false)
   const listError = ref('')
   const selectedId = ref('')
@@ -183,6 +185,8 @@ export function useWhisperReports() {
     items.value = []
     nextCursor.value = null
     pagination.reset()
+    currentPage.value = 1
+    total.value = null
     listBusy.value = false
     listError.value = ''
     listNotice.value = ''
@@ -194,13 +198,17 @@ export function useWhisperReports() {
     loading.value = false
     listBusy.value = false
   }
-  async function loadList(cursor: string | null) {
+  async function loadList(cursor: string | null, target = 1) {
     listBusy.value = true
     listError.value = ''
     await workspace.run(
-      (signal) => client.whisperAdminReportsList(cursor, signal),
+      (signal) => client.whisperAdminReportsList(cursor, signal, target),
       (page) => {
-        const merged = new Map(items.value.map((item) => [item.id, item]))
+        const merged = new Map(
+          cursor === null ? [] : items.value.map((item) => [item.id, item] as const),
+        )
+        currentPage.value = page.page ?? 1
+        total.value = page.total ?? null
         for (const item of page.items) {
           if (
             detail.value?.id === item.id &&
@@ -237,6 +245,15 @@ export function useWhisperReports() {
     cancelReads()
     clearAll()
     await loadList(null)
+  }
+  async function changePage(target: number) {
+    if (listBusy.value || writing.value || editorOpen.value) return
+    clearDetail()
+    await loadList(null, target)
+  }
+  async function resizePage(size: number) {
+    pageSize.value = size
+    await refresh()
   }
   async function more() {
     if (listBusy.value || editorOpen.value || nextCursor.value === null) return
@@ -436,6 +453,10 @@ export function useWhisperReports() {
     pageSize,
     items,
     nextCursor,
+    currentPage,
+    total,
+    changePage,
+    resizePage,
     listBusy,
     listError,
     listNotice,

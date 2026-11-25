@@ -1,3 +1,4 @@
+import { parseNumberedPage } from './numbered-page'
 import { record } from '@/types/admin'
 import type { CursorPage } from '@/types/moderation'
 
@@ -21,5 +22,10 @@ export function reviewPage<T>(value: unknown, parse: (item: unknown) => T): Curs
     (data['next_cursor'] !== null && typeof data['next_cursor'] !== 'string')
   )
     throw new Error('分页响应格式异常')
-  return { items: data['items'].map(parse), next_cursor: data['next_cursor'] }
+  const items = data['items'].map(parse)
+  return {
+    items,
+    next_cursor: data['next_cursor'],
+    ...parseNumberedPage(data, items.length, data['next_cursor'], 100),
+  }
 }

@@ -70,11 +70,10 @@ const visibleRows = computed(() => {
   return rows.value.filter((entry) => entry.text.toLocaleLowerCase().includes(query))
 })
 const history = computed(() => items.value.filter((item) => item.kind === kind.value))
-const { pageSize, page, pages, pageRows } = useLocalPagination(visibleRows)
+const { pageSize, page, pageRows } = useLocalPagination(visibleRows)
 const {
   pageSize: historySize,
   page: historyPage,
-  pages: historyPages,
   pageRows: historyRows,
 } = useLocalPagination(history)
 const conflicted = computed(
@@ -591,7 +590,7 @@ onMounted(() => {
             v-if="kind !== 'builtin'"
             v-model:page="page"
             v-model:size="pageSize"
-            :pages="pages"
+            :total="visibleRows.length"
             :disabled="locked"
           />
         </section>
@@ -707,7 +706,7 @@ onMounted(() => {
           <LocalPagination
             v-model:page="historyPage"
             v-model:size="historySize"
-            :pages="historyPages"
+            :total="history.length"
             :disabled="locked"
           />
         </template>

@@ -98,21 +98,17 @@ export function useMatchmakingTraits() {
     )
   }
   async function search() {
-    if (locked.value) return
+    if (writing.value || pending.value || editorOpen.value) return
+    workspace.cancel()
     page.value = 1
     applied = { ...filters }
     detail.value = null
     notice.value = ''
     await load()
   }
-  async function turn(direction: number) {
-    if (
-      locked.value ||
-      page.value + direction < 1 ||
-      (direction > 0 && page.value * 20 >= total.value)
-    )
-      return
-    page.value += direction
+  async function turn(target: number) {
+    if (locked.value || target < 1 || target > Math.ceil(total.value / 20)) return
+    page.value = target
     await load()
   }
   async function inspect(id: string) {

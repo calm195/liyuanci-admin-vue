@@ -248,8 +248,16 @@ export function parseResourcePage<T>(
   value: unknown,
   parse: (value: unknown) => T,
   max: number,
+  numbered = false,
 ): ResourcePage<T> {
-  const data = object(value, ['items', 'next_cursor'])
+  const hasNumberedFields =
+    numbered && record(value) && ('total' in value || 'page' in value || 'page_size' in value)
+  const data = object(
+    value,
+    hasNumberedFields
+      ? ['items', 'next_cursor', 'page', 'page_size', 'total']
+      : ['items', 'next_cursor'],
+  )
   const cursor = data['next_cursor'] === null ? null : text(data['next_cursor'])
   if (
     !Array.isArray(data['items']) ||
@@ -257,7 +265,21 @@ export function parseResourcePage<T>(
     (cursor !== null && (!cursor || [...cursor].length > 2048))
   )
     return invalid()
-  return { items: data['items'].map(parse), next_cursor: cursor }
+  const items = data['items'].map(parse)
+  if (numbered && data['total'] !== undefined) {
+    const page = integer(data['page'])
+    const page_size = integer(data['page_size'], 1, max)
+    const total = integer(data['total'], 0)
+    if (
+      cursor !== null ||
+      page > Math.max(1, Math.ceil(total / page_size)) ||
+      items.length !== Math.min(page_size, Math.max(0, total - (page - 1) * page_size))
+    )
+      return invalid()
+    return { items, next_cursor: cursor, page, page_size, total }
+  }
+  if (numbered && (data['page'] !== undefined || data['page_size'] !== undefined)) return invalid()
+  return { items, next_cursor: cursor }
 }
 export function parseResourceFile(value: unknown): ResourceFile {
   const file = object(value, ['id', 'name', 'content_type', 'size'])
@@ -505,15 +527,17 @@ export function createResourcesClient(
         ),
       )
     },
-    async list(filters, cursor, signal) {
+    async list(filters, cursor, signal, page) {
       const values = normalizeResourceFilters(filters),
         params = query(cursor, values.limit)
+      if (page !== undefined) params.set('page', String(integer(page, 1, 1_000_000)))
       for (const key of ['q', 'category_id', 'status'] as const)
         if (values[key]) params.set(key, values[key])
       return parseResourcePage(
         await request(`resources?${params}`, signal),
         parseResourceSummary,
         values.limit,
+        page !== undefined,
       )
     },
     detail(id, signal) {
@@ -563,13 +587,15 @@ export function createResourcesClient(
         ),
       )
     },
-    async categories(enabled, cursor, signal, limit = 100) {
+    async categories(enabled, cursor, signal, limit = 100, page) {
       const params = query(cursor, integer(limit, 1, 100))
       if (enabled !== null) params.set('enabled', String(bool(enabled)))
+      if (page !== undefined) params.set('page', String(integer(page, 1, 1_000_000)))
       return parseResourcePage(
         await request(`resource-categories?${params}`, signal),
         parseResourceCategory,
-        100,
+        limit,
+        page !== undefined,
       )
     },
     category(id, signal) {

@@ -1,3 +1,4 @@
+import { parseNumberedPage } from '../numbered-page'
 import { parseWordlistEvidence } from '../wordlists'
 import type * as T from '@/types/whispers'
 
@@ -129,14 +130,13 @@ export function parseCrisisSummary(value: unknown): T.CrisisSummary {
 }
 
 export function parseCrisisSummaryPage(value: unknown): T.CrisisSummaryPage {
-  const data = object(value, ['items', 'next_cursor'])
-  return {
-    items: array(data['items'], (item) => parseCrisisSummary(item), false),
-    next_cursor:
-      data['next_cursor'] === null
-        ? null
-        : text(data['next_cursor'], { minLength: 1, maxLength: 4096 }),
-  }
+  const data = object(value, ['items', 'next_cursor', 'page', 'page_size', 'total'])
+  const items = array(data['items'], (item) => parseCrisisSummary(item), false)
+  const next_cursor =
+    data['next_cursor'] === null
+      ? null
+      : text(data['next_cursor'], { minLength: 1, maxLength: 4096 })
+  return { items, next_cursor, ...parseNumberedPage(data, items.length, next_cursor) }
 }
 
 export function parseDeletionJob(value: unknown): T.DeletionJob {
@@ -323,14 +323,13 @@ export function parseReportSummary(value: unknown): T.ReportSummary {
 }
 
 export function parseReportSummaryPage(value: unknown): T.ReportSummaryPage {
-  const data = object(value, ['items', 'next_cursor'])
-  return {
-    items: array(data['items'], (item) => parseReportSummary(item), false),
-    next_cursor:
-      data['next_cursor'] === null
-        ? null
-        : text(data['next_cursor'], { minLength: 1, maxLength: 4096 }),
-  }
+  const data = object(value, ['items', 'next_cursor', 'page', 'page_size', 'total'])
+  const items = array(data['items'], (item) => parseReportSummary(item), false)
+  const next_cursor =
+    data['next_cursor'] === null
+      ? null
+      : text(data['next_cursor'], { minLength: 1, maxLength: 4096 })
+  return { items, next_cursor, ...parseNumberedPage(data, items.length, next_cursor) }
 }
 
 export function parseRestrictionCommand(value: unknown): T.RestrictionCommand {
@@ -457,14 +456,13 @@ export function parseReviewSummary(value: unknown): T.ReviewSummary {
 }
 
 export function parseReviewSummaryPage(value: unknown): T.ReviewSummaryPage {
-  const data = object(value, ['items', 'next_cursor'])
-  return {
-    items: array(data['items'], (item) => parseReviewSummary(item), false),
-    next_cursor:
-      data['next_cursor'] === null
-        ? null
-        : text(data['next_cursor'], { minLength: 1, maxLength: 4096 }),
-  }
+  const data = object(value, ['items', 'next_cursor', 'page', 'page_size', 'total'])
+  const items = array(data['items'], (item) => parseReviewSummary(item), false)
+  const next_cursor =
+    data['next_cursor'] === null
+      ? null
+      : text(data['next_cursor'], { minLength: 1, maxLength: 4096 })
+  return { items, next_cursor, ...parseNumberedPage(data, items.length, next_cursor) }
 }
 
 export function parseTimelineEntry(value: unknown): T.TimelineEntry {

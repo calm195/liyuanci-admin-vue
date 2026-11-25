@@ -23,6 +23,9 @@ export interface ModerationCase {
 export interface CursorPage<T> {
   items: T[]
   next_cursor: string | null
+  page?: number
+  page_size?: number
+  total?: number
 }
 export type ReviewDecision =
   | { decision: 'approved'; expected_version: number }
@@ -54,6 +57,7 @@ export interface ModerationClient {
     cursor: string | null,
     signal: AbortSignal,
     filters?: ModerationFilters,
+    page?: number,
   ): Promise<CursorPage<ModerationSummary>>
   detail(id: string, signal: AbortSignal): Promise<ModerationCase>
   decide(

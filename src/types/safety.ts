@@ -60,7 +60,12 @@ export interface PenaltyInput extends ReasonInput {
 }
 export type RestrictionAction = 'offline' | 'release-restriction'
 export interface SafetyClient {
-  reports(cursor: string | null, signal: AbortSignal): Promise<CursorPage<SafetySummary>>
+  reports(
+    cursor: string | null,
+    signal: AbortSignal,
+    page?: number,
+    resolved?: boolean,
+  ): Promise<CursorPage<SafetySummary>>
   report(id: string, signal: AbortSignal): Promise<ReportDetail>
   decideReport(
     id: string,
@@ -74,7 +79,11 @@ export interface SafetyClient {
     key: string,
     signal: AbortSignal,
   ): Promise<SafetySummary>
-  appeals(cursor: string | null, signal: AbortSignal): Promise<CursorPage<AppealSummary>>
+  appeals(
+    cursor: string | null,
+    signal: AbortSignal,
+    page?: number,
+  ): Promise<CursorPage<AppealSummary>>
   appeal(id: string, signal: AbortSignal): Promise<AppealDetail>
   decideAppeal(
     id: string,

@@ -142,9 +142,10 @@ export function createCrisisClient(
     return result
   }
   return {
-    async list(cursor, signal) {
+    async list(cursor, signal, page) {
       const query = new URLSearchParams({ limit: String(pageSize()) })
       if (cursor !== null) query.set('cursor', cursor)
+      else if (page !== undefined) query.set('page', String(page))
       return reviewPage(await request(`crisis-cases?${query}`, signal), parseCrisisSummary)
     },
     async detail(id, signal) {

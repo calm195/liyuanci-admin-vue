@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { resourceStatusLabels } from '@/utils/dictionary-labels'
 
@@ -12,6 +13,7 @@ const feedbackLabels = computed(() => ({
   incomplete: dictionaries.label('resource_feedback', 'incomplete'),
 }))
 import FloatingNotice from '@/components/FloatingNotice.vue'
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
@@ -49,6 +51,9 @@ const {
   workspace,
   search,
   page,
+  pageNumber,
+  total,
+  turn,
   open,
   create,
   close,
@@ -73,6 +78,11 @@ function time(value: string) {
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(
   () => Boolean(error.value) || Boolean(categoryError.value) || Boolean(detailError.value),
 )
+const automaticSearch = useAutoSearch(search, () => !writing.value && workspace.allowed())
+function resizePage(size: number) {
+  filters.limit = size
+  return search()
+}
 </script>
 <template>
   <FloatingNotice
@@ -112,6 +122,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <form
           id="resource-filters"
           class="experience-filters"
+          @input="automaticSearch.input"
+          @change="automaticSearch.change"
+          @compositionstart="automaticSearch.start"
+          @compositionend="automaticSearch.end"
+          @submit="automaticSearch.cancel"
           @submit.prevent="runRead(() => search(), '查询已完成')"
         >
           <label
@@ -133,14 +148,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
               </option>
             </select></label
           >
-          <button type="submit" :disabled="busy || writing">查询 / 从首页刷新</button>
+          <button type="submit" :disabled="busy || writing">刷新</button>
         </form>
         <FloatingNotice v-if="categoryError" :message="categoryError" tone="error">
           {{ categoryError }}
           <button @click="runRead(() => loadCategories(), '查询已完成')">重新读取分类</button>
         </FloatingNotice>
         <p v-if="categoriesBusy">正在读取分类…</p>
-        <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
         <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
         <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
         <p v-if="busy" role="status">正在读取资料…</p>
@@ -200,7 +214,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :total="total"
+          :page-size="filters.limit"
+          :disabled="busy || writing"
+          @turn="turn"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect v-model="filters.limit" :disabled="busy || writing" @change="search" />
           <button :disabled="busy || dirty || !history.length" @click="page(false)">上一页</button
           ><button :disabled="busy || dirty || !next" @click="page(true)">下一页</button>

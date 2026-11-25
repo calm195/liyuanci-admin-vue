@@ -42,6 +42,8 @@ type Confirmation =
 /** 路由分别持有查询与处理状态，离页清除正文、确认及回执。 */
 export function useSafety(mode: SafetyMode, initialReport?: string, initialAppeal?: string) {
   const pageSize = ref(10)
+  const currentPage = ref(1)
+  const total = ref<number | null>(null)
   const editorOpen = ref(false)
   const editorTask = ref<'case' | 'crisis'>('case')
   const escalating = ref(false)
@@ -215,6 +217,8 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     cursor.value = null
     nextCursor.value = null
     history.value = []
+    currentPage.value = 1
+    total.value = null
     busy.value = false
     listError.value = ''
     notice.value = ''
@@ -228,11 +232,13 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     await workspace.run<CursorPage<SafetySummary | AppealSummary>>(
       (signal) =>
         mode !== 'appeals'
-          ? client.reports(cursor.value, signal)
-          : client.appeals(cursor.value, signal),
+          ? client.reports(cursor.value, signal, currentPage.value, mode === 'penalties')
+          : client.appeals(cursor.value, signal, currentPage.value),
       (result) => {
         items.value = result.items
         nextCursor.value = result.next_cursor
+        currentPage.value = result.page ?? 1
+        total.value = result.total ?? null
       },
       (cause) => {
         listError.value = reviewErrorMessage(cause)
@@ -251,8 +257,18 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     if (reset) {
       cursor.value = null
       history.value = []
+      currentPage.value = 1
     }
     await loadList()
+  }
+  async function changePage(target: number) {
+    if (busy.value || editorOpen.value || writing.value || escalating.value) return
+    currentPage.value = target
+    await refresh(false)
+  }
+  async function resizePage(size: number) {
+    pageSize.value = size
+    await refresh()
   }
   async function page(next: boolean) {
     if (busy.value || editorOpen.value || writing.value || escalating.value) return
@@ -520,6 +536,10 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
   return {
     uncertain,
     pageSize,
+    currentPage,
+    total,
+    changePage,
+    resizePage,
     editorOpen,
     editorTask,
     escalating,

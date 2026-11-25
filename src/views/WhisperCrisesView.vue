@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { whisperCrisisStatuses, whisperDeliveryLabels } from '@/utils/dictionary-labels'
@@ -15,6 +16,10 @@ const {
   pageSize,
   items,
   nextCursor,
+  currentPage,
+  total,
+  changePage,
+  resizePage,
   listBusy,
   listError,
   listNotice,
@@ -143,7 +148,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="listBusy || writing || editorOpen"
+          @turn="changePage"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect
             v-model="pageSize"
             :disabled="listBusy || writing || editorOpen"

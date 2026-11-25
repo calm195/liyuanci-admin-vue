@@ -21,9 +21,10 @@ export class WhisperApiError extends ApiError {
 function contentKind(value: T.ContentRef['kind']) {
   return choice(value, ['whisper_post', 'whisper_comment', 'whisper_nickname', 'whisper_capsule'])
 }
-function pageQuery(cursor: string | null, pageSize: () => number): string {
+function pageQuery(cursor: string | null, pageSize: () => number, page?: number): string {
   const query = new URLSearchParams({ limit: String(pageSize()) })
   if (cursor !== null) query.set('cursor', text(cursor, { minLength: 1, maxLength: 4096 }))
+  else if (page !== undefined) query.set('page', String(page))
   return query.toString()
 }
 function command(method: string, input: unknown, key: string): RequestInit {
@@ -102,9 +103,9 @@ export function createWhispersClient(
     return envelope['data']
   }
   return {
-    async whisperAdminReviewsList(cursor: string | null, signal: AbortSignal) {
+    async whisperAdminReviewsList(cursor: string | null, signal: AbortSignal, page?: number) {
       const result = P.parseReviewSummaryPage(
-        await request(`reviews?${pageQuery(cursor, pageSize)}`, 'admin-review', signal, 200),
+        await request(`reviews?${pageQuery(cursor, pageSize, page)}`, 'admin-review', signal, 200),
       )
       return result
     },
@@ -205,9 +206,9 @@ export function createWhispersClient(
       )
       return result
     },
-    async whisperAdminReportsList(cursor: string | null, signal: AbortSignal) {
+    async whisperAdminReportsList(cursor: string | null, signal: AbortSignal, page?: number) {
       const result = P.parseReportSummaryPage(
-        await request(`reports?${pageQuery(cursor, pageSize)}`, 'admin-safety', signal, 200),
+        await request(`reports?${pageQuery(cursor, pageSize, page)}`, 'admin-safety', signal, 200),
       )
       return result
     },
@@ -253,9 +254,9 @@ export function createWhispersClient(
       )
       return result
     },
-    async whisperAdminCrisesList(cursor: string | null, signal: AbortSignal) {
+    async whisperAdminCrisesList(cursor: string | null, signal: AbortSignal, page?: number) {
       const result = P.parseCrisisSummaryPage(
-        await request(`crises?${pageQuery(cursor, pageSize)}`, 'admin-crisis', signal, 200),
+        await request(`crises?${pageQuery(cursor, pageSize, page)}`, 'admin-crisis', signal, 200),
       )
       return result
     },

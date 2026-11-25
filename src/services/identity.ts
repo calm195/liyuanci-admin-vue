@@ -1,3 +1,4 @@
+import { parseNumberedPage } from './numbered-page'
 import { record } from '@/types/admin'
 import type {
   IdentityCase,
@@ -58,7 +59,7 @@ export function parseIdentityPage(
       ...(withCreatedAt ? { created_at: timestamp(item['created_at']) } : {}),
     }
   })
-  return { items, next_cursor: cursor }
+  return { items, next_cursor: cursor, ...parseNumberedPage(value, items.length, cursor) }
 }
 export function parseIdentityCase(value: unknown): IdentityCase {
   if (!record(value)) return invalid()

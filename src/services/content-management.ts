@@ -1,5 +1,6 @@
 import { parseContentImages } from './content-images'
 import { createContentRequest } from './content-request'
+import { parseNumberedPage } from './numbered-page'
 import { record } from '@/types/admin'
 
 export type ContentKind = 'wishes' | 'whispers'
@@ -88,6 +89,9 @@ function publication(value: unknown) {
 function detail(value: unknown, kind: ContentKind) {
   const row = object(value)
   const stats = statistics(row['stats'], kind)
+  const commentsPage = optionalCount(row['comments_page'])
+  const commentsTotal = optionalCount(row['comments_total'])
+  if ((commentsPage === undefined) !== (commentsTotal === undefined)) return invalid()
   return {
     ...summary(row, kind),
     supportCount: stats.supportCount,
@@ -100,6 +104,9 @@ function detail(value: unknown, kind: ContentKind) {
     story: row['story'] === null ? null : publication(row['story']),
     comments: array(row['comments']).map(publication),
     commentsMore: boolean(row['comments_more']),
+    ...(commentsPage !== undefined && commentsTotal !== undefined
+      ? { commentsPage, commentsTotal }
+      : {}),
     exportable: boolean(row['exportable']),
   }
 }
@@ -146,13 +153,14 @@ export function createContentManagementClient(
       filters: ContentFilters,
       cursor: string | null,
       signal: AbortSignal,
+      page?: number,
     ) {
-      const query = listQuery(filters, cursor)
-      const data = object(await request(`content/${kind}${query ? '?' + query : ''}`, signal))
-      return {
-        items: array(data['items']).map((item) => summary(item, kind)),
-        next: data['next_cursor'] === null ? null : text(data['next_cursor']),
-      }
+      const query = new URLSearchParams(listQuery(filters, cursor))
+      if (page !== undefined) query.set('page', String(page))
+      const data = object(await request(`content/${kind}?${query}`, signal))
+      const items = array(data['items']).map((item) => summary(item, kind))
+      const next = data['next_cursor'] === null ? null : text(data['next_cursor'])
+      return { items, next, ...parseNumberedPage(data, items.length, next, 20) }
     },
     async detail(kind: ContentKind, target: string, page: number, signal: AbortSignal) {
       const query = `?include=stats${page > 0 ? `&comments_page=${page}` : ''}`

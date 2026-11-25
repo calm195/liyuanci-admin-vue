@@ -156,12 +156,40 @@ export function parseUserPenalty(value: unknown): UserPenalty {
     appeal_id: data['appeal_id'] === null ? null : userId(data['appeal_id']),
   }
 }
-export function parseUserPage<T>(value: unknown, parse: (item: unknown) => T): UserPage<T> {
-  const data = object(value, ['items', 'next_cursor'])
+export function parseUserPage<T>(
+  value: unknown,
+  parse: (item: unknown) => T,
+  numbered = false,
+): UserPage<T> {
+  const extended =
+    numbered && record(value) && ('total' in value || 'page' in value || 'page_size' in value)
+  const data = object(
+    value,
+    extended ? ['items', 'next_cursor', 'page', 'page_size', 'total'] : ['items', 'next_cursor'],
+  )
   if (!Array.isArray(data['items'])) return invalid()
   const cursor = nullableText(data['next_cursor'])
   if (cursor === '') return invalid()
-  return { items: data['items'].map(parse), next_cursor: cursor }
+  const items = data['items'].map(parse)
+  if (!extended) return { items, next_cursor: cursor }
+  const { page, page_size, total } = data
+  if (
+    cursor !== null ||
+    typeof total !== 'number' ||
+    !Number.isSafeInteger(total) ||
+    total < 0 ||
+    typeof page_size !== 'number' ||
+    !Number.isSafeInteger(page_size) ||
+    page_size < 1 ||
+    page_size > 50 ||
+    typeof page !== 'number' ||
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    page > Math.max(1, Math.ceil(total / page_size)) ||
+    items.length !== Math.min(page_size, Math.max(0, total - (page - 1) * page_size))
+  )
+    return invalid()
+  return { items, next_cursor: cursor, page, page_size, total }
 }
 export function parseUserRestrictionState(value: unknown): UserRestrictionState {
   const data = object(value, [
@@ -301,13 +329,17 @@ export function createUsersClient(
         }),
       })
     },
-    async users(filters, cursor, signal) {
+    async users(filters, cursor, signal, page) {
       const normalized = normalizeUserFilters(filters)
       const query = pageQuery(cursor)
       query.set('limit', String(normalized.limit))
+      if (page !== undefined) {
+        if (!Number.isSafeInteger(page) || page < 1 || page > 1_000_000) return invalid()
+        query.set('page', String(page))
+      }
       for (const key of ['user_id', 'nickname', 'verification', 'restriction'] as const)
         if (normalized[key]) query.set(key, normalized[key])
-      return parseUserPage(await request(`?${query}`, signal), parseUser)
+      return parseUserPage(await request(`?${query}`, signal), parseUser, page !== undefined)
     },
     async user(id, signal) {
       const target = userId(id)

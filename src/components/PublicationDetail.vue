@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import ContentImages from '@/components/ContentImages.vue'
 import type { ContentDetail } from '@/services/content-management'
 import { displayBeijingTime } from '@/utils/admin-time'
@@ -95,7 +96,16 @@ function replyAuthor(id: string) {
           <p class="publication-body">{{ item.body }}</p>
         </li>
       </ol>
-      <div v-if="commentsPage > 0 || detail.commentsMore" class="business-pagination">
+      <NumberedPagination
+        v-if="detail.commentsTotal !== undefined"
+        :page="commentsPage + 1"
+        :total="detail.commentsTotal"
+        :page-size="30"
+        :disabled="busy"
+        fixed-size
+        @turn="$emit('page', $event - 1)"
+      />
+      <div v-else-if="commentsPage > 0 || detail.commentsMore" class="business-pagination">
         <button :disabled="busy || commentsPage === 0" @click="$emit('page', commentsPage - 1)">
           上一页评论
         </button>

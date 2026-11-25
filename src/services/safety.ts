@@ -121,9 +121,17 @@ export function createSafetyClient(
       throw new Error('安全治理响应封装不符合契约')
     return value['data']
   }
-  async function list(path: string, cursor: string | null, signal: AbortSignal) {
+  async function list(
+    path: string,
+    cursor: string | null,
+    signal: AbortSignal,
+    page?: number,
+    resolved?: boolean,
+  ) {
     const query = new URLSearchParams({ limit: String(pageSize()) })
     if (cursor !== null) query.set('cursor', cursor)
+    else if (page !== undefined) query.set('page', String(page))
+    if (resolved) query.set('status', 'resolved')
     return reviewPage(await request(`${path}?${query}`, signal), parseSafetySummary)
   }
   function bound(value: unknown, id: string) {
@@ -132,10 +140,11 @@ export function createSafetyClient(
     return result
   }
   return {
-    reports: (cursor, signal) => list('reports', cursor, signal),
-    async appeals(cursor, signal) {
+    reports: (cursor, signal, page, resolved) => list('reports', cursor, signal, page, resolved),
+    async appeals(cursor, signal, page) {
       const query = new URLSearchParams({ limit: String(pageSize()) })
       if (cursor !== null) query.set('cursor', cursor)
+      else if (page !== undefined) query.set('page', String(page))
       return reviewPage(await request(`appeals?${query}`, signal), parseAppealSummary)
     },
     async report(id, signal) {

@@ -113,8 +113,8 @@ export function useMatchmaking(libraryOnly = false) {
     () =>
       busy.value || writing.value || !!pending.value || autoWriting.value || !!autoPending.value,
   )
-  const canNext = computed(
-    () => detailPage.value * 20 < Math.max(detail.value?.total ?? 0, detail.value?.pair_total ?? 0),
+  const detailTotal = computed(() =>
+    Math.max(detail.value?.total ?? 0, detail.value?.pair_total ?? 0),
   )
   const canReview = computed(
     () => detail.value?.activity.status === 'published' && detail.value.activity.phase !== 'ended',
@@ -372,14 +372,9 @@ export function useMatchmaking(libraryOnly = false) {
     await rememberLocation(true)
     await loadActivities()
   }
-  async function detailTurn(direction: number) {
-    if (
-      locked.value ||
-      (direction < 0 && detailPage.value <= 1) ||
-      (direction > 0 && !canNext.value)
-    )
-      return
-    detailPage.value += direction
+  async function detailTurn(target: number) {
+    if (locked.value || target < 1 || target > Math.ceil(detailTotal.value / 20)) return
+    detailPage.value = target
     await loadDetail()
   }
   async function runPending() {
@@ -726,7 +721,7 @@ export function useMatchmaking(libraryOnly = false) {
     tab,
     workspace,
     locked,
-    canNext,
+    detailTotal,
     canReview,
     canPair,
     canEditTemplates,

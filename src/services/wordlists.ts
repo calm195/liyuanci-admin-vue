@@ -124,7 +124,13 @@ export function parseMatches(value: unknown): WordlistMatch[] {
     const source = data['source']
     const kind = parseKind(data['kind'])
     const field = data['field']
-    if (field !== undefined && field !== 'body' && field !== 'title' && field !== 'reward_text')
+    if (
+      field !== undefined &&
+      field !== 'body' &&
+      field !== 'title' &&
+      field !== 'reward_text' &&
+      field !== 'nickname'
+    )
       throw new Error('命中字段格式异常')
     const start = count(data['start'])
     const end = count(data['end'])

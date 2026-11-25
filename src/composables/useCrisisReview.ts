@@ -32,6 +32,8 @@ export function crisisStatusLabel(value: string) {
 
 export function useCrisisReview() {
   const pageSize = ref(10)
+  const currentPage = ref(1)
+  const total = ref<number | null>(null)
   const editorOpen = ref(false)
   const route = useRoute()
   let mounted = true
@@ -160,6 +162,8 @@ export function useCrisisReview() {
     cursor.value = null
     nextCursor.value = null
     history.value = []
+    currentPage.value = 1
+    total.value = null
     listBusy.value = false
     listError.value = ''
     notice.value = ''
@@ -176,10 +180,12 @@ export function useCrisisReview() {
     items.value = []
     nextCursor.value = null
     await workspace.run(
-      (signal) => client.list(cursor.value, signal),
+      (signal) => client.list(cursor.value, signal, currentPage.value),
       (page) => {
         items.value = page.items
         nextCursor.value = page.next_cursor
+        currentPage.value = page.page ?? 1
+        total.value = page.total ?? null
       },
       (cause) => {
         listError.value = failure(cause)
@@ -198,8 +204,18 @@ export function useCrisisReview() {
     if (reset) {
       cursor.value = null
       history.value = []
+      currentPage.value = 1
     }
     await loadList()
+  }
+  async function changePage(target: number) {
+    if (listBusy.value || editorOpen.value) return
+    currentPage.value = target
+    await refresh(false)
+  }
+  async function resizePage(size: number) {
+    pageSize.value = size
+    await refresh()
   }
   async function page(next: boolean) {
     if (listBusy.value || editorOpen.value) return
@@ -383,6 +399,10 @@ export function useCrisisReview() {
   return {
     uncertain,
     pageSize,
+    currentPage,
+    total,
+    changePage,
+    resizePage,
     editorOpen,
     startProcessing,
     cancelProcessing,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
@@ -13,6 +14,9 @@ const pageTitle = props.history ? '身份审核历史' : '身份审核'
 const {
   uncertain,
   pageSize,
+  pageNumber,
+  total,
+  turn,
   editorOpen,
   allowed,
   items,
@@ -53,6 +57,10 @@ const {
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
   Boolean(listError.value),
 )
+function resizePage(size: number) {
+  pageSize.value = size
+  return refreshList()
+}
 </script>
 
 <template>
@@ -151,7 +159,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="listBusy || editorOpen"
+          @turn="turn"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect
             v-model="pageSize"
             :disabled="listBusy || editorOpen"

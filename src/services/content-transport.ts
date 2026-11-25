@@ -41,11 +41,13 @@ export function moderationQuery(
   cursor: string | null,
   pageSize: () => number,
   filters?: ModerationFilters,
+  page?: number,
 ): string {
   const params = new URLSearchParams(query(cursor, pageSize))
   params.set('status', filters?.status ?? 'human_required')
   if (filters?.kind) params.set('kind', filters.kind)
   if (filters?.q.trim()) params.set('q', filters.q.trim())
+  if (page !== undefined && cursor === null) params.set('page', String(page))
   return params.toString()
 }
 
@@ -57,9 +59,12 @@ export function createModerationTransport(
 ): ModerationClient {
   const request = createContentRequest(token, allowed, transport)
   return {
-    async list(cursor, signal, filters) {
+    async list(cursor, signal, filters, page = 1) {
       return parseModerationPage(
-        await request(`moderation-tasks?${moderationQuery(cursor, pageSize, filters)}`, signal),
+        await request(
+          `moderation-tasks?${moderationQuery(cursor, pageSize, filters, page)}`,
+          signal,
+        ),
       )
     },
     async detail(id, signal) {

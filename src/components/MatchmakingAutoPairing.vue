@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
+
 import { computed, ref, watch } from 'vue'
 import { ElDialog } from 'element-plus'
 import 'element-plus/theme-chalk/el-dialog.css'
@@ -250,11 +252,13 @@ function time(value: string) {
                 </li>
               </ul>
               <p v-else>本分类暂无记录。</p>
-              <nav v-if="total > 20" class="auto-pagination" aria-label="分配预览分页">
-                <button :disabled="page <= 1" @click="page--">上一页预览</button
-                ><span>第 {{ page }} / {{ Math.ceil(total / 20) }} 页，共 {{ total }} 条</span
-                ><button :disabled="page * 20 >= total" @click="page++">下一页预览</button>
-              </nav>
+              <NumberedPagination
+                :page="page"
+                :page-size="20"
+                :total="total"
+                fixed-size
+                @turn="page = $event"
+              />
             </ElDialog>
           </template>
         </template>

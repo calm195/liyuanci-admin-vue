@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import { ref } from 'vue'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
@@ -37,7 +38,7 @@ const {
   tab,
   workspace,
   locked,
-  canNext,
+  detailTotal,
   canReview,
   canPair,
   canEditTemplates,
@@ -319,18 +320,14 @@ function time(value: string) {
             </tbody>
           </table>
         </div>
-        <div class="match-pagination" aria-label="每日任务库分页">
-          <button :disabled="locked || libraryPage <= 1" @click="runRead(() => libraryTurn(-1))">
-            上一页
-          </button>
-          <span>第 {{ libraryPage }} 页</span>
-          <button
-            :disabled="locked || libraryPage * 20 >= libraryTotal"
-            @click="runRead(() => libraryTurn(1))"
-          >
-            下一页
-          </button>
-        </div>
+        <NumberedPagination
+          :page="libraryPage"
+          :page-size="20"
+          :total="libraryTotal"
+          fixed-size
+          :disabled="locked"
+          @turn="libraryTurn($event - libraryPage)"
+        />
       </section>
       <div v-else class="match-layout">
         <section v-if="!selected" class="experience-panel activity-list" aria-label="活动列表">
@@ -339,7 +336,6 @@ function time(value: string) {
               <h2>
                 全部活动 <span class="experience-muted">{{ total }}</span>
               </h2>
-              <p class="experience-muted">按当前页展示，进入详情管理活动。</p>
             </div>
             <button :disabled="locked" @click="runRead(refresh, '页面数据已刷新')">刷新列表</button>
           </div>
@@ -384,19 +380,14 @@ function time(value: string) {
             <h2>暂无活动</h2>
             <p>新建一场活动，开始准备下一次相遇。</p>
           </div>
-          <div class="business-pagination" aria-label="活动列表分页">
-            <span class="experience-muted">共 {{ total }} 场 · 每页 20 场</span>
-            <button :disabled="locked || listPage <= 1" @click="runRead(() => listTurn(-1))">
-              上一页
-            </button>
-            <span>第 {{ listPage }} 页</span>
-            <button
-              :disabled="locked || listPage * 20 >= total"
-              @click="runRead(() => listTurn(1))"
-            >
-              下一页
-            </button>
-          </div>
+          <NumberedPagination
+            :page="listPage"
+            :page-size="20"
+            :total="total"
+            fixed-size
+            :disabled="locked"
+            @turn="listTurn($event - listPage)"
+          />
         </section>
         <div v-else class="match-main experience-panel">
           <template v-if="selected">
@@ -732,18 +723,15 @@ function time(value: string) {
                 </fieldset>
               </form>
             </section>
-            <div
+            <NumberedPagination
               v-if="detail && (tab === 'enrollments' || tab === 'pairs')"
-              class="match-pagination"
-              aria-label="活动工作台记录分页"
-            >
-              <button :disabled="locked || detailPage <= 1" @click="runRead(() => detailTurn(-1))">
-                上一页</button
-              ><span>第 {{ detailPage }} 页 · 每页 20 条</span
-              ><button :disabled="locked || !canNext" @click="runRead(() => detailTurn(1))">
-                下一页
-              </button>
-            </div>
+              :page="detailPage"
+              :page-size="20"
+              :total="detailTotal"
+              :disabled="locked"
+              fixed-size
+              @turn="runRead(() => detailTurn($event))"
+            />
           </template>
         </div>
       </div>

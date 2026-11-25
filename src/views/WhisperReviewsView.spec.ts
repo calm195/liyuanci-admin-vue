@@ -221,6 +221,24 @@ describe('WA-02 树洞审核页面', () => {
     expect(view().find('blockquote').exists()).toBe(false)
     expect(view().find('form').exists()).toBe(false)
   })
+
+  it('审核通过后重新读取当前页、保留回执和已处理案件', async () => {
+    await flushPromises()
+    await open()
+    await processing()
+    mocks.whisperAdminReviewsList.mockResolvedValueOnce({
+      items: [summary({ ...first, version: 4, status: 'approved' })],
+      next_cursor: null,
+      page: 1,
+      page_size: 10,
+      total: 1,
+    })
+    await confirm()
+    expect(mocks.whisperAdminReviewsList).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1)
+    expect(view().get('tbody').text()).toContain('approved')
+    expect(view().get('[aria-label="列表分页"]').text()).toContain('共 1 条')
+    expect(view().find('[aria-label="树洞审核回执"]').exists()).toBe(true)
+  })
   it.each([404, 409])('%s清除正文及表单，不自动重提，需手工重新读取', async (status) => {
     await flushPromises()
     await open()

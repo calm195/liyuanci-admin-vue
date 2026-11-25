@@ -2,7 +2,8 @@
 import { confirmDiscardChanges } from './confirmDiscardChanges'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
-import PageSizeSelect from './PageSizeSelect.vue'
+import NumberedPagination from './NumberedPagination.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import { computed, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { reviewErrorMessage, useAdminWorkspace } from '@/composables/useAdminWorkspace'
@@ -56,7 +57,8 @@ function entryQuery(start: number, limit: number, currentFilters: typeof applied
 }
 
 async function load(start: number, search = false) {
-  if (loading.value || selecting.value || props.locked) return
+  if ((!search && loading.value) || selecting.value || props.locked) return
+  if (search) workspace.cancel()
   const nextFilters = search ? { ...filters.value } : applied.value
   const query = entryQuery(start, pageSize.value, nextFilters)
   loading.value = true
@@ -166,6 +168,17 @@ onBeforeRouteLeave(
 )
 onMounted(() => void load(0))
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+function turnPage(target: number) {
+  return load((target - 1) * pageSize.value)
+}
+function resizePage(size: number) {
+  pageSize.value = size
+  return load(0)
+}
+const automaticSearch = useAutoSearch(
+  () => load(0, true),
+  () => !props.locked && !selecting.value,
+)
 </script>
 
 <template>
@@ -177,7 +190,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
   />
   <section aria-label="内置词条" :aria-busy="loading || selecting">
     <p v-if="page">上游版本 {{ page.upstream_version }} · 当前筛选 {{ page.total }} 条</p>
-    <form @submit.prevent="runRead(() => load(0, true), '查询已完成')">
+    <form
+      @input="automaticSearch.input"
+      @change="automaticSearch.change"
+      @compositionstart="automaticSearch.start"
+      @compositionend="automaticSearch.end"
+      @submit="automaticSearch.cancel"
+      @submit.prevent="runRead(() => load(0, true), '查询已完成')"
+    >
       <fieldset class="business-filters" :disabled="loading || selecting || locked">
         <legend>筛选内置词条</legend>
         <label>关键词 <input v-model="filters.q" type="search" maxlength="255" /></label>
@@ -207,7 +227,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           </select>
         </label>
         <button type="submit">应用筛选</button>
-        <div v-if="headVersion !== undefined" class="business-toolbar-tools business-row-actions">
+        <div
+          v-if="headVersion !== undefined"
+          class="business-toolbar-tools business-row-actions"
+          data-manual-action
+        >
           <span role="status">已选 {{ selected.size }} 条</span>
           <select
             v-model="bulkAction"
@@ -304,28 +328,14 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
           </tbody>
         </table>
       </div>
-      <nav aria-label="内置词条分页">
-        <PageSizeSelect
-          v-model="pageSize"
-          :disabled="loading || selecting || locked"
-          @change="load(0)"
-        />
-        <button
-          type="button"
-          :disabled="!offset || loading || selecting || locked"
-          @click="runRead(() => load(offset - pageSize), '查询已完成')"
-        >
-          上一页
-        </button>
-        <span> 第 {{ offset / pageSize + 1 }} 页 / {{ Math.ceil(page.total / pageSize) }} 页 </span>
-        <button
-          type="button"
-          :disabled="offset + pageSize >= page.total || loading || selecting || locked"
-          @click="runRead(() => load(offset + pageSize), '查询已完成')"
-        >
-          下一页
-        </button>
-      </nav>
+      <NumberedPagination
+        :page="Math.floor(offset / pageSize) + 1"
+        :page-size="pageSize"
+        :total="page.total"
+        :disabled="loading || selecting || locked"
+        @turn="turnPage"
+        @resize="resizePage"
+      />
     </template>
   </section>
 </template>

@@ -25,6 +25,9 @@ export interface IdentityHistory extends IdentitySummary {
 export interface IdentityPage {
   items: IdentityListItem[]
   next_cursor: string | null
+  page?: number
+  page_size?: number
+  total?: number
 }
 export interface IdentityCase extends IdentitySummary {
   name: string
@@ -47,7 +50,12 @@ export interface IdentityReceipt {
   revision_suggestion?: string
 }
 export interface IdentityReviewClient {
-  list(cursor: string | null, signal: AbortSignal, view: IdentityListView): Promise<IdentityPage>
+  list(
+    cursor: string | null,
+    signal: AbortSignal,
+    view: IdentityListView,
+    page?: number,
+  ): Promise<IdentityPage>
   detail(id: string, signal: AbortSignal): Promise<IdentityCase>
   history(id: string, signal: AbortSignal): Promise<IdentityHistory>
   card(id: string, signal: AbortSignal): Promise<Blob>

@@ -51,6 +51,9 @@ export interface UserPenalty {
 export interface UserPage<T> {
   items: T[]
   next_cursor: string | null
+  page?: number
+  page_size?: number
+  total?: number
 }
 export interface UsersClient {
   restrictions(id: string, signal: AbortSignal): Promise<UserRestrictionState>
@@ -65,6 +68,7 @@ export interface UsersClient {
     filters: UserFilters,
     cursor: string | null,
     signal: AbortSignal,
+    page?: number,
   ): Promise<UserPage<UserSummary>>
   user(id: string, signal: AbortSignal): Promise<UserDetail>
   userPenalties(

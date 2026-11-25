@@ -31,6 +31,8 @@ export function useContentManagement(kind: () => ContentKind) {
   const cursor = ref<string | null>(null)
   const next = ref<string | null>(null)
   const history = ref<(string | null)[]>([])
+  const pageNumber = ref(1)
+  const total = ref<number | null>(null)
   const busy = ref(false)
   const error = ref('')
   const notice = ref('')
@@ -39,6 +41,8 @@ export function useContentManagement(kind: () => ContentKind) {
 
   function clear() {
     items.value = []
+    pageNumber.value = 1
+    total.value = null
     detail.value = null
     selected.value = null
     commentsPage.value = 0
@@ -85,10 +89,19 @@ export function useContentManagement(kind: () => ContentKind) {
     items.value = []
     next.value = null
     await run(
-      (signal) => client.list(kind(), submitted.value, cursor.value, signal),
+      (signal) =>
+        client.list(
+          kind(),
+          submitted.value,
+          cursor.value,
+          signal,
+          cursor.value === null ? pageNumber.value : undefined,
+        ),
       (result) => {
         items.value = result.items
         next.value = result.next
+        total.value = result.total ?? null
+        pageNumber.value = result.page ?? history.value.length + 1
       },
     )
   }
@@ -101,6 +114,13 @@ export function useContentManagement(kind: () => ContentKind) {
     submitted.value = { ...draft }
     cursor.value = null
     history.value = []
+    pageNumber.value = 1
+    await load()
+  }
+
+  async function turn(target: number) {
+    if (busy.value || dirty.value) return
+    pageNumber.value = target
     await load()
   }
 
@@ -124,7 +144,7 @@ export function useContentManagement(kind: () => ContentKind) {
       (signal) => client.detail(kind(), id, commentPage, signal),
       (result) => {
         detail.value = result
-        commentsPage.value = commentPage
+        commentsPage.value = result.commentsPage ?? commentPage
       },
     )
   }
@@ -191,6 +211,9 @@ export function useContentManagement(kind: () => ContentKind) {
     notice,
     search,
     page,
+    pageNumber,
+    total,
+    turn,
     open,
     close,
     download,

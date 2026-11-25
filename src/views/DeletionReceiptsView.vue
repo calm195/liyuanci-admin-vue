@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
@@ -18,6 +19,36 @@ onMounted(() => {
   }
 })
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+
+let activeLookup: 'first' | 'second' = 'first'
+
+const autoSearch = useAutoSearch(
+  () => {
+    if (activeLookup === 'first') {
+      if (validDeletionId(jobId.value.trim())) return query('job')
+    } else {
+      if (validDeletionReceipt(handle.value.trim())) return query('receipt')
+    }
+  },
+  () => workspace.allowed() && !busy.value,
+)
+
+function scheduleLookup(kind: typeof activeLookup, event: Event) {
+  activeLookup = kind
+  autoSearch.input(event)
+}
+function clearSearch() {
+  autoSearch.cancel()
+  void reset()
+}
+function submitJobSearch() {
+  autoSearch.cancel()
+  void runRead(() => query('job'), '查询已完成')
+}
+function submitReceiptSearch() {
+  autoSearch.cancel()
+  void runRead(() => query('receipt'), '查询已完成')
+}
 </script>
 <template>
   <FloatingNotice
@@ -39,14 +70,10 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
         <h2>查询清理进度</h2>
         <BusinessToolbar label="查询操作栏">
           <template #tools>
-            <button :disabled="busy" @click="reset">清空页面</button>
+            <button :disabled="busy" @click="clearSearch">清空页面</button>
           </template>
         </BusinessToolbar>
-        <form
-          id="job-query"
-          class="experience-editor"
-          @submit.prevent="runRead(() => query('job'), '查询已完成')"
-        >
+        <form id="job-query" class="experience-editor" @submit.prevent="submitJobSearch">
           <fieldset :disabled="busy">
             <legend>后台证据删除待办</legend>
             <label for="delete-job-id">删除待办标识</label>
@@ -56,6 +83,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               type="password"
               autocomplete="off"
               spellcheck="false"
+              @input="scheduleLookup('first', $event)"
+              @compositionstart="autoSearch.start"
+              @compositionend="autoSearch.end"
             />
             <button type="submit" :disabled="!validDeletionId(jobId.trim())">
               查询证据删除待办
@@ -65,11 +95,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       </section>
       <section class="experience-panel" aria-label="匿名删除回执查询">
         <h2>查询匿名回执</h2>
-        <form
-          id="receipt-query"
-          class="experience-editor"
-          @submit.prevent="runRead(() => query('receipt'), '查询已完成')"
-        >
+        <form id="receipt-query" class="experience-editor" @submit.prevent="submitReceiptSearch">
           <fieldset :disabled="busy">
             <legend>匿名删除回执</legend>
             <label for="delete-receipt">本人主动提供的完整删除回执</label>
@@ -79,6 +105,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
               type="password"
               autocomplete="off"
               spellcheck="false"
+              @input="scheduleLookup('second', $event)"
+              @compositionstart="autoSearch.start"
+              @compositionend="autoSearch.end"
             />
             <p>回执是访问凭据，请勿复制到网址、日志或截图；查询不携带后台令牌。</p>
             <p v-if="handle.trim() && !validDeletionReceipt(handle.trim())" role="status">

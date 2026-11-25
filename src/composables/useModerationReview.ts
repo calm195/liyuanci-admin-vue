@@ -31,6 +31,8 @@ export function useModerationReview() {
   const nextCursor = ref<string | null>(null)
   const history = ref<(string | null)[]>([])
   const listBusy = ref(false)
+  const pageNumber = ref(1)
+  const total = ref<number | null>(null)
   const listError = ref('')
   const error = ref('')
   const detail = ref<ModerationCase | null>(null)
@@ -145,6 +147,8 @@ export function useModerationReview() {
     cursor.value = null
     nextCursor.value = null
     history.value = []
+    pageNumber.value = 1
+    total.value = null
     listBusy.value = false
     listError.value = ''
   }
@@ -154,9 +158,14 @@ export function useModerationReview() {
     items.value = []
     nextCursor.value = null
     await workspace.run(
-      (signal) => client.list(cursor.value, signal, { ...appliedFilters }),
+      (signal) =>
+        pageNumber.value > 1 && cursor.value === null
+          ? client.list(null, signal, { ...appliedFilters }, pageNumber.value)
+          : client.list(cursor.value, signal, { ...appliedFilters }),
       (page) => {
         items.value = page.items
+        total.value = page.total ?? null
+        pageNumber.value = page.page ?? history.value.length + 1
         nextCursor.value = page.next_cursor
       },
       (cause) => {
@@ -168,12 +177,12 @@ export function useModerationReview() {
     )
   }
   async function search() {
-    if (listBusy.value || editorOpen.value || writing.value) return
+    if (editorOpen.value || writing.value || pending.value) return
     appliedFilters = { ...filters, q: filters.q.trim() }
     await refresh()
   }
   async function resetFilters() {
-    if (listBusy.value || editorOpen.value || writing.value) return
+    if (editorOpen.value || writing.value || pending.value) return
     Object.assign(filters, defaultFilters())
     await search()
   }
@@ -183,8 +192,15 @@ export function useModerationReview() {
     if (reset) {
       cursor.value = null
       history.value = []
+      pageNumber.value = 1
     }
     await loadList()
+  }
+  async function turn(target: number) {
+    if (listBusy.value || editorOpen.value || writing.value) return
+    pageNumber.value = target
+    cursor.value = null
+    await refresh(false)
   }
   async function page(direction: 'next' | 'previous') {
     if (listBusy.value || writing.value) return
@@ -196,6 +212,7 @@ export function useModerationReview() {
       if (!history.value.length) return
       cursor.value = history.value.pop() ?? null
     }
+    pageNumber.value = history.value.length + 1
     await refresh(false)
   }
   async function openCase(id: string) {
@@ -310,6 +327,9 @@ export function useModerationReview() {
     pending,
     retryPending,
     pageSize,
+    pageNumber,
+    total,
+    turn,
     filters,
     search,
     resetFilters,

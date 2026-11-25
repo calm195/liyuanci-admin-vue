@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
@@ -12,6 +14,9 @@ const {
   pending,
   retryPending,
   pageSize,
+  pageNumber,
+  total,
+  turn,
   filters,
   search,
   resetFilters,
@@ -64,6 +69,11 @@ function moderationKindLabel(kind?: string) {
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(
   () => Boolean(error.value) || Boolean(listError.value),
 )
+const automaticSearch = useAutoSearch(search, () => !editorOpen.value && !writing.value)
+function resizePage(size: number) {
+  pageSize.value = size
+  return refresh()
+}
 </script>
 <template>
   <FloatingNotice
@@ -121,6 +131,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
         <form
           class="moderation-filters"
           aria-label="审核案件筛选"
+          @input="automaticSearch.input"
+          @change="automaticSearch.change"
+          @compositionstart="automaticSearch.start"
+          @compositionend="automaticSearch.end"
+          @submit="automaticSearch.cancel"
           @submit.prevent="runRead(search, '筛选结果已更新')"
         >
           <fieldset class="experience-filters" :disabled="listBusy || writing || editorOpen">
@@ -203,7 +218,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="listBusy || editorOpen || writing"
+          @turn="turn"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect
             v-model="pageSize"
             :disabled="listBusy || writing || editorOpen"

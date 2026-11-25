@@ -20,6 +20,8 @@ export function useUsers() {
   const cursor = ref<string | null>(null)
   const next = ref<string | null>(null)
   const history = ref<(string | null)[]>([])
+  const pageNumber = ref(1)
+  const total = ref<number | null>(null)
   const busy = ref(false)
   const error = ref('')
   const notice = ref('')
@@ -37,6 +39,8 @@ export function useUsers() {
   function clear() {
     listRequest.abort()
     items.value = []
+    total.value = null
+    pageNumber.value = 1
     cursor.value = null
     next.value = null
     history.value = []
@@ -56,11 +60,18 @@ export function useUsers() {
     error.value = ''
     await workspace.run(
       (signal) =>
-        client.users(submitted.value, cursor.value, AbortSignal.any([signal, current.signal])),
+        client.users(
+          submitted.value,
+          cursor.value,
+          AbortSignal.any([signal, current.signal]),
+          cursor.value === null ? pageNumber.value : undefined,
+        ),
       (result) => {
         if (!current.signal.aborted) {
           items.value = result.items
           next.value = result.next_cursor
+          total.value = result.total ?? null
+          pageNumber.value = result.page ?? history.value.length + 1
         }
       },
       (cause) => {
@@ -82,6 +93,12 @@ export function useUsers() {
     }
     cursor.value = null
     history.value = []
+    pageNumber.value = 1
+    await load()
+  }
+  async function turn(target: number) {
+    if (busy.value || dirty.value) return
+    pageNumber.value = target
     await load()
   }
   async function page(forward: boolean) {
@@ -107,6 +124,9 @@ export function useUsers() {
     items,
     next,
     history,
+    pageNumber,
+    total,
+    turn,
     busy,
     error,
     notice,

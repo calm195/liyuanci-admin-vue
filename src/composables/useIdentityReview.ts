@@ -25,6 +25,8 @@ export function useIdentityReview(view: IdentityListView) {
   const currentCursor = ref<string | null>(null)
   const cursors = ref<(string | null)[]>([])
   const listBusy = ref(false)
+  const pageNumber = ref(1)
+  const total = ref<number | null>(null)
   const listError = ref('')
   const detail = ref<IdentityCase | null>(null)
   const historyDetail = ref<IdentityHistory | null>(null)
@@ -122,6 +124,8 @@ export function useIdentityReview(view: IdentityListView) {
     nextCursor.value = null
     currentCursor.value = null
     cursors.value = []
+    pageNumber.value = 1
+    total.value = null
     listError.value = ''
     listBusy.value = false
     notice.value = ''
@@ -141,7 +145,10 @@ export function useIdentityReview(view: IdentityListView) {
     }
     return '操作未完成，请重试；提交失败时请先核对案件最新状态'
   }
-  async function loadList(cursor: string | null = currentCursor.value) {
+  async function loadList(
+    cursor: string | null = currentCursor.value,
+    numbered = cursor === null ? pageNumber.value : 1,
+  ) {
     if (!allowed()) return clearAll()
     listController?.abort()
     const controller = new AbortController()
@@ -152,10 +159,15 @@ export function useIdentityReview(view: IdentityListView) {
     items.value = []
     nextCursor.value = null
     try {
-      const result = await client.list(cursor, controller.signal, view)
+      const result =
+        numbered > 1
+          ? await client.list(cursor, controller.signal, view, numbered)
+          : await client.list(cursor, controller.signal, view)
       if (!active || controller.signal.aborted || generation !== listGeneration || !allowed())
         return
       items.value = result.items
+      pageNumber.value = result.page ?? cursors.value.length + 1
+      total.value = result.total ?? null
       nextCursor.value = result.next_cursor
       currentCursor.value = cursor
     } catch (error) {
@@ -169,7 +181,13 @@ export function useIdentityReview(view: IdentityListView) {
     clearCase()
     cursors.value = []
     currentCursor.value = null
+    pageNumber.value = 1
     await loadList(null)
+  }
+  function turn(target: number) {
+    if (listBusy.value || editorOpen.value) return
+    clearCase()
+    return loadList(null, target)
   }
   async function nextPage() {
     if (!nextCursor.value || listBusy.value) return
@@ -182,7 +200,8 @@ export function useIdentityReview(view: IdentityListView) {
     if (!cursors.value.length || listBusy.value) return
     clearCase()
     currentCursor.value = cursors.value.pop() ?? null
-    await loadList()
+    pageNumber.value = cursors.value.length + 1
+    await loadList(currentCursor.value, 1)
   }
   function removeMissingCase(id: string) {
     items.value = items.value.filter((item) => item.id !== id)
@@ -336,6 +355,9 @@ export function useIdentityReview(view: IdentityListView) {
   return {
     uncertain,
     pageSize,
+    pageNumber,
+    total,
+    turn,
     editorOpen,
     allowed,
     items,

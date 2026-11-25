@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import TraitWordCloud from '@/components/TraitWordCloud.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
@@ -37,6 +39,7 @@ const {
   save,
 } = useMatchmakingTraits()
 const { feedback, run } = useOperationFeedback(() => !!error.value)
+const automaticSearch = useAutoSearch(search, () => !editorOpen.value)
 </script>
 
 <template>
@@ -62,7 +65,14 @@ const { feedback, run } = useOperationFeedback(() => !!error.value)
         <button :disabled="busy || writing" @click="retry">原样重试</button>
       </section>
       <section class="experience-panel experience-table-panel" aria-label="特质统计">
-        <form @submit.prevent="run(search, '筛选结果已更新')">
+        <form
+          @input="automaticSearch.input"
+          @change="automaticSearch.change"
+          @compositionstart="automaticSearch.start"
+          @compositionend="automaticSearch.end"
+          @submit="automaticSearch.cancel"
+          @submit.prevent="run(search, '筛选结果已更新')"
+        >
           <fieldset class="experience-filters" :disabled="locked">
             <label class="trait-search"
               >词条名称<input
@@ -190,18 +200,14 @@ const { feedback, run } = useOperationFeedback(() => !!error.value)
             </table>
           </div>
           <p v-else-if="!busy" class="experience-empty">没有符合条件的词条，请调整筛选。</p>
-          <nav class="business-pagination" aria-label="词条分页">
-            <span class="experience-muted">共 {{ total }} 个词条 · 每页 20 个</span
-            ><button :disabled="locked || page <= 1" @click="run(() => turn(-1), '已切换上一页')">
-              上一页</button
-            ><span>第 {{ page }} 页</span
-            ><button
-              :disabled="locked || page * 20 >= total"
-              @click="run(() => turn(1), '已切换下一页')"
-            >
-              下一页
-            </button>
-          </nav>
+          <NumberedPagination
+            :page="page"
+            :page-size="20"
+            :total="total"
+            fixed-size
+            :disabled="locked"
+            @turn="turn"
+          />
         </template>
       </section>
       <section class="experience-panel trait-cloud-panel">

@@ -13,7 +13,7 @@ const filter = ref<WordlistKind | ''>('')
 const rows = computed(() =>
   items.value.filter((item) => !filter.value || item.kind === filter.value),
 )
-const { pageSize, page, pages, pageRows } = useLocalPagination(rows)
+const { pageSize, page, pageRows } = useLocalPagination(rows)
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
 </script>
 
@@ -74,7 +74,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       <LocalPagination
         v-model:page="page"
         v-model:size="pageSize"
-        :pages="pages"
+        :total="rows.length"
         :disabled="busy"
       />
     </section>

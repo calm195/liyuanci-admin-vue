@@ -49,7 +49,11 @@ export interface CrisisCommand extends CrisisReason {
   action: CrisisAction
 }
 export interface CrisisClient {
-  list(cursor: string | null, signal: AbortSignal): Promise<CursorPage<CrisisSummary>>
+  list(
+    cursor: string | null,
+    signal: AbortSignal,
+    page?: number,
+  ): Promise<CursorPage<CrisisSummary>>
   detail(id: string, signal: AbortSignal): Promise<CrisisDetail>
   timeline(id: string, signal: AbortSignal): Promise<CrisisEvent[]>
   work(id: string, signal: AbortSignal): Promise<CrisisWork>

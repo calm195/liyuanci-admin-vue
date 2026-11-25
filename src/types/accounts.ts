@@ -12,9 +12,12 @@ export interface RolesInput {
 export interface AccountPage {
   items: AdminAccount[]
   next_cursor: string | null
+  page?: number
+  page_size?: number
+  total?: number
 }
 export interface AccountsClient {
-  list(cursor: string | null, signal: AbortSignal): Promise<AccountPage>
+  list(cursor: string | null, signal: AbortSignal, page?: number): Promise<AccountPage>
   create(input: AccountInput, key: string, signal: AbortSignal): Promise<AdminAccount>
   replaceRoles(
     id: string,

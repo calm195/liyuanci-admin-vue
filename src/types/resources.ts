@@ -73,6 +73,9 @@ export interface ResourceFilters {
 export interface ResourcePage<T> {
   items: T[]
   next_cursor: string | null
+  page?: number
+  page_size?: number
+  total?: number
 }
 export interface ResourcesClient {
   upload(file: File, key: string, signal: AbortSignal): Promise<ResourceFile>
@@ -80,6 +83,7 @@ export interface ResourcesClient {
     filters: ResourceFilters,
     cursor: string | null,
     signal: AbortSignal,
+    page?: number,
   ): Promise<ResourcePage<ResourceSummary>>
   detail(id: string, signal: AbortSignal): Promise<ResourceDetail>
   create(input: ResourceInput, key: string, signal: AbortSignal): Promise<ResourceDetail>
@@ -102,6 +106,7 @@ export interface ResourcesClient {
     cursor: string | null,
     signal: AbortSignal,
     limit?: number,
+    page?: number,
   ): Promise<ResourcePage<AdminResourceCategory>>
   category(id: string, signal: AbortSignal): Promise<AdminResourceCategory>
   createCategory(

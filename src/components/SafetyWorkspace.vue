@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
@@ -26,6 +27,10 @@ const {
   escalating,
   items,
   nextCursor,
+  currentPage,
+  total,
+  changePage,
+  resizePage,
   history,
   busy,
   loading,
@@ -161,7 +166,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" role="group" aria-label="分页操作">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="busy || editorOpen || writing || escalating"
+          @turn="changePage"
+          @resize="resizePage"
+        />
+        <div v-else class="business-pagination" role="group" aria-label="分页操作">
           <PageSizeSelect
             v-model="pageSize"
             :disabled="busy || editorOpen || writing || escalating"

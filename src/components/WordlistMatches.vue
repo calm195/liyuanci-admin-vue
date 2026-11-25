@@ -14,8 +14,9 @@ const kinds: Record<WordlistKind, string> = {
   school: '涉校',
   ordinary_violation: '普通违规',
 }
-const fields = { body: '正文', title: '标题', reward_text: '报答方式' }
+const fields = { body: '正文', title: '标题', reward_text: '报答方式', nickname: '资料昵称' }
 function fragment(match: WordlistMatch) {
+  if (match.field === 'nickname') return ''
   const value = { body: props.body, title: props.title, reward_text: props.rewardText }[
     match.field ?? 'body'
   ]

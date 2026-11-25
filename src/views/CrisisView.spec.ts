@@ -304,10 +304,10 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     mocks.list.mockResolvedValueOnce({ items: [], next_cursor: null })
     await button('下一页').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith('opaque', expect.any(AbortSignal))
+    expect(mocks.list).toHaveBeenLastCalledWith('opaque', expect.any(AbortSignal), 1)
     await button('从首页刷新').trigger('click')
     await flushPromises()
-    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal))
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1)
     expect(wrapper?.text()).not.toContain(first.body)
   })
   it('离页或换会话取消请求，迟到回执不会恢复旧主体材料', async () => {

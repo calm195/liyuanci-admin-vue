@@ -64,6 +64,9 @@ export interface CrisisSummary {
 }
 
 export interface CrisisSummaryPage {
+  page?: number
+  page_size?: number
+  total?: number
   items: CrisisSummary[]
   next_cursor: string | null
 }
@@ -162,6 +165,9 @@ export interface ReportSummary {
 }
 
 export interface ReportSummaryPage {
+  page?: number
+  page_size?: number
+  total?: number
   items: ReportSummary[]
   next_cursor: string | null
 }
@@ -218,6 +224,9 @@ export interface ReviewSummary {
 }
 
 export interface ReviewSummaryPage {
+  page?: number
+  page_size?: number
+  total?: number
   items: ReviewSummary[]
   next_cursor: string | null
 }

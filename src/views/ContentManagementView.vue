@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import NumberedPagination from '@/components/NumberedPagination.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { computed } from 'vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
@@ -71,11 +73,15 @@ const {
   notice,
   search,
   page,
+  pageNumber,
+  total,
+  turn,
   open,
   close,
   download,
 } = useContentManagement(() => props.kind)
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
+const automaticSearch = useAutoSearch(search, () => workspace.allowed())
 </script>
 
 <template>
@@ -98,6 +104,11 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
       <section class="experience-panel experience-table-panel" aria-label="内容查询">
         <form
           id="content-management-filters"
+          @input="automaticSearch.input"
+          @change="automaticSearch.change"
+          @compositionstart="automaticSearch.start"
+          @compositionend="automaticSearch.end"
+          @submit="automaticSearch.cancel"
           @submit.prevent="runRead(() => search(), '查询已完成')"
         >
           <div class="experience-filters">
@@ -113,7 +124,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
                 </option>
               </select>
             </label>
-            <button type="submit" class="business-primary">查询 / 从首页刷新</button>
+            <button type="submit" class="business-primary">刷新</button>
           </div>
           <details class="content-advanced">
             <summary>更多筛选</summary>
@@ -127,7 +138,6 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </div>
           </details>
         </form>
-        <p v-if="dirty">条件已修改，请重新查询后翻页。</p>
         <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
         <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
         <p v-if="busy" role="status">正在加载内容…</p>
@@ -158,7 +168,16 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Bool
             </tbody>
           </table>
         </div>
-        <div class="business-pagination" aria-label="内容分页">
+        <NumberedPagination
+          v-if="total !== null"
+          :page="pageNumber"
+          :page-size="20"
+          :total="total"
+          :disabled="busy || dirty"
+          fixed-size
+          @turn="turn"
+        />
+        <div v-else class="business-pagination" aria-label="内容分页">
           <span class="experience-muted">按创建时间倒序 · 北京时间</span>
           <button type="button" :disabled="busy || dirty || !history.length" @click="page(false)">
             上一页
