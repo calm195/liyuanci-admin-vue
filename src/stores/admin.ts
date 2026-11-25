@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   ApiError,
@@ -9,12 +9,23 @@ import {
   changeAdminPassword,
 } from '@/services/admin'
 import type { AdminSession, Role, AdminLoginInput, AdminPasswordInput } from '@/types/admin'
+import type { RandomProfileCommand } from '@/types/random-profiles'
 
 /** 访问令牌仅保存在内存中，启动时通过服务端 Cookie 恢复有效会话。 */
 export const useAdminStore = defineStore('admin-session', () => {
   const session = ref<AdminSession | null>(null)
   const notice = ref('')
   const forbidden = ref(0)
+  const pendingRandomProfile = shallowRef<{ key: string; command: RandomProfileCommand } | null>(
+    null,
+  )
+  watch(
+    [session, forbidden],
+    () => {
+      pendingRandomProfile.value = null
+    },
+    { flush: 'sync' },
+  )
   const initialized = ref(false)
   const restoring = ref(false)
   const restoreError = ref('')
@@ -143,6 +154,7 @@ export const useAdminStore = defineStore('admin-session', () => {
     session,
     notice,
     forbidden,
+    pendingRandomProfile,
     authenticated,
     initialized,
     restoring,

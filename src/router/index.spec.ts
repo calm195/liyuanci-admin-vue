@@ -19,6 +19,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/wordlists',
     '/accounts',
     '/module-guide',
+    '/random-profiles',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('未登录访问%s回登录', async (path) => {
@@ -32,6 +33,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/wordlists',
     '/accounts',
     '/module-guide',
+    '/random-profiles',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('危机角色不能进入%s且审核菜单不可见', async (path) => {
@@ -67,6 +69,7 @@ describe('T010 REQ-019 路由与菜单', () => {
     '/wordlists',
     '/accounts',
     '/module-guide',
+    '/random-profiles',
     '/evidence-deletion',
     '/deletion-receipts',
   ])('超管可进入%s', async (path) => {
@@ -99,6 +102,23 @@ describe('T010 REQ-019 路由与菜单', () => {
     await router.push('/password')
     expect(router.currentRoute.value.path).toBe('/password')
   })
+})
+
+it('审核运营无法通过深链访问随机资料配置', async () => {
+  const admin = useAdminStore()
+  admin.session = {
+    token: 'synthetic',
+    account: {
+      id: 'op',
+      login_name: '测试账号',
+      version: 1,
+      active: true,
+      roles: ['review_operator'],
+    },
+  }
+  await router.push('/random-profiles')
+  expect(router.currentRoute.value.path).toBe('/403')
+  expect(menu.filter(canAccessMenu).some((item) => item.path === '/random-profiles')).toBe(false)
 })
 
 it('REQ-019 审核运营不能访问超管账号管理', async () => {

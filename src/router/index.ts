@@ -35,6 +35,7 @@ export const menu: MenuItem[] = [
   },
   { path: '/report-types', group: '系统管理', title: '举报类型', role: 'super_admin' },
   { path: '/dictionaries', group: '系统管理', title: '展示字典', role: 'super_admin' },
+  { path: '/random-profiles', group: '系统管理', title: '随机资料', role: 'super_admin' },
   { path: '/resources', group: '资料管理', title: '资料列表', roles: resourceRoles },
   { path: '/resource-categories', group: '资料管理', title: '资料分类', roles: resourceRoles },
   { path: '/users', group: '用户管理', title: '平台用户', roles: userRoles },
@@ -85,6 +86,11 @@ export const router = createRouter({
     {
       path: '/dictionaries',
       component: () => import('@/views/system/DictionariesView.vue'),
+      meta: { role: 'super_admin' },
+    },
+    {
+      path: '/random-profiles',
+      component: () => import('@/views/system/RandomProfilesView.vue'),
       meta: { role: 'super_admin' },
     },
     {
