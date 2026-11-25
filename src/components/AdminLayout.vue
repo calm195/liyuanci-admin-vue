@@ -12,6 +12,7 @@ const admin = useAdminStore()
 const route = useRoute()
 const router = useRouter()
 const menuOpen = ref(false)
+const manuallyCollapsed = new Set<string>()
 const expandedGroups = ref(new Set<string>())
 const expandedLeaves = ref(new Set<string>())
 const error = ref('')
@@ -34,8 +35,13 @@ const visibleGroups = computed(() => {
     }))
 })
 function toggleGroup(title: string) {
-  if (expandedGroups.value.has(title)) expandedGroups.value.delete(title)
-  else expandedGroups.value.add(title)
+  if (expandedGroups.value.has(title)) {
+    expandedGroups.value.delete(title)
+    manuallyCollapsed.add(title)
+  } else {
+    expandedGroups.value.add(title)
+    manuallyCollapsed.delete(title)
+  }
 }
 function toggleLeaf(path: string) {
   if (expandedLeaves.value.has(path)) expandedLeaves.value.delete(path)
@@ -47,8 +53,13 @@ const wordlistChildren = [
 ]
 watch(
   () => route.path,
-  () => {
+  (path) => {
     menuOpen.value = false
+    const active = visibleGroups.value.find((group) =>
+      group.items.some((item) => item.path === path || path.startsWith(item.path + '/')),
+    )
+    if (active && !manuallyCollapsed.has(active.title)) expandedGroups.value.add(active.title)
+    if (path.startsWith('/wordlists/')) expandedLeaves.value.add('/wordlists')
   },
   { immediate: true },
 )
@@ -119,7 +130,6 @@ async function logout() {
           </div>
         </section>
       </nav>
-      <p class="sidebar-caption">鲤源池 · WEB 管理端</p>
     </aside>
     <div class="workspace-body">
       <header class="workspace-header">

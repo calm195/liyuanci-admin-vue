@@ -189,7 +189,7 @@ it('登录后默认进入顶层首页，业务分组均默认收起', async () =
   }
 })
 
-it('所有分组默认收起，路由变化不覆盖用户折叠选择', async () => {
+it('深链展开当前分组，保留用户主动折叠的其他分组', async () => {
   login()
   await router.push('/identity')
   const view = render()
@@ -201,10 +201,10 @@ it('所有分组默认收起，路由变化不覆盖用户折叠选择', async (
   const identity = view.get('a[href="/identity"]')
   expect(toggle.attributes('aria-expanded')).toBe('false')
   expect(link.isVisible()).toBe(false)
-  expect(identity.isVisible()).toBe(false)
+  expect(identity.isVisible()).toBe(true)
   await toggle.trigger('click')
   expect(toggle.attributes('aria-expanded')).toBe('true')
-  expect(identity.isVisible()).toBe(false)
+  expect(identity.isVisible()).toBe(true)
   await toggle.trigger('click')
   expect(link.isVisible()).toBe(false)
   await router.push('/resources')
