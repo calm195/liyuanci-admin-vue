@@ -1,10 +1,13 @@
 import { ApiError } from './admin'
 import { record } from '@/types/admin'
 import { reviewRecord, reviewText, reviewVersion } from './review-boundary'
+import { parseNumberedPage } from './numbered-page'
 import type {
   DeletionJob,
   DeletionProgress,
   EvidenceDeletionInput,
+  EvidenceDeletionPage,
+  EvidenceDeletionTask,
   EvidenceTarget,
 } from '@/types/privacy'
 
@@ -58,7 +61,7 @@ export function createPrivacyClient(
     if (!allowed()) throw new ApiError(403)
   }
   function id(value: string) {
-    if (!validDeletionId(value)) throw new Error('请填写有效的证据或待办标识')
+    if (!validDeletionId(value)) throw new Error('证据或删除任务标识无效')
     return value
   }
   async function request(
@@ -95,6 +98,38 @@ export function createPrivacyClient(
     return value['data']
   }
   return {
+    async jobs(page: number, limit: number, signal: AbortSignal): Promise<EvidenceDeletionPage> {
+      reviewVersion(page)
+      reviewVersion(limit)
+      if (limit > 50) throw new Error('分页大小超出范围')
+      const query = new URLSearchParams({ page: String(page), limit: String(limit) })
+      const data = reviewRecord(await request(`admin/evidence-deletion-jobs?${query}`, signal))
+      if (!Array.isArray(data['items']) || data['next_cursor'] !== null)
+        throw new Error('删除任务列表不符合约定')
+      const items = data['items'].map((value: unknown): EvidenceDeletionTask => {
+        const item = reviewRecord(value)
+        const createdAt = reviewText(item['created_at'])
+        const source = item['source_module']
+        if (
+          (source !== 'legacy' && source !== 'whispers') ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(
+            createdAt,
+          ) ||
+          !Number.isFinite(Date.parse(createdAt))
+        )
+          throw new Error('删除任务来源或时间异常')
+        return {
+          id: id(reviewText(item['id'])),
+          source_module: source,
+          created_at: createdAt,
+          ...parseDeletionProgress(item),
+        }
+      })
+      const paging = parseNumberedPage(data, items.length, null)
+      if (paging.page === undefined || paging.page_size !== limit)
+        throw new Error('删除任务分页响应异常')
+      return { items, ...paging }
+    },
     async evidence(evidenceId: string, signal: AbortSignal): Promise<EvidenceTarget> {
       const data = reviewRecord(await request(`admin/evidence/${id(evidenceId)}`, signal))
       const target = {

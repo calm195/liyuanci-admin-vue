@@ -18,14 +18,15 @@ import type {
   ContentKind,
   PenaltyInput,
   PenaltyLevel,
-  ReasonInput,
   ReportDecisionInput,
   ReportDetail,
   RestrictionAction,
+  RestrictionInput,
   SafetySummary,
 } from '@/types/safety'
 
-export type SafetyMode = 'reports' | 'penalties' | 'appeals'
+export type SafetyMode = 'reports' | 'appeals'
+type EditorTask = 'case' | 'penalty' | 'crisis'
 type Operation =
   'confirmed' | 'dismissed' | 'penalty' | 'offline' | 'release-restriction' | 'uphold' | 'revoke'
 type Confirmation =
@@ -37,15 +38,16 @@ type Confirmation =
       id: string
       kind: ContentKind
       action: RestrictionAction
-      input: ReasonInput
+      input: RestrictionInput
     }
 /** 路由分别持有查询与处理状态，离页清除正文、确认及回执。 */
-export function useSafety(mode: SafetyMode, initialReport?: string, initialAppeal?: string) {
+export function useSafety(mode: SafetyMode, initialCase?: string, initialResolved = false) {
+  const resolvedOnly = ref(initialResolved)
   const pageSize = ref(10)
   const currentPage = ref(1)
   const total = ref<number | null>(null)
   const editorOpen = ref(false)
-  const editorTask = ref<'case' | 'crisis'>('case')
+  const editorTask = ref<EditorTask>('case')
   const escalating = ref(false)
   const items = ref<(SafetySummary | AppealSummary)[]>([])
   const cursor = ref<string | null>(null)
@@ -66,7 +68,6 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
   const reason = ref('')
   const level = ref<PenaltyLevel>('minor')
   const accountVersion = ref('')
-  const resourceVersion = ref('')
   const confirmation = ref<Confirmation | null>(null)
   let attempt: { fingerprint: string; key: string } | null = null
   let generation = 0
@@ -91,6 +92,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
   const navigation = useUserNavigation()
   const target = navigation.target
   const detail = computed(() => report.value ?? appeal.value)
+  const canPenalize = computed(() => report.value?.status === 'resolved')
   const operationLabels: Record<Operation, string> = {
     confirmed: '确认举报',
     dismissed: '驳回举报',
@@ -111,16 +113,17 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     whisper_nickname: '树洞昵称',
     whisper_capsule: '私密胶囊',
     wish: '心愿',
+    wish_comment: '心愿评论',
     application: '应愿留言',
     message: '私聊消息',
     story: '还愿故事',
   }
   const options = computed<Operation[]>(() => {
+    if (editorTask.value === 'penalty') return canPenalize.value ? ['penalty'] : []
     if (appeal.value) return appeal.value.status === 'pending' ? ['uphold', 'revoke'] : []
     const current = report.value
     if (!current || !['pending', 'processing', 'resolved', 'rejected'].includes(current.status))
       return []
-    if (mode === 'penalties') return current.status === 'resolved' ? ['penalty'] : []
     const result: Operation[] = ['offline', 'release-restriction']
     if (current.status === 'pending' || current.status === 'processing')
       result.unshift('confirmed', 'dismissed')
@@ -141,30 +144,21 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     }
     return labels[value] ?? '未知状态（仅供查看）'
   }
-  function positiveVersion(value: string): number | null {
-    if (!/^[1-9]\d*$/u.test(value.trim())) return null
-    const result = Number(value)
-    return Number.isSafeInteger(result) ? result : null
-  }
-  const valid = computed(() => {
-    if (!reason.value.trim() || !options.value.includes(operation.value)) return false
-    if (operation.value === 'penalty') return report.value !== null
-    if (operation.value === 'offline' || operation.value === 'release-restriction')
-      return positiveVersion(resourceVersion.value) !== null
-    return true
-  })
+  const valid = computed(
+    () => Boolean(reason.value.trim()) && options.value.includes(operation.value),
+  )
   function resetProcessing() {
     uncertain.value = false
     preparation++
     editorOpen.value = false
+    editorTask.value = 'case'
     reason.value = ''
     accountVersion.value = ''
-    resourceVersion.value = ''
     level.value = 'minor'
     confirmation.value = null
     attempt = null
   }
-  function startProcessing(task: 'case' | 'crisis' = 'case') {
+  function startProcessing(task: EditorTask = 'case') {
     if (uncertain.value) return
     if (
       !workspace.allowed() ||
@@ -176,14 +170,15 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     )
       return
     if (task === 'case' && !options.value.length) return
+    if (task === 'penalty' && !canPenalize.value) return
     if (
       task === 'crisis' &&
       (mode !== 'reports' || !report.value || !useAdminStore().can('crisis_operator'))
     )
       return
     resetProcessing()
-    operation.value = options.value[0] ?? 'confirmed'
     editorTask.value = task
+    operation.value = options.value[0] ?? 'confirmed'
     error.value = ''
     editorOpen.value = true
   }
@@ -231,8 +226,8 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     listError.value = ''
     await workspace.run<CursorPage<SafetySummary | AppealSummary>>(
       (signal) =>
-        mode !== 'appeals'
-          ? client.reports(cursor.value, signal, currentPage.value, mode === 'penalties')
+        mode === 'reports'
+          ? client.reports(cursor.value, signal, currentPage.value, resolvedOnly.value)
           : client.appeals(cursor.value, signal, currentPage.value),
       (result) => {
         items.value = result.items
@@ -261,6 +256,12 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     }
     await loadList()
   }
+  async function filterReports(resolved: boolean) {
+    if (mode !== 'reports' || resolved === resolvedOnly.value) return
+    if (busy.value || editorOpen.value || writing.value || escalating.value) return
+    resolvedOnly.value = resolved
+    await refresh()
+  }
   async function changePage(target: number) {
     if (busy.value || editorOpen.value || writing.value || escalating.value) return
     currentPage.value = target
@@ -285,6 +286,13 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
   async function open(id: string) {
     if (busy.value || editorOpen.value || writing.value || escalating.value) return
     await readDetail(id)
+  }
+  async function openPenaltyFromReceipt() {
+    const current = receipt.value
+    if (mode !== 'reports' || current?.status !== 'resolved' || busy.value || loading.value) return
+    const expected = generation + 1
+    await open(current.id)
+    if (generation === expected && report.value?.id === current.id) startProcessing('penalty')
   }
   async function readDetail(id: string) {
     workspace.cancel()
@@ -327,10 +335,73 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     workspace.cancel()
     clearEditor()
   }
+  async function prepareRestriction(
+    current: ReportDetail,
+    action: RestrictionAction,
+    message: string,
+  ) {
+    const currentPreparation = ++preparation
+    loading.value = true
+    confirmation.value = null
+    error.value = ''
+    await workspace.run(
+      async (signal) => {
+        const control = await client.reportContentControl(current.id, signal)
+        if (
+          control.report_id !== current.id ||
+          control.report_version !== current.version ||
+          control.report_status !== current.status ||
+          control.target_id !== current.target_id ||
+          control.target_kind !== current.target_kind ||
+          control.content_ref !== current.content_ref ||
+          control.content_version !== current.content_version
+        )
+          throw new ApiError(409)
+        return control
+      },
+      (control) => {
+        if (
+          currentPreparation !== preparation ||
+          !editorOpen.value ||
+          selected.value !== current.id ||
+          operation.value !== action ||
+          reason.value.trim() !== message
+        )
+          return
+        confirmation.value = {
+          type: 'restriction',
+          id: control.target_id,
+          kind: control.target_kind,
+          action,
+          input: {
+            reason: message,
+            expected_version: control.version,
+            report_id: control.report_id,
+            report_version: control.report_version,
+          },
+        }
+      },
+      async (cause) => {
+        if (currentPreparation !== preparation) return
+        if (cause instanceof ApiError && cause.status === 409) {
+          const expected = generation + 1
+          await readDetail(current.id)
+          if (generation === expected && report.value?.id === current.id && workspace.allowed())
+            error.value = '案件或关联内容已变化，已重新读取，请核对案件后再发起处置'
+        } else if (cause instanceof ApiError && cause.status === 404) {
+          clearEditor()
+          error.value = reviewErrorMessage(cause)
+        } else error.value = reviewErrorMessage(cause)
+      },
+      () => {
+        if (currentPreparation === preparation) loading.value = false
+      },
+    )
+  }
   async function prepare() {
     if (
       !editorOpen.value ||
-      editorTask.value !== 'case' ||
+      editorTask.value === 'crisis' ||
       !valid.value ||
       writing.value ||
       loading.value
@@ -406,15 +477,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
           },
         )
       } else if (operation.value === 'offline' || operation.value === 'release-restriction') {
-        const version = positiveVersion(resourceVersion.value)
-        if (version === null) return
-        confirmation.value = {
-          type: 'restriction',
-          id: current.target_id,
-          kind: current.target_kind,
-          action: operation.value,
-          input: { reason: message, expected_version: version },
-        }
+        await prepareRestriction(current, operation.value, message)
       }
     } else if (appeal.value && (operation.value === 'uphold' || operation.value === 'revoke')) {
       confirmation.value = {
@@ -433,7 +496,7 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     if (
       !current ||
       !editorOpen.value ||
-      editorTask.value !== 'case' ||
+      editorTask.value === 'crisis' ||
       writing.value ||
       !workspace.allowed()
     )
@@ -483,7 +546,12 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
         if (cause instanceof ApiError && cause.status === 409) {
           const expected = generation + 1
           await readDetail(caseId)
-          if (current.type === 'penalty' && report.value && workspace.allowed()) {
+          if (
+            generation === expected &&
+            current.type === 'penalty' &&
+            canPenalize.value &&
+            workspace.allowed()
+          ) {
             await workspace.run(
               (signal) => users.user(current.id, signal),
               (user) => {
@@ -496,11 +564,19 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
             )
           }
           if (generation === expected && workspace.allowed()) {
+            editorTask.value = current.type === 'penalty' ? 'penalty' : 'case'
+            operation.value =
+              current.type === 'restriction' && options.value.includes(current.action)
+                ? current.action
+                : (options.value[0] ?? 'confirmed')
             editorOpen.value = options.value.length > 0
+            if (!editorOpen.value) editorTask.value = 'case'
             error.value =
-              current.type === 'penalty' || current.type === 'restriction'
-                ? '目标版本或状态已变化，已重读案件并清空版本与确认；请再次核对处理，系统将重新读取账号版本，不会自动重提'
-                : '案件版本或状态已变化，已重新读取；请重新核对，旧决定不会自动重提'
+              current.type === 'restriction'
+                ? '内容对象版本或状态已变化，已重读案件；再次核对处理时会重新读取内容对象版本'
+                : current.type === 'penalty'
+                  ? '目标版本或状态已变化，已重读案件并清空版本与确认；请再次核对处理，系统将重新读取账号版本，不会自动重提'
+                  : '案件版本或状态已变化，已重新读取；请重新核对，旧决定不会自动重提'
           }
         } else if (cause instanceof ApiError && cause.status === 404) {
           clearEditor()
@@ -513,25 +589,23 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     )
   }
   watch(
-    [operation, reason, level, accountVersion, resourceVersion],
+    [operation, reason, level, accountVersion],
     () => {
       confirmation.value = null
     },
     { flush: 'sync' },
   )
   const visibleItems = computed(() =>
-    mode === 'penalties' ? items.value.filter((item) => item.status === 'resolved') : items.value,
+    resolvedOnly.value ? items.value.filter((item) => item.status === 'resolved') : items.value,
   )
   onMounted(async () => {
     const expected = generation
     await loadList()
-    if (generation === expected && mode === 'penalties' && initialReport && workspace.allowed())
-      await open(initialReport)
-    else if (generation === expected && mode === 'appeals' && initialAppeal && workspace.allowed())
-      await open(initialAppeal)
+    if (generation === expected && initialCase && workspace.allowed()) await open(initialCase)
   })
-  onBeforeRouteLeave(() => !uncertain.value)
-  onBeforeRouteUpdate(() => !uncertain.value)
+  const canLeave = () => !writing.value && !escalating.value && !uncertain.value
+  onBeforeRouteLeave(canLeave)
+  onBeforeRouteUpdate(canLeave)
 
   return {
     uncertain,
@@ -558,11 +632,11 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     appeal,
     detail,
     receipt,
+    canPenalize,
     operation,
     reason,
     level,
     accountVersion,
-    resourceVersion,
     confirmation,
     workspace,
     options,
@@ -572,9 +646,12 @@ export function useSafety(mode: SafetyMode, initialReport?: string, initialAppea
     kindLabels,
     status,
     refresh,
+    resolvedOnly,
+    filterReports,
     loadList,
     page,
     open,
+    openPenaltyFromReceipt,
     close,
     reloadSelected,
     startProcessing,

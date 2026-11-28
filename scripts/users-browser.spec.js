@@ -20,6 +20,33 @@ const fixtures = JSON.parse(
 )
 const detail = fixtures.fixtures.find((item) => item.name === 'detail-valid').body
 const summary = fixtures.fixtures.find((item) => item.name === 'nullable-name').body
+const penalty = fixtures.fixtures.find((item) => item.name === 'penalty-valid').body
+const nickname = '<img src=x onerror=alert(1)>'
+const reportID = penalty.case_link.id
+const appealID = penalty.appeal_id
+const reviewID = 'ac220000-0000-4000-8000-000000000041'
+const reviewPenalty = {
+  ...penalty,
+  id: 'ac220000-0000-4000-8000-000000000012',
+  reason: '合成历史第二页',
+  case_link: { kind: 'ordinary_review', id: reviewID },
+  appeal_id: null,
+}
+const report = {
+  id: reportID,
+  status: 'resolved',
+  version: 7,
+  kind: 'wish',
+  target_kind: 'wish',
+  target_id: 'synthetic-wish',
+  content_ref: 'synthetic-registry',
+  content_version: 3,
+  type_code: 'synthetic',
+  subject_id: detail.id,
+  body: '合成已确认举报正文',
+  description: '合成举报说明',
+  reason: null,
+}
 const results = []
 const failures = []
 const browser = await chromium.launch({
@@ -43,6 +70,7 @@ try {
       allowed_actions: ['ban', 'mute'],
     }
     const queries = []
+    const historyQueries = []
     await page.route('**/api/v1/**', async (route) => {
       if (await handleSessionAndDashboard(route)) return
       const request = route.request()
@@ -83,13 +111,30 @@ try {
               {
                 ...summary,
                 id: detail.id,
-                display_name: '<img src=x onerror=alert(1)>',
+                display_name: nickname,
                 restriction: control.banned ? 'banned' : control.muted ? 'muted' : 'normal',
                 muted_until: control.banned ? null : control.muted_until,
               },
               { ...summary, display_name: '同名小鲤', restriction: 'normal', muted_until: null },
             ],
             next_cursor: url.searchParams.has('cursor') ? null : 'synthetic-next',
+          }
+        } else if (url.pathname === `/api/v1/admin/users/${detail.id}`) {
+          data = {
+            ...detail,
+            display_name: nickname,
+            account_version: control.account_version,
+            restriction: control.banned ? 'banned' : control.muted ? 'muted' : 'normal',
+            muted_until: control.banned ? null : control.muted_until,
+            active_penalties: control.muted ? detail.active_penalties : [],
+          }
+        } else if (url.pathname === `/api/v1/admin/users/${detail.id}/penalties`) {
+          assert.equal(request.method(), 'GET')
+          historyQueries.push(url.searchParams.get('cursor'))
+          const secondPage = url.searchParams.get('cursor') === 'history-next'
+          data = {
+            items: [secondPage ? reviewPenalty : penalty],
+            next_cursor: secondPage ? null : 'history-next',
           }
         } else if (url.pathname.startsWith(`/api/v1/admin/users/${detail.id}/restrictions`)) {
           assert.equal(role, 'super_admin')
@@ -116,6 +161,32 @@ try {
             ]
           }
           data = control
+        } else if (url.pathname === '/api/v1/admin/reports') {
+          data = { items: [report], next_cursor: null }
+        } else if (url.pathname === `/api/v1/admin/reports/${reportID}`) data = report
+        else if (url.pathname === '/api/v1/admin/appeals') {
+          data = { items: [], next_cursor: null }
+        } else if (url.pathname === `/api/v1/admin/appeals/${appealID}`) {
+          data = {
+            id: appealID,
+            version: 4,
+            status: 'pending',
+            penalty_id: penalty.id,
+            body: '合成关联申诉正文',
+            penalty_reason: '合成原处罚理由',
+            reason: null,
+          }
+        } else if (url.pathname === '/api/v1/admin/moderation-tasks') {
+          data = { items: [], next_cursor: null }
+        } else if (url.pathname === `/api/v1/admin/moderation-tasks/${reviewID}`) {
+          assert.notEqual(role, 'crisis_operator')
+          data = {
+            id: reviewID,
+            status: 'rejected',
+            version: 1,
+            content_version: 3,
+            body: '合成关联内容审核正文',
+          }
         } else {
           failures.push(`未定义请求：${request.method()} ${url.pathname}`)
           await route.abort()
@@ -137,9 +208,13 @@ try {
     await page.getByRole('link', { name: '平台用户', exact: true }).click()
     await page.locator('tbody tr').first().waitFor()
     assert.equal(await page.locator('tbody img').count(), 0)
-    for (const theme of ['light', 'dark']) {
+    for (const [theme, label] of [
+      ['light', '浅色'],
+      ['dark', '深色'],
+    ]) {
       await page.setViewportSize({ width: 1440, height: 1000 })
-      await page.locator(`input[value="${theme}"]`).check({ force: true })
+      await page.getByText(label, { exact: true }).click()
+      assert.equal(await page.locator(`input[value="${theme}"]`).isChecked(), true)
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 })
         await page.screenshot({
@@ -149,8 +224,16 @@ try {
         })
       }
     }
-    assert.equal(await page.getByRole('button', { name: /查看详情/ }).count(), 0)
-    const target = page.getByRole('row').filter({ hasText: '<img src=x onerror=alert(1)>' })
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    assert.equal(await page.getByLabel('用户 ID', { exact: true }).count(), 0)
+    const target = page.getByRole('row').filter({ hasText: nickname })
+    const userDrawer = page.getByRole('dialog', { name: nickname, exact: true })
+    const historyList = userDrawer.getByRole('region', { name: '处罚历史', exact: true })
+    const openUser = async () => {
+      await target.getByRole('button', { name: /查看.*资料/ }).click()
+      await historyList.getByText(penalty.reason, { exact: true }).waitFor()
+    }
+    await openUser()
     if (role === 'super_admin') {
       for (const [label, kind, active] of [
         ['封禁', '封禁', true],
@@ -158,7 +241,7 @@ try {
         ['解封', '封禁', false],
         ['取消禁言', '禁言', false],
       ]) {
-        const toggle = target.getByRole('switch', { name: new RegExp(`的${kind}$`) })
+        const toggle = userDrawer.getByRole('switch', { name: new RegExp(`的${kind}$`) })
         await toggle.click()
         const dialog = page.getByRole('dialog', { name: label, exact: true })
         assert.equal(await dialog.getByText(detail.id, { exact: true }).count(), 0)
@@ -166,14 +249,14 @@ try {
         await dialog.getByRole('button', { name: '核对用户操作', exact: true }).click()
         await dialog.getByRole('button', { name: `确认${label}`, exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
-        await target
+        await userDrawer
           .locator(`[role="switch"][aria-label$="的${kind}"][aria-checked="${active}"]`)
           .waitFor()
       }
       assert.equal(control.account_version, 11)
       assert.equal(control.banned, false)
       assert.equal(control.muted, false)
-      await target.getByRole('switch', { name: /的封禁$/ }).click()
+      await userDrawer.getByRole('switch', { name: /的封禁$/ }).click()
       await page.getByRole('dialog', { name: '封禁', exact: true }).waitFor()
       await page.screenshot({
         path: path.join(output, 'direct-actions.png'),
@@ -181,17 +264,49 @@ try {
         fullPage: true,
       })
       await page.getByRole('button', { name: '取消操作', exact: true }).click()
-      await page.getByRole('dialog').waitFor({ state: 'hidden' })
+      await page.getByRole('dialog', { name: '封禁', exact: true }).waitFor({ state: 'hidden' })
     } else {
-      assert.equal(await page.getByRole('switch').count(), 0)
+      assert.equal(await userDrawer.getByRole('switch').count(), 0)
     }
-    await page.getByLabel('昵称关键词', { exact: true }).fill("小鲤%_'\\")
-    assert.equal(await page.getByRole('button', { name: '下一页', exact: true }).isDisabled(), true)
-    await page.getByRole('button', { name: '查询 / 从首页刷新', exact: true }).click()
-    await page.locator('tbody tr').first().waitFor()
+    await historyList.getByRole('link', { name: '查看举报', exact: true }).click()
+    await page.waitForURL(`${base}/safety/reports?report=${reportID}`)
+    await page.getByText(report.body, { exact: true }).waitFor()
+    await page.getByRole('button', { name: '给予账号处罚', exact: true }).waitFor()
+    await page.goBack()
+    await openUser()
+    await historyList.getByRole('link', { name: '查看申诉', exact: true }).click()
+    await page.waitForURL(`${base}/safety/appeals?appeal=${appealID}`)
+    await page.getByText('合成关联申诉正文', { exact: true }).waitFor()
+    await page.goBack()
+    await openUser()
+    await historyList.getByRole('button', { name: '下一页', exact: true }).click()
+    await historyList.getByText(reviewPenalty.reason, { exact: true }).waitFor()
+    assert.equal(historyQueries.at(-1), 'history-next')
+    if (role === 'crisis_operator') {
+      assert.equal(
+        await historyList.getByRole('link', { name: '查看审核', exact: true }).count(),
+        0,
+      )
+      await historyList.getByRole('button', { name: '上一页', exact: true }).click()
+      await historyList.getByText(penalty.reason, { exact: true }).waitFor()
+      assert.equal(historyQueries.at(-1), null)
+      await userDrawer.getByRole('button', { name: '关闭', exact: true }).click()
+    } else {
+      await historyList.getByRole('link', { name: '查看审核', exact: true }).click()
+      await page.waitForURL(`${base}/moderation?case=${reviewID}`)
+      await page.getByText('合成关联内容审核正文', { exact: true }).waitFor()
+      await page.goBack()
+    }
+    await userDrawer.waitFor({ state: 'hidden' })
+    await Promise.all([
+      page.waitForRequest((request) => new URL(request.url()).searchParams.has('nickname')),
+      page.getByLabel('昵称关键词', { exact: true }).fill("小鲤%_'\\"),
+    ])
+    await target.waitFor()
     assert.equal(queries.at(-1).nickname, "小鲤%_'\\")
+    assert.equal('user_id' in queries.at(-1), false)
     await page.getByRole('button', { name: '下一页', exact: true }).click()
-    await page.locator('tbody tr').first().waitFor()
+    await target.waitFor()
     assert.equal(queries.at(-1).cursor, 'synthetic-next')
     assert.equal(new URL(page.url()).search, '')
     assert.equal(
@@ -203,7 +318,7 @@ try {
       false,
     )
     fail = true
-    await page.getByRole('button', { name: '查询 / 从首页刷新', exact: true }).click()
+    await page.getByRole('button', { name: '刷新', exact: true }).click()
     await page.getByRole('alert').filter({ hasText: '服务暂不可用' }).waitFor()
     assert.equal(await page.locator('tbody').count(), 0)
     await page.getByRole('button', { name: '退出登录', exact: true }).click()

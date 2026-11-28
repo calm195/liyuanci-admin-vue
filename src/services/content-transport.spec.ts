@@ -174,7 +174,7 @@ describe('内容审核查询筛选', () => {
     const result = await createModerationTransport('token', () => true, transport).list(
       'opaque',
       signal(),
-      { q: '  ab+/  ', status: 'all', kind: 'message' },
+      { status: 'all', kind: 'message' },
     )
     const url = transport.mock.calls[0]?.[0]
     expect(typeof url).toBe('string')
@@ -185,7 +185,6 @@ describe('内容审核查询筛选', () => {
       cursor: 'opaque',
       status: 'all',
       kind: 'message',
-      q: 'ab+/',
     })
     expect(result.items.map((item) => item.id)).toEqual(['pending-z', 'approved-a'])
   })

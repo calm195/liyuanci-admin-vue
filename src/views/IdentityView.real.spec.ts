@@ -1,6 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import IdentityView from './IdentityView.vue'
 import { useAdminStore } from '@/stores/admin'
 afterEach(() => {
@@ -40,7 +41,12 @@ it('T012 默认真实身份审核进入页面即读取后台队列，按需读�
       version: 1,
     },
   }
-  const wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/identity', component: IdentityView }],
+  })
+  await router.push('/identity')
+  const wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
   await flushPromises()
   expect(transport.mock.calls[0]?.[0]).toBe(
     '/api/v1/admin/identity-reviews?limit=10&view=pending&include=created_at&page=1',

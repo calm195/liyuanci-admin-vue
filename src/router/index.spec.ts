@@ -14,7 +14,10 @@ beforeEach(async () => {
 describe('T010 REQ-019 路由与菜单', () => {
   it.each([
     '/identity',
+    '/identity/history',
+    '/identity?tab=processed',
     '/moderation',
+    '/moderation?case=sample',
     '/whispers/reviews',
     '/wordlists',
     '/accounts',
@@ -28,7 +31,10 @@ describe('T010 REQ-019 路由与菜单', () => {
   })
   it.each([
     '/identity',
+    '/identity/history',
+    '/identity?tab=processed',
     '/moderation',
+    '/moderation?case=sample',
     '/whispers/reviews',
     '/wordlists',
     '/accounts',
@@ -56,7 +62,6 @@ describe('T010 REQ-019 路由与菜单', () => {
       '/password',
       '/whispers/reports',
       '/safety/reports',
-      '/safety/penalties',
       '/safety/appeals',
       '/whispers/crises',
       '/crisis',
@@ -102,6 +107,38 @@ describe('T010 REQ-019 路由与菜单', () => {
     await router.push('/password')
     expect(router.currentRoute.value.path).toBe('/password')
   })
+})
+
+it.each([
+  { role: 'review_operator', allowed: true },
+  { role: 'super_admin', allowed: true },
+  { role: 'crisis_operator', allowed: false },
+  { role: null, allowed: false },
+] as const)('身份审核旧入口与内容审核定位遵循岗位权限 $role', async ({ role, allowed }) => {
+  useAdminStore().session = {
+    token: 'synthetic',
+    account: {
+      id: 'a',
+      login_name: '合成岗位',
+      active: true,
+      version: 1,
+      roles: role ? [role] : [],
+    },
+  }
+  const destinations = [
+    ['/identity/history', '/identity?tab=processed'],
+    ['/identity?tab=processed', '/identity?tab=processed'],
+    ['/moderation?case=sample', '/moderation?case=sample'],
+  ] as const
+  for (const [path, expected] of destinations) {
+    await router.replace('/')
+    await router.push(path)
+    expect(router.currentRoute.value.fullPath).toBe(allowed ? expected : '/403')
+  }
+  const navigation = menu.filter(canAccessMenu).map((item) => item.path)
+  expect(navigation.includes('/identity')).toBe(allowed)
+  expect(navigation.includes('/moderation')).toBe(allowed)
+  expect(navigation).not.toContain('/identity/history')
 })
 
 it('审核运营无法通过深链访问随机资料配置', async () => {
@@ -184,7 +221,7 @@ it('T030 普通审核与空角色不能进入危机工作台，未登录回登�
   }
 })
 
-it.each(['/safety/reports', '/safety/penalties', '/safety/appeals', '/whispers/reports'])(
+it.each(['/safety/reports', '/safety/appeals', '/whispers/reports'])(
   'REQ-019 %s独立路由要求登录与案件角色，三类案件角色均可访问',
   async (path) => {
     await router.push(path)
@@ -201,64 +238,101 @@ it.each(['/safety/reports', '/safety/penalties', '/safety/appeals', '/whispers/r
   },
 )
 
-it('回执查询面包屑与菜单独立，普通审核角色不可见', async () => {
-  useAdminStore().session = {
-    token: 'synthetic',
-    account: {
-      id: 'a',
-      login_name: '合成审核',
-      version: 1,
-      active: true,
-      roles: ['review_operator'],
-    },
+it('旧处罚入口保留单个举报定位并沿用举报路由授权', async () => {
+  const legacy = '/safety/penalties?report=sample&status=pending'
+  await router.push(legacy)
+  expect(router.currentRoute.value.path).toBe('/login')
+  for (const roles of [[], ['review_operator'], ['crisis_operator'], ['super_admin']] as const) {
+    useAdminStore().session = {
+      token: 'synthetic',
+      account: { id: 'a', login_name: '合成角色', version: 1, active: true, roles: [...roles] },
+    }
+    await router.push(legacy)
+    if (roles.length) {
+      expect(router.currentRoute.value.path).toBe('/safety/reports')
+      expect(router.currentRoute.value.query).toEqual({ status: 'resolved', report: 'sample' })
+    } else expect(router.currentRoute.value.path).toBe('/403')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === '/safety/penalties')).toBe(false)
   }
-  await router.push('/deletion-receipts')
-  expect(router.currentRoute.value.path).toBe('/403')
-  expect(menu.filter(canAccessMenu).some((item) => item.path === '/deletion-receipts')).toBe(false)
-  expect(router.resolve('/deletion-receipts').meta).toMatchObject({
-    title: '回执查询',
-    group: '隐私管理',
-    role: 'super_admin',
-  })
+  await router.push('/safety/penalties?report=one&report=two')
+  expect(router.currentRoute.value.fullPath).toBe('/safety/reports?status=resolved')
+  await router.push('/safety/penalties')
+  expect(router.currentRoute.value.fullPath).toBe('/safety/reports?status=resolved')
 })
 
-it.each(['/whispers/crises', '/whispers/evidence'])(
-  'WA-04 %s独立投影严格隔离角色与菜单',
-  async (path) => {
-    await router.push(path)
-    expect(router.currentRoute.value.path).toBe('/login')
-    for (const role of ['review_operator', 'crisis_operator', 'super_admin'] as const) {
-      useAdminStore().session = {
-        token: 'test',
-        account: {
-          id: 'admin',
-          login_name: '合成角色',
-          version: 1,
-          active: true,
-          roles: [role],
-        },
-      }
-      const allowed =
-        role === 'super_admin' || (path === '/whispers/crises' && role === 'crisis_operator')
-      await router.push(path)
-      expect(router.currentRoute.value.path).toBe(allowed ? path : '/403')
-      expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(allowed)
+it.each(['review_operator', 'crisis_operator', 'super_admin'] as const)(
+  '%s的用户处罚历史关联页沿用各工作台权限',
+  async (role) => {
+    useAdminStore().session = {
+      token: 'synthetic',
+      account: { id: 'a', login_name: '合成角色', version: 1, active: true, roles: [role] },
     }
+    await router.push('/users')
+    expect(router.currentRoute.value.path).toBe('/users')
+    await router.push('/safety/reports?report=sample')
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
+    await router.push('/safety/appeals?appeal=sample')
+    expect(router.currentRoute.value.path).toBe('/safety/appeals')
+    await router.push('/moderation?case=sample')
+    expect(router.currentRoute.value.path).toBe(role === 'crisis_operator' ? '/403' : '/moderation')
+  },
+)
+
+it.each([
+  ['/deletion-receipts', '删除任务与回执', true],
+  ['/evidence-deletion', '证据删除', false],
+  ['/whispers/evidence', '树洞证据', false],
+] as const)('%s仅超管可进入，证据处理从案件关联进入', async (path, title, hasMenu) => {
+  await router.push(path)
+  expect(router.currentRoute.value.path).toBe('/login')
+  for (const roles of [[], ['review_operator'], ['crisis_operator'], ['super_admin']] as const) {
+    useAdminStore().session = {
+      token: 'synthetic',
+      account: { id: 'a', login_name: '合成岗位', version: 1, active: true, roles: [...roles] },
+    }
+    await router.replace('/')
+    await router.push(path)
+    const allowed = roles[0] === 'super_admin'
+    expect(router.currentRoute.value.path).toBe(allowed ? path : '/403')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(allowed && hasMenu)
+  }
+  expect(router.resolve(path).meta).toMatchObject({ title, group: '隐私管理', role: 'super_admin' })
+})
+
+it.each(['/whispers/crises'])('WA-04 %s危机投影严格隔离角色与菜单', async (path) => {
+  await router.push(path)
+  expect(router.currentRoute.value.path).toBe('/login')
+  for (const role of ['review_operator', 'crisis_operator', 'super_admin'] as const) {
     useAdminStore().session = {
       token: 'test',
       account: {
         id: 'admin',
-        login_name: '空角色',
+        login_name: '合成角色',
         version: 1,
         active: true,
-        roles: [],
+        roles: [role],
       },
     }
-    await router.replace('/')
+    const allowed =
+      role === 'super_admin' || (path === '/whispers/crises' && role === 'crisis_operator')
     await router.push(path)
-    expect(router.currentRoute.value.path).toBe('/403')
-  },
-)
+    expect(router.currentRoute.value.path).toBe(allowed ? path : '/403')
+    expect(menu.filter(canAccessMenu).some((item) => item.path === path)).toBe(allowed)
+  }
+  useAdminStore().session = {
+    token: 'test',
+    account: {
+      id: 'admin',
+      login_name: '空角色',
+      version: 1,
+      active: true,
+      roles: [],
+    },
+  }
+  await router.replace('/')
+  await router.push(path)
+  expect(router.currentRoute.value.path).toBe('/403')
+})
 
 it.each(['/resources', '/resource-categories'])(
   'REQ-023 %s仅审核运营和超管可访问，菜单与深链一致',

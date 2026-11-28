@@ -44,7 +44,6 @@ export const menu: MenuItem[] = [
   { path: '/module-guide', group: '系统管理', title: '模块使用说明', role: 'super_admin' },
   { path: '/accounts', group: '系统管理', title: '后台账号管理', role: 'super_admin' },
   { path: '/identity', group: '用户管理', title: '身份审核', role: 'review_operator' },
-  { path: '/identity/history', group: '用户管理', title: '身份审核历史', role: 'review_operator' },
   { path: '/content/wishes', group: '内容管理', title: '心愿管理', role: 'review_operator' },
   { path: '/content/whispers', group: '内容管理', title: '悄悄话管理', role: 'review_operator' },
   { path: '/moderation', group: '内容治理', title: '内容审核', role: 'review_operator' },
@@ -52,13 +51,10 @@ export const menu: MenuItem[] = [
   { path: '/wordlists', group: '内容治理', title: '词库管理', role: 'review_operator' },
   { path: '/whispers/reports', group: '安全治理', title: '树洞举报', roles: safetyRoles },
   { path: '/safety/reports', group: '安全治理', title: '举报管理', roles: safetyRoles },
-  { path: '/safety/penalties', group: '安全治理', title: '处罚管理', roles: safetyRoles },
   { path: '/safety/appeals', group: '安全治理', title: '申诉管理', roles: safetyRoles },
   { path: '/whispers/crises', group: '安全治理', title: '树洞危机', roles: crisisRoles },
-  { path: '/whispers/evidence', group: '隐私管理', title: '树洞证据', role: 'super_admin' },
   { path: '/crisis', group: '安全治理', title: '危机工作台', roles: crisisRoles },
-  { path: '/evidence-deletion', group: '隐私管理', title: '证据删除', role: 'super_admin' },
-  { path: '/deletion-receipts', group: '隐私管理', title: '回执查询', role: 'super_admin' },
+  { path: '/deletion-receipts', group: '隐私管理', title: '删除任务与回执', role: 'super_admin' },
 ]
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -122,8 +118,7 @@ export const router = createRouter({
     },
     {
       path: '/identity/history',
-      component: () => import('@/views/IdentityHistoryView.vue'),
-      meta: { role: 'review_operator' },
+      redirect: { path: '/identity', query: { tab: 'processed' } },
     },
     {
       path: '/content/wishes',
@@ -203,8 +198,16 @@ export const router = createRouter({
         },
         {
           path: 'penalties',
-          component: () => import('@/views/PenaltiesView.vue'),
-          meta: { title: '处罚管理' },
+          redirect: (to: RouteLocation) => {
+            const report = to.query['report']
+            return {
+              path: '/safety/reports',
+              query: {
+                status: 'resolved',
+                report: typeof report === 'string' ? report : undefined,
+              },
+            }
+          },
         },
         {
           path: 'appeals',
@@ -226,7 +229,13 @@ export const router = createRouter({
     {
       path: '/whispers/evidence',
       component: () => import('@/views/WhisperEvidenceView.vue'),
-      meta: { role: 'super_admin' },
+      meta: {
+        role: 'super_admin',
+        title: '树洞证据',
+        group: '隐私管理',
+        parentTitle: '树洞危机',
+        parentPath: '/whispers/crises',
+      },
     },
     {
       path: '/crisis',
@@ -236,7 +245,13 @@ export const router = createRouter({
     {
       path: '/evidence-deletion',
       component: () => import('@/views/EvidenceDeletionView.vue'),
-      meta: { role: 'super_admin' },
+      meta: {
+        role: 'super_admin',
+        title: '证据删除',
+        group: '隐私管理',
+        parentTitle: '危机工作台',
+        parentPath: '/crisis',
+      },
     },
     {
       path: '/deletion-receipts',

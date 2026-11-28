@@ -283,7 +283,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               <button
                 v-if="evidence && admin.can('super_admin')"
                 :disabled="privacyPending || editorOpen"
-                @click="openPrivacy('/evidence-deletion', evidence.id)"
+                @click="
+                  openPrivacy({
+                    path: '/evidence-deletion',
+                    id: evidence.id,
+                    caseId: detail.id,
+                  })
+                "
               >
                 管理当前证据范围
               </button>

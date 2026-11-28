@@ -5,8 +5,9 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import type { Router } from 'vue-router'
 import IdentityView from './IdentityView.vue'
-import IdentityHistoryView from './IdentityHistoryView.vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import type { IdentityCase, IdentityReviewClient } from '@/types/identity'
@@ -35,6 +36,7 @@ const second: IdentityCase = {
   asset_id: 'asset-b',
 }
 let wrapper: VueWrapper | undefined
+let router: Router
 const createUrl = vi.fn(() => 'blob:synthetic-card')
 const revokeUrl = vi.fn()
 function deferred<T>() {
@@ -82,11 +84,17 @@ async function confirm() {
   await button('确认提交').trigger('click')
   await flushPromises()
 }
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetAllMocks()
   vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   createUrl.mockReturnValue('blob:synthetic-card')
-  vi.stubGlobal('URL', { createObjectURL: createUrl, revokeObjectURL: revokeUrl })
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static override createObjectURL = createUrl
+      static override revokeObjectURL = revokeUrl
+    },
+  )
   const pinia = createPinia()
   setActivePinia(pinia)
   useAdminStore().session = {
@@ -108,7 +116,12 @@ beforeEach(() => {
   )
   mocks.card.mockResolvedValue(new Blob(['synthetic'], { type: 'image/png' }))
   mocks.decide.mockResolvedValue({ request_id: first.id, version: 2, status: 'approved' })
-  wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/identity', component: IdentityView }],
+  })
+  await router.push('/identity')
+  wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
 })
 afterEach(() => {
   wrapper?.unmount()
@@ -139,7 +152,7 @@ describe('T012 身份审核页面业务', () => {
     wrapper?.unmount()
     const pinia = getActivePinia()
     if (!pinia) throw new Error('缺少会话')
-    wrapper = mount(IdentityView, { global: { plugins: [pinia] } })
+    wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
     await flushPromises()
     await open('case-b')
     pending.resolve({ request_id: first.id, status: 'approved', version: 2 })
@@ -423,22 +436,33 @@ it('提交期间不能关闭处理或切换案件，404后关闭失效案件', a
   expect(wrapper?.find('form').exists()).toBe(false)
 })
 
-it('审核历史独立查询已处理案件并仅展示结果和时间', async () => {
-  wrapper?.unmount()
-  const pinia = getActivePinia()
-  if (!pinia) throw new Error('缺少会话')
+it('已处理标签保留同一页面并独立查询历史列表与分页', async () => {
+  await flushPromises()
+  expect(wrapper?.get('a[aria-current="page"]').text()).toBe('待审核')
   mocks.list.mockResolvedValue({
     items: [{ ...first, status: 'rejected', reviewed_at: '2026-11-05T01:30:00Z' }],
-    next_cursor: null,
+    next_cursor: 'history-next',
   })
-  wrapper = mount(IdentityHistoryView, { global: { plugins: [pinia] } })
+  await wrapper?.get('a[href="/identity?tab=processed"]').trigger('click')
   await flushPromises()
+  expect(router.currentRoute.value.fullPath).toBe('/identity?tab=processed')
   expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'history')
-  expect(wrapper.get('tbody').text()).toContain('合成学号甲')
-  expect(wrapper.get('tbody').text()).toContain('已驳回')
-  expect(wrapper.get('tbody').text()).toContain('09:30:00')
-  expect(wrapper.get('tbody button').text()).toBe('查看记录')
+  expect(wrapper?.get('main').attributes('aria-label')).toBe('身份审核')
+  expect(wrapper?.get('a[aria-current="page"]').text()).toBe('已处理')
+  expect(wrapper?.get('tbody').text()).toContain('合成学号甲')
+  expect(wrapper?.get('tbody').text()).toContain('已驳回')
+  expect(wrapper?.get('tbody').text()).toContain('09:30:00')
+  expect(wrapper?.get('tbody button').text()).toBe('查看记录')
   expect(mocks.detail).not.toHaveBeenCalled()
+  await button('下一页').trigger('click')
+  await flushPromises()
+  expect(mocks.list).toHaveBeenLastCalledWith('history-next', expect.any(AbortSignal), 'history')
+  mocks.list.mockResolvedValueOnce({ items: [second], next_cursor: null })
+  await wrapper?.get('a[href="/identity"]').trigger('click')
+  await flushPromises()
+  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'pending')
+  expect(wrapper?.get('tbody').text()).toContain('合成学号乙')
+  expect(wrapper?.get('tbody').text()).not.toContain('已驳回')
 })
 
 it.each([new TypeError('offline'), new ApiError(408), new ApiError(429), new ApiError(503)])(
@@ -481,7 +505,7 @@ it('审核处理的取消与Esc守卫保留未保存意见，明确放弃后才�
   expect(mocks.decide).not.toHaveBeenCalled()
 })
 it('历史详情仅调用历史投影，不展示学生卡或再次审核操作', async () => {
-  wrapper?.unmount()
+  await flushPromises()
   mocks.list.mockResolvedValue({
     items: [
       {
@@ -505,18 +529,120 @@ it('历史详情仅调用历史投影，不展示学生卡或再次审核操作'
     reason: '历史驳回理由',
     revision_suggestion: '历史修改建议',
   })
-  wrapper = mount(IdentityHistoryView, { global: { plugins: [getActivePinia() ?? createPinia()] } })
+  await router.push('/identity?tab=processed')
   await flushPromises()
   await button('查看记录').trigger('click')
   await flushPromises()
   expect(mocks.history).toHaveBeenCalledWith(first.id, expect.any(AbortSignal))
-  expect(wrapper.get('[aria-label="只读审核记录"]').text()).toContain('审核员编号')
-  expect(wrapper.text()).toContain('历史驳回理由')
+  expect(wrapper?.get('[aria-label="只读审核记录"]').text()).toContain('审核员编号')
+  expect(wrapper?.text()).toContain('历史驳回理由')
   expect(mocks.detail).not.toHaveBeenCalled()
   expect(mocks.card).not.toHaveBeenCalled()
   expect(
     wrapper
-      .findAll('button')
+      ?.findAll('button')
       .some((item) => item.text() === '查看学生卡' || item.text() === '处理身份审核'),
   ).toBe(false)
+})
+
+it('切换到已处理时中止未完成的读卡，返回待审核后清除历史详情', async () => {
+  await flushPromises()
+  await open()
+  const pendingCard = deferred<Blob>()
+  mocks.card.mockReturnValueOnce(pendingCard.promise)
+  await button('查看学生卡').trigger('click')
+  mocks.list.mockResolvedValueOnce({
+    items: [{ ...second, status: 'approved', reviewed_at: '2026-11-05T01:30:00Z' }],
+    next_cursor: null,
+  })
+  await router.push('/identity?tab=processed')
+  pendingCard.resolve(new Blob(['late-card'], { type: 'image/png' }))
+  await flushPromises()
+  expect(mocks.card.mock.calls[0]?.[1]).toHaveProperty('aborted', true)
+  expect(createUrl).not.toHaveBeenCalled()
+  expect(dialogText()).toBe('')
+  expect(wrapper?.get('tbody').text()).toContain('已通过')
+
+  const pendingHistory = deferred<Awaited<ReturnType<IdentityReviewClient['history']>>>()
+  mocks.history.mockReturnValueOnce(pendingHistory.promise)
+  await button('查看记录').trigger('click')
+  await router.push('/identity')
+  pendingHistory.resolve({
+    id: second.id,
+    version: 2,
+    status: 'approved',
+    name: second.name,
+    student_number: second.student_number,
+    created_at: '2026-11-01T00:00:00Z',
+    reviewed_at: '2026-11-05T01:30:00Z',
+    reviewer_id: null,
+    reason: '晚到的历史详情',
+    revision_suggestion: null,
+  })
+  await flushPromises()
+  expect(mocks.history.mock.calls[0]?.[1]).toHaveProperty('aborted', true)
+  expect(wrapper?.text()).not.toContain('晚到的历史详情')
+  expect(dialogText()).toBe('')
+})
+
+it('切换标签时中止原列表，晚到的手动刷新结果和提示不进入已处理', async () => {
+  await flushPromises()
+  const pendingList = deferred<Awaited<ReturnType<IdentityReviewClient['list']>>>()
+  mocks.list.mockReturnValueOnce(pendingList.promise)
+  await button('刷新列表').trigger('click')
+  const pendingSignal: unknown = mocks.list.mock.calls[1]?.[1]
+  expect(wrapper?.text()).toContain('正在处理，请稍候')
+
+  mocks.list.mockResolvedValueOnce({
+    items: [{ ...second, status: 'approved', reviewed_at: '2026-11-05T01:30:00Z' }],
+    next_cursor: null,
+  })
+  await router.push('/identity?tab=processed')
+  await flushPromises()
+  expect(pendingSignal).toHaveProperty('aborted', true)
+  expect(wrapper?.text()).not.toContain('正在处理，请稍候')
+  pendingList.resolve({
+    items: [{ ...first, status: 'pending', reviewed_at: null }],
+    next_cursor: null,
+  })
+  await flushPromises()
+  expect(wrapper?.get('tbody').text()).toContain('已通过')
+  expect(wrapper?.get('tbody').text()).not.toContain('合成甲')
+  expect(wrapper?.text()).not.toContain('查询已完成')
+})
+
+it('切换标签前核对未保存意见，并锁定提交中或结果未确认的原决定', async () => {
+  await flushPromises()
+  await open()
+  await processing()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#reject-reason').setValue('还未保存的理由')
+  await wrapper?.get('#revision-suggestion').setValue('还未保存的建议')
+  vi.mocked(confirmDiscardChanges).mockResolvedValueOnce(false)
+  await router.push('/identity?tab=processed')
+  expect(router.currentRoute.value.fullPath).toBe('/identity')
+  expect(wrapper?.get('#reject-reason').element).toHaveProperty('value', '还未保存的理由')
+  expect(confirmDiscardChanges).toHaveBeenCalledOnce()
+
+  const pendingDecision = deferred<Awaited<ReturnType<IdentityReviewClient['decide']>>>()
+  mocks.decide.mockReturnValueOnce(pendingDecision.promise)
+  await wrapper?.get('form').trigger('submit')
+  await button('确认提交').trigger('click')
+  await router.push('/identity?tab=processed')
+  expect(router.currentRoute.value.fullPath).toBe('/identity')
+  pendingDecision.resolve(Promise.reject(new ApiError(503)))
+  await flushPromises()
+  await router.push('/identity?tab=processed')
+  expect(router.currentRoute.value.fullPath).toBe('/identity')
+  expect(wrapper?.text()).toContain('提交结果尚未确认')
+  expect(mocks.list).toHaveBeenCalledTimes(1)
+  expect(confirmDiscardChanges).toHaveBeenCalledOnce()
+
+  const original = mocks.decide.mock.calls[0]?.slice(0, 3)
+  await button('确认提交').trigger('click')
+  await flushPromises()
+  expect(mocks.decide.mock.calls[1]?.slice(0, 3)).toEqual(original)
+  await router.push('/identity?tab=processed')
+  expect(router.currentRoute.value.fullPath).toBe('/identity?tab=processed')
+  expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 'history')
 })

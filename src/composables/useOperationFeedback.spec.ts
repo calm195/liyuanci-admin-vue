@@ -48,4 +48,22 @@ describe('用户主动操作反馈', () => {
     expect(feedback.feedback.revision).toBe(revision + 1)
     wrapper.unmount()
   })
+  it('切换工作区时清除旧反馈，晚到的旧操作不能覆盖新反馈', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    let finish: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const wrapper = mount(Harness, { global: { plugins: [pinia] } })
+    if (!feedback) throw new Error('未初始化反馈')
+    const previous = feedback.run(() => pending, '旧查询已完成')
+    feedback.reset()
+    expect(feedback.feedback.message).toBe('')
+    await feedback.run(() => undefined, '新查询已完成')
+    finish?.()
+    await previous
+    expect(feedback.feedback.message).toBe('新查询已完成')
+    wrapper.unmount()
+  })
 })

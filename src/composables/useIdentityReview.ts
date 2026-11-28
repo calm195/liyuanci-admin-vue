@@ -1,5 +1,6 @@
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import type { Ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { ApiError } from '@/services/admin'
 import { validIdentityFeedback } from '@/services/identity'
@@ -13,8 +14,9 @@ import type {
   IdentityListView,
 } from '@/types/identity'
 
-export function useIdentityReview(view: IdentityListView) {
-  const pageSize = ref(10)
+export function useIdentityReview(view: Readonly<Ref<IdentityListView>>) {
+  const defaultPageSize = 10
+  const pageSize = ref(defaultPageSize)
   const editorOpen = ref(false)
   const admin = useAdminStore()
   const owner = admin.session
@@ -161,8 +163,8 @@ export function useIdentityReview(view: IdentityListView) {
     try {
       const result =
         numbered > 1
-          ? await client.list(cursor, controller.signal, view, numbered)
-          : await client.list(cursor, controller.signal, view)
+          ? await client.list(cursor, controller.signal, view.value, numbered)
+          : await client.list(cursor, controller.signal, view.value)
       if (!active || controller.signal.aborted || generation !== listGeneration || !allowed())
         return
       items.value = result.items
@@ -218,7 +220,7 @@ export function useIdentityReview(view: IdentityListView) {
     caseBusy.value = true
     try {
       const result =
-        view === 'history'
+        view.value === 'history'
           ? await client.history(id, controller.signal)
           : await client.detail(id, controller.signal)
       if (!active || controller.signal.aborted || generation !== caseGeneration || !allowed())
@@ -341,6 +343,15 @@ export function useIdentityReview(view: IdentityListView) {
     },
     { flush: 'sync' },
   )
+  watch(
+    view,
+    () => {
+      clearAll()
+      pageSize.value = defaultPageSize
+      void loadList()
+    },
+    { flush: 'sync' },
+  )
   onMounted(() => {
     void loadList()
   })
@@ -349,8 +360,9 @@ export function useIdentityReview(view: IdentityListView) {
     clearAll()
   })
 
-  onBeforeRouteLeave(() => !uncertain.value)
-  onBeforeRouteUpdate(() => !uncertain.value)
+  const canNavigate = () => !submitting.value && !uncertain.value
+  onBeforeRouteLeave(canNavigate)
+  onBeforeRouteUpdate(canNavigate)
 
   return {
     uncertain,

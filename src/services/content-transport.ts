@@ -46,7 +46,6 @@ export function moderationQuery(
   const params = new URLSearchParams(query(cursor, pageSize))
   params.set('status', filters?.status ?? 'human_required')
   if (filters?.kind) params.set('kind', filters.kind)
-  if (filters?.q.trim()) params.set('q', filters.q.trim())
   if (page !== undefined && cursor === null) params.set('page', String(page))
   return params.toString()
 }

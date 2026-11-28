@@ -78,14 +78,18 @@ it('REQ-019 显示当前页面面包屑、标题及按角色过滤的菜单', as
   await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
   expect(view.get('[aria-label="面包屑导航"] .el-breadcrumb__inner').text()).toBe('首页')
 })
-it('身份审核历史位于用户管理并沿用审核岗位权限', async () => {
+it('身份审核旧历史入口高亮合并后的菜单并沿用审核岗位权限', async () => {
   login()
   await router.push('/identity/history')
   const view = render()
-  const link = view.get('nav a[href="/identity/history"]')
+  expect(router.currentRoute.value.fullPath).toBe('/identity?tab=processed')
+  const link = view.get('nav a[href="/identity"]')
   expect(link.element.closest('.navigation-group')?.textContent).toContain('用户管理')
   expect(link.attributes('aria-current')).toBe('page')
-  expect(view.get('[aria-label="面包屑导航"]').text()).toContain('身份审核历史')
+  expect(view.find('nav a[href="/identity/history"]').exists()).toBe(false)
+  expect(
+    view.get('[aria-label="面包屑导航"] [aria-current="page"] .el-breadcrumb__inner').text(),
+  ).toBe('身份审核')
 
   const session = useAdminStore().session
   if (!session) throw new Error('缺少会话')
@@ -94,7 +98,7 @@ it('身份审核历史位于用户管理并沿用审核岗位权限', async () =
   await router.push('/identity/history')
   await flushPromises()
   expect(router.currentRoute.value.path).toBe('/403')
-  expect(view.find('nav a[href="/identity/history"]').exists()).toBe(false)
+  expect(view.find('nav a[href="/identity"]').exists()).toBe(false)
 })
 it('REQ-019 移动端菜单切换，页面变化后收起，拒绝页也有明确面包屑', async () => {
   login()
@@ -144,14 +148,15 @@ it('REQ-019 词库子路由继承权限，详情保留菜单高亮与列表面�
   expect(router.currentRoute.value.path).toBe('/403')
 })
 
-it('REQ-019 安全治理三个入口各自高亮，面包屑和页面标题随路由更新', async () => {
+it('REQ-019 举报管理与申诉管理各自高亮，旧处罚入口显示举报页面标题', async () => {
   login()
-  await router.push('/safety')
+  await router.push('/safety/penalties')
   const view = render()
   expect(router.currentRoute.value.path).toBe('/safety/reports')
+  expect(router.currentRoute.value.query).toEqual({ status: 'resolved' })
+  expect(view.find('nav[aria-label="管理菜单"] a[href="/safety/penalties"]').exists()).toBe(false)
   for (const [path, title] of [
     ['reports', '举报管理'],
-    ['penalties', '处罚管理'],
     ['appeals', '申诉管理'],
   ]) {
     await router.push(`/safety/${path}`)

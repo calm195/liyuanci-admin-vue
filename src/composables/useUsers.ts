@@ -6,8 +6,7 @@ import { useAdminWorkspace, reviewErrorMessage } from './useAdminWorkspace'
 import { userRoles } from '@/types/users'
 import type { UserFilters, UserSummary } from '@/types/users'
 
-const defaults = (): UserFilters => ({
-  user_id: '',
+const defaults = (): Omit<UserFilters, 'user_id'> => ({
   nickname: '',
   verification: '',
   restriction: '',
@@ -15,7 +14,7 @@ const defaults = (): UserFilters => ({
 })
 export function useUsers() {
   const draft = reactive(defaults())
-  const submitted = ref<UserFilters>(defaults())
+  const submitted = ref(defaults())
   const items = ref<UserSummary[]>([])
   const cursor = ref<string | null>(null)
   const next = ref<string | null>(null)
@@ -61,7 +60,7 @@ export function useUsers() {
     await workspace.run(
       (signal) =>
         client.users(
-          submitted.value,
+          { user_id: '', ...submitted.value },
           cursor.value,
           AbortSignal.any([signal, current.signal]),
           cursor.value === null ? pageNumber.value : undefined,
@@ -85,8 +84,9 @@ export function useUsers() {
   async function search() {
     notice.value = ''
     try {
-      submitted.value = normalizeUserFilters(draft)
-      Object.assign(draft, submitted.value)
+      const { nickname } = normalizeUserFilters({ user_id: '', ...draft })
+      draft.nickname = nickname
+      submitted.value = { ...draft }
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : '查询条件无效'
       return

@@ -8,6 +8,7 @@ import type {
   AppealSummary,
   ContentKind,
   ReasonInput,
+  ReportContentControl,
   ReportDetail,
   SafetyClient,
   SafetySummary,
@@ -51,6 +52,19 @@ export function parseReportDetail(value: unknown): ReportDetail {
     body: text(data['body']),
     description: text(data['description']),
     reason: reason(data['reason']),
+  }
+}
+function parseReportContentControl(value: unknown): ReportContentControl {
+  const data = reviewRecord(value)
+  return {
+    report_id: reviewText(data['report_id']),
+    report_version: reviewVersion(data['report_version']),
+    report_status: reviewText(data['report_status']),
+    target_kind: kind(data['target_kind']),
+    target_id: reviewText(data['target_id']),
+    content_ref: reviewText(data['content_ref']),
+    content_version: reviewVersion(data['content_version']),
+    version: reviewVersion(data['version']),
   }
 }
 /** 新来源仅由申诉投影消费，旧举报和内容处置仍限制为原类型。 */
@@ -152,6 +166,13 @@ export function createSafetyClient(
       if (value.id !== id) throw new Error('举报详情响应不匹配')
       return value
     },
+    async reportContentControl(id, signal) {
+      const value = parseReportContentControl(
+        await request(`reports/${segment(id)}/content-control`, signal),
+      )
+      if (value.report_id !== id) throw new Error('内容对象与所选举报不匹配')
+      return value
+    },
     async appeal(id, signal) {
       const value = parseAppealDetail(await request(`appeals/${segment(id)}`, signal))
       if (value.id !== id) throw new Error('申诉详情响应不匹配')
@@ -226,11 +247,25 @@ export function createSafetyClient(
       kind(contentKind)
       if (action !== 'offline' && action !== 'release-restriction')
         throw new Error('内容处置操作无效')
+      if (input.report_id !== undefined || input.report_version !== undefined) {
+        if (input.report_id === undefined) throw new Error('缺少关联举报')
+        segment(input.report_id)
+        reviewVersion(input.report_version)
+      }
       const result = bound(
         await request(
           `contents/${contentKind}/${segment(id)}/${action}`,
           signal,
-          command(input, { reason: input.reason, expected_version: input.expected_version }, key),
+          command(
+            input,
+            {
+              reason: input.reason,
+              expected_version: input.expected_version,
+              report_id: input.report_id,
+              report_version: input.report_version,
+            },
+            key,
+          ),
         ),
         id,
       )

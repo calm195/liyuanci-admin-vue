@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { useAutoSearch } from '@/composables/useAutoSearch'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
 import { RouterLink } from 'vue-router'
 import { crisisStatusLabel } from '@/composables/useCrisisReview'
-import { validDeletionId } from '@/services/privacy'
 import { useEvidenceDeletion } from '@/composables/useEvidenceDeletion'
 const {
   editorOpen,
   uncertain,
-  evidenceId,
+  canReload,
   target,
   reason,
   confirmation,
@@ -27,7 +24,6 @@ const {
   loadTarget,
   prepare,
   submit,
-  reset,
   startProcessing,
   cancelProcessing,
 } = useEvidenceDeletion()
@@ -38,28 +34,10 @@ const {
   consume,
 } = usePrivacyHandoff()
 onMounted(() => {
-  const id = consume()
-  if (id && workspace.allowed()) {
-    evidenceId.value = id
-    void loadTarget()
-  }
+  const selection = consume()
+  if (selection?.path === '/evidence-deletion' && workspace.allowed()) void loadTarget(selection)
 })
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
-
-const autoSearch = useAutoSearch(
-  () => {
-    if (validDeletionId(evidenceId.value.trim())) return loadTarget()
-  },
-  () => workspace.allowed() && !busy.value && !editorOpen.value,
-)
-function clearSearch() {
-  autoSearch.cancel()
-  void reset()
-}
-function submitEvidenceSearch() {
-  autoSearch.cancel()
-  void runRead(loadTarget, '证据元信息已读取')
-}
 </script>
 <template>
   <FloatingNotice
@@ -70,41 +48,24 @@ function submitEvidenceSearch() {
   />
   <FloatingNotice v-if="accepted" message="删除任务已受理，请继续核对清理进度" tone="success" />
   <main class="experience-page workflow privacy-workspace" aria-label="证据删除">
-    <WorkspaceHeading
-      title="证据删除"
-      description="读取并核对证据范围、当前版本与理由；受理后通过回执查询清理结果。"
-    />
+    <WorkspaceHeading title="证据删除" description="从危机案件选中证据后核对删除范围与当前版本。" />
     <template v-if="workspace.allowed()">
       <p class="banner">删除作用于该证据所属的整个保留范围，无法撤回。受理不代表物理清理完成。</p>
-      <p>可从授权危机案件进入，或输入已知证据条目标识查询元信息。信息仅保留在当前页面内存中。</p>
       <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
       <p v-if="busy" role="status">正在处理请求…</p>
       <section class="experience-panel" aria-label="证据删除">
         <h2>读取并核对证据</h2>
-        <BusinessToolbar label="查询操作栏">
-          <template #tools>
-            <button :disabled="busy || editorOpen" @click="clearSearch">清空页面</button>
-          </template>
-        </BusinessToolbar>
-        <form class="experience-editor" @submit.prevent="submitEvidenceSearch">
-          <fieldset :disabled="busy || editorOpen">
-            <legend>已知证据条目标识</legend>
-            <label for="delete-evidence-id">证据条目标识</label>
-            <input
-              id="delete-evidence-id"
-              v-model="evidenceId"
-              type="password"
-              autocomplete="off"
-              spellcheck="false"
-              @input="autoSearch.input"
-              @compositionstart="autoSearch.start"
-              @compositionend="autoSearch.end"
-            />
-            <button :disabled="!validDeletionId(evidenceId.trim())" type="submit">
-              读取证据元信息
-            </button>
-          </fieldset>
-        </form>
+        <button
+          v-if="canReload"
+          :disabled="busy || editorOpen"
+          @click="runRead(() => loadTarget(), '证据元信息已读取')"
+        >
+          重新读取证据范围
+        </button>
+        <template v-else-if="!accepted">
+          <p>请从普通危机案件详情点选证据。</p>
+          <RouterLink to="/crisis">前往危机工作台</RouterLink>
+        </template>
         <div v-if="target" class="business-table">
           <table>
             <thead>
@@ -129,7 +90,7 @@ function submitEvidenceSearch() {
             </tbody>
           </table>
         </div>
-        <p v-if="target">关联案件状态仅用于核对范围。清理状态请前往回执查询。</p>
+        <p v-if="target">关联案件状态仅用于核对范围。清理状态请前往删除任务列表。</p>
       </section>
       <section v-if="accepted" aria-label="证据删除受理回执" role="status">
         <p>已受理，尚未确认清理完成。</p>
@@ -149,9 +110,14 @@ function submitEvidenceSearch() {
                 <td>
                   <button
                     :disabled="privacyPending"
-                    @click="openPrivacy('/deletion-receipts', accepted.id)"
+                    @click="
+                      openPrivacy({
+                        path: '/deletion-receipts',
+                        task: { id: accepted.id, source_module: 'legacy' },
+                      })
+                    "
                   >
-                    前往回执查询
+                    查看删除任务
                   </button>
                 </td>
               </tr>
@@ -162,7 +128,7 @@ function submitEvidenceSearch() {
       <FloatingNotice v-if="privacyError" :message="privacyError" tone="error">{{
         privacyError
       }}</FloatingNotice>
-      <RouterLink v-if="!accepted" to="/deletion-receipts">前往回执查询</RouterLink>
+      <RouterLink v-if="!accepted" to="/deletion-receipts">查看删除任务</RouterLink>
       <WorkspaceDrawer
         v-if="editorOpen"
         presentation="dialog"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { useTemplateRef } from 'vue'
+import { onBeforeRouteUpdate } from 'vue-router'
 import NumberedPagination from '@/components/NumberedPagination.vue'
-import { useAutoSearch } from '@/composables/useAutoSearch'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
 import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
@@ -69,7 +70,12 @@ function moderationKindLabel(kind?: string) {
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(
   () => Boolean(error.value) || Boolean(listError.value),
 )
-const automaticSearch = useAutoSearch(search, () => !editorOpen.value && !writing.value)
+const editor = useTemplateRef<{ close: () => Promise<void> }>('editor')
+onBeforeRouteUpdate(async (to, from) => {
+  if (!editorOpen.value || to.query['case'] === from.query['case']) return true
+  await editor.value?.close()
+  return !editorOpen.value
+})
 function resizePage(size: number) {
   pageSize.value = size
   return refresh()
@@ -131,21 +137,13 @@ function resizePage(size: number) {
         <form
           class="moderation-filters"
           aria-label="审核案件筛选"
-          @input="automaticSearch.input"
-          @change="automaticSearch.change"
-          @compositionstart="automaticSearch.start"
-          @compositionend="automaticSearch.end"
-          @submit="automaticSearch.cancel"
-          @submit.prevent="runRead(search, '筛选结果已更新')"
+          @change="runRead(search, '筛选结果已更新')"
+          @submit.prevent
         >
-          <fieldset class="experience-filters" :disabled="listBusy || writing || editorOpen">
-            <label
-              >搜索案件或内容编号<input
-                v-model="filters.q"
-                type="search"
-                maxlength="80"
-                placeholder="输入案件 ID 或内容 ID"
-            /></label>
+          <fieldset
+            class="experience-filters"
+            :disabled="listBusy || writing || editorOpen || !!pending"
+          >
             <label
               >审核状态<select v-model="filters.status">
                 <option value="human_required">需要审核</option>
@@ -164,7 +162,6 @@ function resizePage(size: number) {
                 <option value="wish_comment">心愿评论与补充</option>
               </select></label
             >
-            <button type="submit" class="business-primary">查询</button>
             <button type="button" @click="runRead(resetFilters, '已恢复需要审核的案件')">
               重置筛选
             </button>
@@ -287,6 +284,7 @@ function resizePage(size: number) {
       </WorkspaceDrawer>
       <WorkspaceDrawer
         v-if="editorOpen"
+        ref="editor"
         presentation="dialog"
         :open="editorOpen"
         :busy="writing || escalating"
@@ -409,7 +407,6 @@ function resizePage(size: number) {
   min-width: 0;
   flex: 1 1 150px;
 }
-.moderation-filters input,
 .moderation-filters select {
   width: 100%;
   min-width: 0;

@@ -47,7 +47,6 @@ export interface ModerationOutcome {
   version: number
 }
 export interface ModerationFilters {
-  q: string
   status: 'human_required' | 'all' | 'approved' | 'rejected'
   kind: '' | 'wish' | 'application' | 'message' | 'story' | 'wish_comment'
 }

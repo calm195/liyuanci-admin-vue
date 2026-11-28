@@ -1,7 +1,12 @@
 import { confirmDiscardChanges } from '@/components/confirmDiscardChanges'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import { defineComponent, h } from 'vue'
+import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
+import DeletionReceiptsView from './DeletionReceiptsView.vue'
+import type * as PrivacyService from '@/services/privacy'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WhisperEvidenceView from './WhisperEvidenceView.vue'
 import { useAdminStore } from '@/stores/admin'
@@ -14,10 +19,15 @@ const mocks = vi.hoisted(() => ({
   whisperAdminEvidenceGet: vi.fn(),
   whisperAdminEvidenceDelete: vi.fn(),
   whisperAdminDeletionGet: vi.fn(),
+  jobs: vi.fn(),
 }))
 vi.mock('@/services/whispers', async (original) => ({
   ...(await original<typeof Service>()),
   createWhispersClient: () => mocks,
+}))
+vi.mock('@/services/privacy', async (original) => ({
+  ...(await original<typeof PrivacyService>()),
+  createPrivacyClient: () => mocks,
 }))
 const scope: EvidenceScope = {
   id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
@@ -45,6 +55,18 @@ function deferred<T>() {
   }
 }
 let wrapper: VueWrapper | undefined
+let router: ReturnType<typeof createRouter>
+const crisisView = defineComponent({
+  setup() {
+    const { open } = usePrivacyHandoff()
+    return () =>
+      h(
+        'button',
+        { onClick: () => open({ path: '/whispers/evidence', id: scope.id }) },
+        '选择树洞证据',
+      )
+  },
+})
 function view() {
   if (!wrapper) throw new Error('未挂载')
   return wrapper
@@ -62,8 +84,11 @@ function hasButton(label: string) {
     .some((item) => item.text() === label)
 }
 async function load() {
-  await view().get('#whisper-evidence-id').setValue(scope.id)
-  await view().get('[aria-label="树洞证据范围"] form').trigger('submit')
+  if (router.currentRoute.value.path !== '/whispers/crises') {
+    await router.push('/whispers/crises')
+    await flushPromises()
+  }
+  await button('选择树洞证据').trigger('click')
   await flushPromises()
 }
 async function process() {
@@ -78,11 +103,14 @@ async function confirm() {
   await flushPromises()
 }
 async function query() {
-  await view().get('#whisper-job-id').setValue(job.id)
-  await view().get('[aria-label="树洞证据删除进度"] form').trigger('submit')
+  if (router.currentRoute.value.path !== '/deletion-receipts') {
+    await router.push('/deletion-receipts')
+    await flushPromises()
+  }
+  await button('查看进度').trigger('click')
   await flushPromises()
 }
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetAllMocks()
   vi.mocked(confirmDiscardChanges).mockResolvedValue(true)
   const pinia = createPinia()
@@ -94,7 +122,29 @@ beforeEach(() => {
   mocks.whisperAdminEvidenceGet.mockResolvedValue(scope)
   mocks.whisperAdminEvidenceDelete.mockResolvedValue(job)
   mocks.whisperAdminDeletionGet.mockResolvedValue(job)
-  wrapper = mount(WhisperEvidenceView, { global: { plugins: [pinia] } })
+  mocks.jobs.mockResolvedValue({
+    items: [
+      {
+        id: job.id,
+        source_module: 'whispers',
+        status: 'processing',
+        created_at: '2026-11-28T07:00:00Z',
+      },
+    ],
+    page: 1,
+    page_size: 10,
+    total: 1,
+  })
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/whispers/crises', component: crisisView },
+      { path: '/whispers/evidence', component: WhisperEvidenceView },
+      { path: '/deletion-receipts', component: DeletionReceiptsView },
+    ],
+  })
+  await router.push('/whispers/crises')
+  wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
 })
 afterEach(() => {
   wrapper?.unmount()
@@ -107,25 +157,28 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
     await load()
     await process()
     await confirm()
-    expect(view().find('[aria-label="树洞证据清理结果"]').exists()).toBe(false)
+    expect(view().find('[aria-label="清理结果"]').exists()).toBe(false)
     expect(view().text()).toContain('尚未确认清理完成')
     mocks.whisperAdminDeletionGet.mockResolvedValueOnce({ ...job, status: 'completed' })
-    await query()
-    expect(view().get('[aria-label="树洞证据清理结果"]').text()).toContain('清理已完成（后端确认）')
+    await button('查看删除任务').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/deletion-receipts')
+    expect(mocks.whisperAdminDeletionGet).toHaveBeenCalledWith(job.id, expect.any(AbortSignal))
+    expect(view().get('[aria-label="清理结果"]').text()).toContain('清理已完成（后端确认）')
   })
-  it('按已知UUID读取元信息，不预取、不提供正文或学号', async () => {
+  it('必须从授权案件点选证据，裸链接不读取证据', async () => {
     await flushPromises()
     expect(mocks.whisperAdminEvidenceGet).not.toHaveBeenCalled()
-    expect(button('读取证据范围').attributes('disabled')).toBeDefined()
-    await view().get('#whisper-evidence-id').setValue('不是UUID')
-    expect(button('读取证据范围').attributes('disabled')).toBeDefined()
+    await router.push('/whispers/evidence?id=untrusted')
+    await flushPromises()
+    expect(view().find('#whisper-evidence-id').exists()).toBe(false)
+    expect(view().get('a[href="/whispers/crises"]').text()).toBe('前往树洞危机')
+    expect(mocks.whisperAdminEvidenceGet).not.toHaveBeenCalled()
     await load()
     expect(mocks.whisperAdminEvidenceGet).toHaveBeenCalledWith(scope.id, expect.any(AbortSignal))
     expect(view().text()).toContain('范围版本 31')
     expect(view().find('blockquote').exists()).toBe(false)
     expect(view().find('input[type="number"]').exists()).toBe(false)
-    await view().get('#whisper-evidence-id').setValue('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
-    expect(hasButton('处理证据删除')).toBe(false)
   })
   it('精确确认短语和非空500码点理由必填，不自动预填确认', async () => {
     await load()
@@ -157,21 +210,23 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
       expect.any(AbortSignal),
     )
     expect(view().text()).toContain('删除请求已受理，尚未确认清理完成')
-    expect(view().get<HTMLInputElement>('#whisper-job-id').element.value).toBe(job.id)
+    expect(view().text()).not.toContain(job.id)
     expect(view().find('#whisper-delete-reason').exists()).toBe(false)
-    expect(view().find('[aria-label="树洞证据清理结果"]').exists()).toBe(false)
+    expect(view().find('[aria-label="清理结果"]').exists()).toBe(false)
     expect(mocks.whisperAdminDeletionGet).not.toHaveBeenCalled()
     expect(hasButton('处理证据删除')).toBe(false)
   })
   it('任务独立查询processing与completed，切任务即清旧完成状态', async () => {
     await query()
     expect(mocks.whisperAdminDeletionGet).toHaveBeenCalledWith(job.id, expect.any(AbortSignal))
-    expect(view().get('[aria-label="树洞证据清理结果"]').text()).toContain('尚未全部完成')
+    expect(view().get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
     mocks.whisperAdminDeletionGet.mockResolvedValueOnce({ ...job, status: 'completed' })
     await query()
-    expect(view().get('[aria-label="树洞证据清理结果"]').text()).toContain('清理已完成（后端确认）')
-    await view().get('#whisper-job-id').setValue('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
-    expect(view().find('[aria-label="树洞证据清理结果"]').exists()).toBe(false)
+    expect(view().get('[aria-label="清理结果"]').text()).toContain('清理已完成（后端确认）')
+    await router.push('/whispers/evidence')
+    await router.push('/deletion-receipts')
+    await flushPromises()
+    expect(view().find('[aria-label="清理结果"]').exists()).toBe(false)
     expect(mocks.whisperAdminEvidenceDelete).not.toHaveBeenCalled()
   })
   it.each([
@@ -209,7 +264,7 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
       expect(button('返回修改').attributes('disabled')).toBeDefined()
       expect(button('取消处理').attributes('disabled')).toBeDefined()
       expect(view().get('#whisper-delete-reason').element.closest('fieldset')?.disabled).toBe(true)
-      expect(view().get('#whisper-job-id').element.closest('fieldset')?.disabled).toBe(true)
+      expect(view().find('#whisper-job-id').exists()).toBe(false)
       const pending = deferred<DeletionJob>()
       mocks.whisperAdminEvidenceDelete.mockReturnValueOnce(pending.promise)
       await button('使用原请求重试').trigger('click')
@@ -249,10 +304,10 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
     await query()
     mocks.whisperAdminDeletionGet.mockRejectedValueOnce(new ApiError(503))
     await query()
-    expect(view().find('[aria-label="树洞证据清理结果"]').exists()).toBe(false)
+    expect(view().find('[aria-label="清理结果"]').exists()).toBe(false)
     expect(view().text()).toContain('服务暂不可用')
     await query()
-    expect(view().get('[aria-label="树洞证据清理结果"]').text()).toContain('尚未全部完成')
+    expect(view().get('[aria-label="清理结果"]').text()).toContain('尚未全部完成')
   })
   it.each([401, 403])('%s拒绝清除范围、理由、任务及回执', async (status) => {
     await load()
@@ -311,7 +366,10 @@ describe('WA-04 REQ-018/019 树洞证据范围', () => {
       const session = useAdminStore().session
       if (!session) throw new Error('缺少会话')
       session.account.roles = [role]
-      wrapper = mount(WhisperEvidenceView)
+      await router.push('/whispers/evidence')
+      wrapper = mount(RouterView, {
+        global: { plugins: [getActivePinia() ?? createPinia(), router] },
+      })
       await flushPromises()
       expect(view().find('form').exists()).toBe(false)
       expect(mocks.whisperAdminEvidenceGet).not.toHaveBeenCalled()

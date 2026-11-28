@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   whisperAdminCrisisGet: vi.fn(),
   whisperAdminCrisisAct: vi.fn(),
   whisperAdminCrisisFalsePositive: vi.fn(),
+  openPrivacy: vi.fn(),
+}))
+vi.mock('@/composables/usePrivacyHandoff', () => ({
+  usePrivacyHandoff: () => ({ open: mocks.openPrivacy, pending: false, error: '' }),
 }))
 vi.mock('@/services/whispers', async (original) => ({
   ...(await original<typeof Service>()),
@@ -52,6 +56,7 @@ const second: CrisisDetail = {
   id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   body: '第二个限定正文',
   source: { ...first.source, kind: 'whisper_nickname' },
+  evidence_scope_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
 }
 function summary(value: CrisisDetail): CrisisSummary {
   return {
@@ -113,6 +118,21 @@ async function confirm() {
   await button('确认提交').trigger('click')
   await flushPromises()
 }
+it('仅超管能从树洞危机详情交接所选案件证据范围', async () => {
+  const label = '前往树洞证据删除与进度查询'
+  await flushPromises()
+  await open()
+  expect(hasButton(label)).toBe(false)
+  const session = useAdminStore().session
+  if (!session) throw new Error('缺少会话')
+  session.account.roles = ['super_admin']
+  await open(second.id)
+  await button(label).trigger('click')
+  expect(mocks.openPrivacy).toHaveBeenCalledWith({
+    path: '/whispers/evidence',
+    id: second.evidence_scope_id,
+  })
+})
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(confirmDiscardChanges).mockResolvedValue(true)

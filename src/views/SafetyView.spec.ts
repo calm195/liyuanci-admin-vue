@@ -10,7 +10,7 @@ import { useAdminStore } from '@/stores/admin'
 import { useUserNavigation } from '@/stores/userNavigation'
 import { ApiError } from '@/services/admin'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
-import type { ReportDetail, SafetySummary } from '@/types/safety'
+import type { ReportContentControl, ReportDetail, SafetySummary } from '@/types/safety'
 vi.mock('@/components/CrisisEscalation.vue', () => ({
   default: {
     name: 'CrisisEscalation',
@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(),
   reports: vi.fn(),
   report: vi.fn(),
+  reportContentControl: vi.fn(),
   decideReport: vi.fn(),
   penalize: vi.fn(),
   appeals: vi.fn(),
@@ -45,6 +46,16 @@ const report: ReportDetail = {
   body: '仅本案可见正文',
   description: '举报说明',
   reason: null,
+}
+const control: ReportContentControl = {
+  report_id: report.id,
+  report_version: report.version,
+  report_status: report.status,
+  target_kind: report.target_kind,
+  target_id: report.target_id,
+  content_ref: report.content_ref,
+  content_version: report.content_version,
+  version: 11,
 }
 let wrapper: VueWrapper | undefined
 let router: Router
@@ -99,6 +110,7 @@ beforeEach(async () => {
     next_cursor: null,
   })
   mocks.report.mockResolvedValue({ ...report })
+  mocks.reportContentControl.mockResolvedValue({ ...control })
   mocks.decideReport.mockResolvedValue({ id: 'report', version: 8, status: 'resolved' })
   mocks.penalize.mockResolvedValue({ id: 'penalty', version: 1, status: 'active' })
   mocks.appeals.mockResolvedValue({
@@ -130,53 +142,48 @@ afterEach(() => {
   wrapper = undefined
 })
 describe('T028 举报、处罚与申诉页面', () => {
-  it.each(['/safety/reports', '/safety/penalties', '/safety/appeals'])(
-    '%s查询和详情默认只读，处理必须显式打开抽屉，取消保留详情与查询结果',
-    async (path) => {
-      mocks.reports.mockResolvedValue({
-        items: [{ id: 'report', version: 7, status: 'resolved' }],
-        next_cursor: null,
-      })
-      mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-      await go(path)
-      expect(wrapper?.find('form').exists()).toBe(false)
-      await open(false)
-      expect(wrapper?.find('form').exists()).toBe(false)
-      const label = path.endsWith('reports')
-        ? '处理举报'
-        : path.endsWith('penalties')
-          ? '给予账号处罚'
-          : '处理申诉'
-      const reads = path.endsWith('appeals')
-        ? mocks.appeals.mock.calls.length
-        : mocks.reports.mock.calls.length
-      await button(label).trigger('click')
-      await wrapper?.get('#safety-reason').setValue('取消的理由')
-      await button('取消并关闭').trigger('click')
-      expect(wrapper?.find('form').exists()).toBe(false)
-      expect(wrapper?.get('[aria-label="案件详情"]').text()).toContain(
-        path.endsWith('appeals') ? '申诉正文' : '仅本案可见正文',
-      )
-      await button(label).trigger('click')
-      expect(wrapper?.get('#safety-reason').element).toHaveProperty('value', '')
-      expect(
-        path.endsWith('appeals')
-          ? mocks.appeals.mock.calls.length
-          : mocks.reports.mock.calls.length,
-      ).toBe(reads)
-      expect(mocks.penalize).not.toHaveBeenCalled()
-      expect(mocks.decideReport).not.toHaveBeenCalled()
-      expect(mocks.decideAppeal).not.toHaveBeenCalled()
-    },
-  )
-  it('处罚依据只筛选当前页已确认举报，空页继续透传游标，详情变更为未确认时禁止处罚', async () => {
+  it.each([
+    ['/safety/reports', '处理举报'],
+    ['/safety/reports?status=resolved', '给予账号处罚'],
+    ['/safety/appeals', '处理申诉'],
+  ])('%s查询和详情默认只读，%s必须显式打开抽屉，取消保留详情与查询结果', async (path, label) => {
+    mocks.reports.mockResolvedValue({
+      items: [{ id: 'report', version: 7, status: 'resolved' }],
+      next_cursor: null,
+    })
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go(path)
+    expect(wrapper?.find('form').exists()).toBe(false)
+    await open(false)
+    expect(wrapper?.find('form').exists()).toBe(false)
+    const reads = path.endsWith('appeals')
+      ? mocks.appeals.mock.calls.length
+      : mocks.reports.mock.calls.length
+    await button(label).trigger('click')
+    await wrapper?.get('#safety-reason').setValue('取消的理由')
+    await button('取消并关闭').trigger('click')
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.get('[aria-label="案件详情"]').text()).toContain(
+      path.endsWith('appeals') ? '申诉正文' : '仅本案可见正文',
+    )
+    await button(label).trigger('click')
+    expect(wrapper?.get('#safety-reason').element).toHaveProperty('value', '')
+    expect(
+      path.endsWith('appeals') ? mocks.appeals.mock.calls.length : mocks.reports.mock.calls.length,
+    ).toBe(reads)
+    expect(mocks.penalize).not.toHaveBeenCalled()
+    expect(mocks.decideReport).not.toHaveBeenCalled()
+    expect(mocks.decideAppeal).not.toHaveBeenCalled()
+  })
+  it('切换已确认举报由服务端筛选，空页继续透传游标，详情变更为未确认时禁止处罚', async () => {
     mocks.reports.mockResolvedValueOnce({
       items: [{ id: 'pending-report', version: 2, status: 'pending' }],
       next_cursor: 'opaque+/=',
     })
-    await go('/safety/penalties')
+    await button('已确认').trigger('click')
+    await flushPromises()
     expect(wrapper?.text()).toContain('本页暂无已确认举报')
-    expect(wrapper?.text()).toContain('处罚历史可在')
+    expect(mocks.reports).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1, true)
     mocks.reports.mockResolvedValueOnce({
       items: [{ id: 'report', version: 7, status: 'resolved' }],
       next_cursor: null,
@@ -186,25 +193,24 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(mocks.reports).toHaveBeenLastCalledWith('opaque+/=', expect.any(AbortSignal), 1, true)
     await open(false)
     expect(wrapper?.find('form').exists()).toBe(false)
-    expect(wrapper?.text()).toContain('仅已确认举报可作为处罚依据')
     expect(wrapper?.findAll('button').some((item) => item.text() === '给予账号处罚')).toBe(false)
     await button('上一页').trigger('click')
     await flushPromises()
     expect(mocks.reports).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1, true)
+    await button('全部举报').trigger('click')
+    await flushPromises()
+    expect(mocks.reports).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1, false)
     expect(mocks.penalize).not.toHaveBeenCalled()
   })
-  it('举报转入处罚页重新查询同一举报，只提供处罚操作且不自动打开或提交', async () => {
+  it('举报详情分别提供举报处理与处罚，处罚表单留在举报页', async () => {
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
     await open(false)
     await button('处理举报').trigger('click')
     expect(wrapper?.get('#safety-operation').text()).not.toContain('给予账号处罚')
     await button('取消并关闭').trigger('click')
-    await wrapper?.get('a[href="/safety/penalties?report=report"]').trigger('click')
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/safety/penalties'))
-    await flushPromises()
-    expect(mocks.report).toHaveBeenCalledTimes(2)
     expect(wrapper?.find('form').exists()).toBe(false)
     await button('给予账号处罚').trigger('click')
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
     expect(
       wrapper
         ?.get('#safety-operation')
@@ -232,7 +238,13 @@ describe('T028 举报、处罚与申诉页面', () => {
     finish({ id: 'report', version: 8, status: 'resolved' })
     await flushPromises()
     expect(wrapper?.find('form').exists()).toBe(false)
-    expect(wrapper?.get('a[href="/safety/penalties?report=report"]').text()).toContain('处罚管理')
+    expect(wrapper?.get('[aria-label="处理回执"]').text()).toContain('给予账号处罚')
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved', version: 8 })
+    await button('给予账号处罚').trigger('click')
+    await flushPromises()
+    expect(mocks.report).toHaveBeenCalledTimes(2)
+    expect(wrapper?.get('#safety-operation').element).toHaveProperty('value', 'penalty')
+    expect(mocks.penalize).not.toHaveBeenCalled()
   })
   it('离页取消旧读取；提交中阻止离页，完成后不将回执带入申诉页', async () => {
     let finish: ((value: ReportDetail) => void) | undefined
@@ -271,7 +283,7 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(wrapper?.find('[aria-label="处理回执"]').exists()).toBe(false)
     expect(wrapper?.find('form').exists()).toBe(false)
   })
-  it('处罚页离开后列表晚到，不再补发来源详情请求', async () => {
+  it('从旧处罚链接跳转保留举报和筛选，离页后列表晚到时不再补发详情请求', async () => {
     let finish: ((value: { items: SafetySummary[]; next_cursor: null }) => void) | undefined
     mocks.reports.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -279,6 +291,9 @@ describe('T028 举报、处罚与申诉页面', () => {
       }),
     )
     await go('/safety/penalties?report=report')
+    expect(router.currentRoute.value.path).toBe('/safety/reports')
+    expect(router.currentRoute.value.query).toMatchObject({ report: 'report', status: 'resolved' })
+    expect(mocks.reports).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), 1, true)
     await go('/safety/appeals')
     if (!finish) throw new Error('尚未查询')
     finish({ items: [], next_cursor: null })
@@ -336,8 +351,9 @@ describe('T028 举报、处罚与申诉页面', () => {
       items: [{ id: 'report', version: 7, status: 'resolved' }],
       next_cursor: null,
     })
-    await go('/safety/penalties')
-    await open()
+    await go('/safety/reports?status=resolved')
+    await open(false)
+    await button('给予账号处罚').trigger('click')
     expect(wrapper?.get('#safety-operation').element).toHaveProperty('value', 'penalty')
     await wrapper?.get('#penalty-level').setValue('general')
     expect(wrapper?.find('#account-version').exists()).toBe(false)
@@ -359,22 +375,85 @@ describe('T028 举报、处罚与申诉页面', () => {
       expect.any(AbortSignal),
     )
   })
-  it('解除限制绑定内容实体及资源版本，不发送举报或registry作为路径', async () => {
-    await flushPromises()
-    await open()
-    await wrapper?.get('#safety-operation').setValue('release-restriction')
-    await wrapper?.get('#resource-version').setValue('11')
+  it.each(['offline', 'release-restriction'] as const)(
+    '%s 自动读取所选举报的内容对象版本并保留关联约束',
+    async (action) => {
+      await go('/safety/reports?report=report')
+      await button('处理举报').trigger('click')
+      await wrapper?.get('#safety-operation').setValue(action)
+      expect(wrapper?.find('#resource-version').exists()).toBe(false)
+      await prepare()
+      expect(mocks.reportContentControl).toHaveBeenCalledWith('report', expect.any(AbortSignal))
+      expect(wrapper?.find('[aria-label="处理确认"]').text()).toContain('目标版本 11')
+      expect(mocks.restrict).not.toHaveBeenCalled()
+      await submit()
+      expect(mocks.restrict).toHaveBeenCalledWith(
+        'wish',
+        'wish',
+        action,
+        { reason: '核对处理', expected_version: 11, report_id: 'report', report_version: 7 },
+        expect.any(String),
+        expect.any(AbortSignal),
+      )
+    },
+  )
+  it.each([{ target_id: 'other' }, { report_version: 8 }, { content_version: 4 }])(
+    '核对发现举报或所关联目标已变化时重新读取案件：%o',
+    async (stale) => {
+      await go('/safety/reports?report=report')
+      await button('处理举报').trigger('click')
+      await wrapper?.get('#safety-operation').setValue('offline')
+      mocks.reportContentControl.mockResolvedValueOnce({ ...control, ...stale })
+      await prepare()
+      expect(wrapper?.text()).toContain('案件或关联内容已变化')
+      expect(mocks.report).toHaveBeenCalledTimes(2)
+      expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+      expect(mocks.restrict).not.toHaveBeenCalled()
+    },
+  )
+  it('关联版本读取无权时清除案件与确认', async () => {
+    await go('/safety/reports?report=report')
+    await button('处理举报').trigger('click')
+    await wrapper?.get('#safety-operation').setValue('offline')
+    mocks.reportContentControl.mockRejectedValueOnce(new ApiError(403))
     await prepare()
-    expect(wrapper?.text()).toContain('不自动恢复旧交互')
+    expect(wrapper?.text()).not.toContain('仅本案可见正文')
+    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    expect(useAdminStore().forbidden).toBe(1)
+    expect(mocks.restrict).not.toHaveBeenCalled()
+  })
+  it('提交冲突后保留原操作选择，重新核对时读取新版本且不自动重试', async () => {
+    await go('/safety/reports?report=report')
+    await button('处理举报').trigger('click')
+    await wrapper?.get('#safety-operation').setValue('release-restriction')
+    await prepare()
+    mocks.restrict.mockRejectedValueOnce(new ApiError(409))
     await submit()
-    expect(mocks.restrict).toHaveBeenCalledWith(
-      'wish',
-      'wish',
-      'release-restriction',
-      { reason: '核对处理', expected_version: 11 },
-      expect.any(String),
-      expect.any(AbortSignal),
+    expect(mocks.restrict).toHaveBeenCalledTimes(1)
+    expect(wrapper?.get('#safety-operation').element).toHaveProperty('value', 'release-restriction')
+    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    mocks.reportContentControl.mockResolvedValueOnce({ ...control, version: 12 })
+    await prepare()
+    expect(wrapper?.find('[aria-label="处理确认"]').text()).toContain('目标版本 12')
+    expect(mocks.restrict).toHaveBeenCalledTimes(1)
+  })
+  it('取消核对后返回的旧内容对象版本不会恢复确认', async () => {
+    await go('/safety/reports?report=report')
+    await button('处理举报').trigger('click')
+    await wrapper?.get('#safety-operation').setValue('offline')
+    let finish: ((value: ReportContentControl) => void) | undefined
+    mocks.reportContentControl.mockReturnValueOnce(
+      new Promise<ReportContentControl>((resolve) => {
+        finish = resolve
+      }),
     )
+    await prepare()
+    await button('取消并关闭').trigger('click')
+    if (!finish) throw new Error('内容版本查询尚未开始')
+    finish(control)
+    await flushPromises()
+    expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
+    expect(mocks.restrict).not.toHaveBeenCalled()
   })
   it('申诉详情按需读取，撤销理由与申诉版本独立，切换清空举报正文', async () => {
     await flushPromises()
@@ -401,8 +480,9 @@ describe('T028 举报、处罚与申诉页面', () => {
       items: [{ id: 'report', version: 7, status: 'resolved' }],
       next_cursor: null,
     })
-    await go('/safety/penalties')
-    await open()
+    await go('/safety/reports?status=resolved')
+    await open(false)
+    await button('给予账号处罚').trigger('click')
     await prepare()
     mocks.penalize.mockRejectedValueOnce(new ApiError(409))
     await submit()
@@ -411,10 +491,24 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(wrapper?.find('#account-version').exists()).toBe(false)
     expect(wrapper?.find('[aria-label="处理确认"]').exists()).toBe(false)
   })
+  it('处罚冲突后举报已非确认时，退回详情并撤下处罚操作', async () => {
+    mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
+    await go('/safety/reports?report=report')
+    await button('给予账号处罚').trigger('click')
+    await prepare()
+    mocks.penalize.mockRejectedValueOnce(new ApiError(409))
+    mocks.report.mockResolvedValueOnce({ ...report, status: 'rejected', version: 8 })
+    await submit()
+    expect(wrapper?.find('form').exists()).toBe(false)
+    expect(wrapper?.text()).toContain('未予支持')
+    expect(wrapper?.findAll('button').some((item) => item.text() === '给予账号处罚')).toBe(false)
+    expect(mocks.user).toHaveBeenCalledTimes(1)
+    expect(mocks.penalize).toHaveBeenCalledTimes(1)
+  })
   it('用户导航绑定目标，其他作者案件不得进入处置', async () => {
     useUserNavigation().target = 'another-user'
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-    await go('/safety/penalties?report=report')
+    await go('/safety/reports?report=report')
     expect(wrapper?.text()).toContain('案件作者与所选用户不一致')
     expect(wrapper?.find('form').exists()).toBe(false)
     expect(mocks.user).not.toHaveBeenCalled()
@@ -428,9 +522,42 @@ describe('T028 举报、处罚与申诉页面', () => {
     expect(mocks.decideAppeal.mock.calls[0]?.[1]).toMatchObject({ expected_version: 4 })
     expect(mocks.user).not.toHaveBeenCalled()
   })
+  it.each([
+    ['reports', 'report'],
+    ['appeals', 'appeal'],
+  ] as const)('同页 %s 关联链接替换详情，旧请求不可覆盖新案件', async (destination, key) => {
+    let finish: ((value: object) => void) | undefined
+    const reader = mocks[key]
+    reader.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    await go(`/safety/${destination}?${key}=older`)
+    const signal: unknown = reader.mock.calls[0]?.[1]
+    reader.mockResolvedValueOnce({ ...report, id: 'latest', body: '当前链接的案件材料' })
+    await go(`/safety/${destination}?${key}=latest`)
+    expect(signal).toHaveProperty('aborted', true)
+    expect(reader).toHaveBeenLastCalledWith('latest', expect.any(AbortSignal))
+    if (!finish) throw new Error('尚未请求旧案件')
+    finish({ ...report, id: 'older', body: '迟到的旧案件材料' })
+    await flushPromises()
+    expect(wrapper?.text()).toContain('当前链接的案件材料')
+    expect(wrapper?.text()).not.toContain('迟到的旧案件材料')
+  })
+  it('同页举报链接切换前确认放弃未保存的处理理由', async () => {
+    await go('/safety/reports?report=report')
+    await button('处理举报').trigger('click')
+    await wrapper?.get('#safety-reason').setValue('未保存的处理意见')
+    vi.mocked(confirmDiscardChanges).mockResolvedValueOnce(false)
+    await go('/safety/reports?report=other')
+    expect(router.currentRoute.value.query['report']).toBe('report')
+    expect(wrapper?.get('#safety-reason').element).toHaveProperty('value', '未保存的处理意见')
+    expect(mocks.report).toHaveBeenCalledTimes(1)
+  })
   it('账号查询失败阻止处罚确认，不回退人工版本', async () => {
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-    await go('/safety/penalties?report=report')
+    await go('/safety/reports?report=report')
     await button('给予账号处罚').trigger('click')
     mocks.user.mockRejectedValueOnce(new ApiError(503))
     await prepare()
@@ -440,7 +567,7 @@ describe('T028 举报、处罚与申诉页面', () => {
   })
   it('核对期间案件内容换版，重新读取而不生成处罚确认', async () => {
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-    await go('/safety/penalties?report=report')
+    await go('/safety/reports?report=report')
     await button('给予账号处罚').trigger('click')
     mocks.report.mockResolvedValue({ ...report, status: 'resolved', content_version: 4 })
     await prepare()
@@ -450,7 +577,7 @@ describe('T028 举报、处罚与申诉页面', () => {
   })
   it('普通处罚网络结果不明时保留同键同请求重试', async () => {
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-    await go('/safety/penalties?report=report')
+    await go('/safety/reports?report=report')
     await button('给予账号处罚').trigger('click')
     await prepare()
     mocks.penalize.mockRejectedValueOnce(new Error('合成网络故障'))
@@ -463,7 +590,7 @@ describe('T028 举报、处罚与申诉页面', () => {
   })
   it('取消核对后晚到账号版本不能恢复处罚确认', async () => {
     mocks.report.mockResolvedValue({ ...report, status: 'resolved' })
-    await go('/safety/penalties?report=report')
+    await go('/safety/reports?report=report')
     await button('给予账号处罚').trigger('click')
     let finish: ((value: { account_version: number }) => void) | undefined
     mocks.user.mockReturnValueOnce(

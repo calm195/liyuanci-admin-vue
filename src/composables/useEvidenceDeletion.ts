@@ -9,7 +9,7 @@ import type { DeletionJob, EvidenceTarget } from '@/types/privacy'
 export function useEvidenceDeletion() {
   const editorOpen = ref(false)
   const uncertain = ref(false)
-  const evidenceId = ref('')
+  const selection = ref<{ id: string; caseId: string } | null>(null)
   const target = ref<EvidenceTarget | null>(null)
   const reason = ref('')
   const confirmation = ref(false)
@@ -33,27 +33,30 @@ export function useEvidenceDeletion() {
   }
   function clear() {
     clearTarget()
-    evidenceId.value = ''
+    selection.value = null
     accepted.value = null
     error.value = ''
     busy.value = false
   }
-  watch(evidenceId, clearTarget, { flush: 'sync' })
   function failure(cause: unknown) {
     error.value = reviewErrorMessage(cause)
   }
-  async function loadTarget() {
-    if (editorOpen.value || busy.value || !validDeletionId(evidenceId.value.trim())) return
+  async function loadTarget(next = selection.value) {
+    if (editorOpen.value || busy.value || !next || !validDeletionId(next.id)) return
+    selection.value = next
     workspace.cancel()
     clearTarget()
     accepted.value = null
     error.value = ''
-    const id = evidenceId.value.trim()
     busy.value = true
     await workspace.run(
-      (signal) => client.evidence(id, signal),
+      async (signal) => {
+        const result = await client.evidence(next.id, signal)
+        if (result.case_id !== next.caseId) throw new Error('证据与当前危机案件不匹配')
+        return result
+      },
       (value) => {
-        if (evidenceId.value.trim() === id) target.value = value
+        target.value = value
       },
       failure,
       () => {
@@ -79,7 +82,7 @@ export function useEvidenceDeletion() {
       (signal) => client.remove(current.id, input, key, signal),
       (value) => {
         clearTarget()
-        evidenceId.value = ''
+        selection.value = null
         accepted.value = value
       },
       (cause) => {
@@ -101,13 +104,6 @@ export function useEvidenceDeletion() {
       },
     )
   }
-  function reset() {
-    if (!busy.value && !editorOpen.value) {
-      workspace.cancel()
-      clear()
-    }
-  }
-
   function startProcessing() {
     if (!target.value || busy.value) return
     reason.value = ''
@@ -122,11 +118,6 @@ export function useEvidenceDeletion() {
     confirmation.value = false
     attempt = null
   }
-  function closeProcessing(done: () => void) {
-    if (busy.value || uncertain.value) return
-    cancelProcessing()
-    done()
-  }
   watch(
     reason,
     () => {
@@ -138,7 +129,7 @@ export function useEvidenceDeletion() {
   return {
     uncertain,
     editorOpen,
-    evidenceId,
+    canReload: computed(() => !!selection.value),
     target,
     reason,
     confirmation,
@@ -151,9 +142,7 @@ export function useEvidenceDeletion() {
     loadTarget,
     prepare,
     submit,
-    reset,
     startProcessing,
     cancelProcessing,
-    closeProcessing,
   }
 }

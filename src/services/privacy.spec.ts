@@ -12,6 +12,77 @@ const signal = () => new AbortController().signal
 const envelope = (data: unknown, status = 200) =>
   Response.json({ code: 0, message: '测试', request_id: 'trace', data }, { status })
 describe('T032 REQ-018/019 删除边界与真实协议', () => {
+  it('分页列表保留两种证据来源和最小进度投影，保持超管令牌与禁止缓存', async () => {
+    const created_at = '2026-11-28T07:00:00Z'
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      envelope({
+        items: [
+          {
+            id: jobId,
+            source_module: 'legacy',
+            created_at,
+            status: 'processing',
+            target_ref: '敏感对象',
+          },
+          {
+            id: evidenceId,
+            source_module: 'whispers',
+            created_at,
+            status: 'completed',
+            reason: '私密删除理由',
+          },
+        ],
+        page: 1,
+        page_size: 10,
+        total: 2,
+        next_cursor: null,
+      }),
+    )
+    const client = createPrivacyClient('token', () => true, transport)
+    expect(await client.jobs(2, 10, signal())).toEqual({
+      items: [
+        { id: jobId, source_module: 'legacy', created_at, status: 'processing' },
+        { id: evidenceId, source_module: 'whispers', created_at, status: 'completed' },
+      ],
+      page: 1,
+      page_size: 10,
+      total: 2,
+    })
+    expect(transport.mock.calls[0]?.[0]).toBe(
+      '/api/v1/admin/evidence-deletion-jobs?page=2&limit=10',
+    )
+    expect(new Headers(transport.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer token',
+    )
+    expect(transport.mock.calls[0]?.[1]).toMatchObject({ cache: 'no-store', credentials: 'omit' })
+  })
+  it.each([
+    { source_module: 'account' },
+    { created_at: '不是日期' },
+    { id: '../anon' },
+    { status: 'pending' },
+  ])('删除任务列表拒绝不符合约定的记录 %s', async (invalid) => {
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      envelope({
+        items: [
+          {
+            id: jobId,
+            source_module: 'legacy',
+            created_at: '2026-11-28T07:00:00Z',
+            status: 'processing',
+            ...invalid,
+          },
+        ],
+        page: 1,
+        page_size: 10,
+        total: 1,
+        next_cursor: null,
+      }),
+    )
+    await expect(
+      createPrivacyClient('token', () => true, transport).jobs(1, 10, signal()),
+    ).rejects.toThrow()
+  })
   it('读取证据只保留元信息，删除使用范围版本并保留同一个幂等键', async () => {
     const transport = vi
       .fn<typeof fetch>()

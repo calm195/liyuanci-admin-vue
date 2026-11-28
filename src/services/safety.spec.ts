@@ -168,6 +168,58 @@ describe('T028 REQ-014/016/018/019 安全治理协议', () => {
       )
     },
   )
+  it('内容对象预检按所选举报读取，只返回目标与版本，不携带正文', async () => {
+    const control = {
+      report_id: 'report',
+      report_version: 7,
+      report_status: 'resolved',
+      target_kind: 'wish_comment',
+      target_id: 'comment',
+      content_ref: 'registry',
+      content_version: 3,
+      version: 11,
+    }
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(envelope({ ...control, body: '多余材料' }))
+      .mockResolvedValueOnce(envelope({ ...control, report_id: 'other' }))
+    const client = createSafetyClient('token', () => true, transport)
+    await expect(client.reportContentControl('report', signal())).resolves.toEqual(control)
+    expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/reports/report/content-control')
+    await expect(client.reportContentControl('report', signal())).rejects.toThrow('不匹配')
+  })
+  it('举报处置写入校验成对的举报约束并发送独立的目标版本', async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        envelope({ id: 'comment', kind: 'wish_comment', version: 12, status: 'restricted' }),
+      )
+    const client = createSafetyClient('token', () => true, transport)
+    const input = {
+      reason: '核对处理',
+      expected_version: 11,
+      report_id: 'report',
+      report_version: 7,
+    }
+    await client.restrict('wish_comment', 'comment', 'offline', input, 'key', signal())
+    expect(transport.mock.calls[0]?.[0]).toBe('/api/v1/admin/contents/wish_comment/comment/offline')
+    expect(transport.mock.calls[0]?.[1]?.body).toBe(JSON.stringify(input))
+    await expect(
+      client.restrict(
+        'wish_comment',
+        'comment',
+        'offline',
+        {
+          reason: '核对处理',
+          expected_version: 11,
+          report_version: 7,
+        },
+        'key',
+        signal(),
+      ),
+    ).rejects.toThrow('缺少关联举报')
+    expect(transport).toHaveBeenCalledTimes(1)
+  })
   it.each([401, 403, 404, 409, 429, 503])('HTTP %s保留状态，不显示错误正文', async (status) => {
     const transport = vi
       .fn<typeof fetch>()

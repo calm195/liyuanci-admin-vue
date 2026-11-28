@@ -1,6 +1,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import type { CrisisSummary } from '@/types/crisis'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createModerationTransport, validModerationFeedback } from '@/services/content-transport'
 import { useAdminStore } from '@/stores/admin'
@@ -19,7 +19,7 @@ export function useModerationReview() {
   const commands = useModerationCommands()
   const pending = computed(() => commands.pending)
   const pageSize = ref(10)
-  const defaultFilters = (): ModerationFilters => ({ q: '', status: 'human_required', kind: '' })
+  const defaultFilters = (): ModerationFilters => ({ status: 'human_required', kind: '' })
   const filters = reactive(defaultFilters())
   let appliedFilters = defaultFilters()
   const editorOpen = ref(false)
@@ -48,6 +48,7 @@ export function useModerationReview() {
   let editorGeneration = 0
   const router = useRouter()
   const route = useRoute()
+  let openedRouteCase: string | undefined
   async function crisisEscalated(value: CrisisSummary) {
     close()
     try {
@@ -178,7 +179,7 @@ export function useModerationReview() {
   }
   async function search() {
     if (editorOpen.value || writing.value || pending.value) return
-    appliedFilters = { ...filters, q: filters.q.trim() }
+    appliedFilters = { ...filters }
     await refresh()
   }
   async function resetFilters() {
@@ -317,10 +318,19 @@ export function useModerationReview() {
     if (commands.save({ id: current.id, key: globalThis.crypto.randomUUID(), body: input }))
       await retryPending()
   }
-  onMounted(async () => {
+  async function openRouteCase() {
+    if (listBusy.value || !workspace.allowed()) return
     const target = route.query['case']
+    const linkedCase = typeof target === 'string' && target ? target : undefined
+    if (linkedCase === openedRouteCase) return
+    openedRouteCase = linkedCase
+    if (linkedCase) await openCase(linkedCase)
+    else close()
+  }
+  watch([() => route.query['case'], listBusy], openRouteCase)
+  onMounted(async () => {
     await loadList()
-    if (typeof target === 'string' && target && workspace.allowed()) await openCase(target)
+    await openRouteCase()
   })
 
   return {

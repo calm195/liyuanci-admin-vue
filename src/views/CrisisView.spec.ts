@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   evidence: vi.fn(),
   act: vi.fn(),
   falsePositive: vi.fn(),
+  openPrivacy: vi.fn(),
+}))
+vi.mock('@/composables/usePrivacyHandoff', () => ({
+  usePrivacyHandoff: () => ({ open: mocks.openPrivacy, pending: false, error: '' }),
 }))
 vi.mock('@/services/crisis', async (original) => ({
   ...(await original<typeof crisisService>()),
@@ -180,6 +184,24 @@ describe('T030 危机工作台案件、证据及安全生命周期', () => {
     })
     await flushPromises()
     expect(wrapper?.text()).not.toContain('迟到证据正文')
+  })
+  it('普通危机岗位可读证据；超管可把当前案件选中的证据交接至删除页', async () => {
+    await flushPromises()
+    await open()
+    await button('查看证据 1').trigger('click')
+    await flushPromises()
+    expect(wrapper?.text()).toContain('限定证据正文')
+    expect(wrapper?.text()).not.toContain('管理当前证据范围')
+    const session = useAdminStore().session
+    if (!session) throw new Error('缺少会话')
+    session.account.roles = ['super_admin']
+    await flushPromises()
+    await button('管理当前证据范围').trigger('click')
+    expect(mocks.openPrivacy).toHaveBeenCalledWith({
+      path: '/evidence-deletion',
+      id: 'evidence-a',
+      caseId: first.id,
+    })
   })
   it('接手理由必填且按当前案件版本二次确认，提交后清敏感材料', async () => {
     await flushPromises()

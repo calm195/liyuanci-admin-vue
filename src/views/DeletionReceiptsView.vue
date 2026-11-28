@@ -1,55 +1,62 @@
 <script setup lang="ts">
-import { useAutoSearch } from '@/composables/useAutoSearch'
-import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
-import { useOperationFeedback } from '@/composables/useOperationFeedback'
-import FloatingNotice from '@/components/FloatingNotice.vue'
-import BusinessToolbar from '@/components/BusinessToolbar.vue'
 import { onMounted } from 'vue'
+import FloatingNotice from '@/components/FloatingNotice.vue'
+import NumberedPagination from '@/components/NumberedPagination.vue'
+import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
+import { useAutoSearch } from '@/composables/useAutoSearch'
+import { deletionTaskLabel, useDeletionReceipts } from '@/composables/useDeletionReceipts'
+import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import { usePrivacyHandoff } from '@/composables/usePrivacyHandoff'
-import { validDeletionId, validDeletionReceipt } from '@/services/privacy'
-import { useDeletionReceipts } from '@/composables/useDeletionReceipts'
-const { busy, error, jobId, handle, progress, progressKind, workspace, retryHint, query, reset } =
-  useDeletionReceipts()
-const privacy = usePrivacyHandoff()
+import { validDeletionReceipt } from '@/services/privacy'
+import { displayBeijingTime } from '@/utils/admin-time'
+
+const {
+  busy,
+  error,
+  handle,
+  task,
+  progress,
+  progressKind,
+  workspace,
+  retryHint,
+  queryTask,
+  queryReceipt,
+  reset,
+  tasks,
+  listBusy,
+  listError,
+  page,
+  pageSize,
+  total,
+  loadTasks,
+  resizeTasks,
+} = useDeletionReceipts()
+const { consume } = usePrivacyHandoff()
 onMounted(() => {
-  const id = privacy.consume()
-  if (id && workspace.allowed()) {
-    jobId.value = id
-    void query('job')
-  }
+  void loadTasks()
+  const selection = consume()
+  if (selection?.path === '/deletion-receipts' && workspace.allowed())
+    void queryTask(selection.task)
 })
-const { feedback: readFeedback, run: runRead } = useOperationFeedback(() => Boolean(error.value))
-
-let activeLookup: 'first' | 'second' = 'first'
-
+const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
+  Boolean(error.value || listError.value),
+)
 const autoSearch = useAutoSearch(
   () => {
-    if (activeLookup === 'first') {
-      if (validDeletionId(jobId.value.trim())) return query('job')
-    } else {
-      if (validDeletionReceipt(handle.value.trim())) return query('receipt')
-    }
+    if (validDeletionReceipt(handle.value.trim())) return queryReceipt()
   },
   () => workspace.allowed() && !busy.value,
 )
-
-function scheduleLookup(kind: typeof activeLookup, event: Event) {
-  activeLookup = kind
-  autoSearch.input(event)
-}
 function clearSearch() {
   autoSearch.cancel()
-  void reset()
-}
-function submitJobSearch() {
-  autoSearch.cancel()
-  void runRead(() => query('job'), '查询已完成')
+  reset()
 }
 function submitReceiptSearch() {
   autoSearch.cancel()
-  void runRead(() => query('receipt'), '查询已完成')
+  void runRead(queryReceipt, '查询已完成')
 }
 </script>
+
 <template>
   <FloatingNotice
     v-if="readFeedback.message"
@@ -57,41 +64,58 @@ function submitReceiptSearch() {
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="experience-page workflow privacy-workspace" aria-label="回执查询">
-    <WorkspaceHeading
-      title="删除回执查询"
-      description="通过任务 ID 或匿名回执核对结果；查询不会触发删除。"
-    />
-
+  <main class="experience-page workflow privacy-workspace" aria-label="删除任务与回执">
+    <WorkspaceHeading title="删除任务与回执" />
     <template v-if="workspace.allowed()">
-      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
-      <p v-if="busy" role="status">正在查询清理进度…</p>
-      <section class="experience-panel" aria-label="删除进度查询">
-        <h2>查询清理进度</h2>
-        <BusinessToolbar label="查询操作栏">
-          <template #tools>
-            <button :disabled="busy" @click="clearSearch">清空页面</button>
-          </template>
-        </BusinessToolbar>
-        <form id="job-query" class="experience-editor" @submit.prevent="submitJobSearch">
-          <fieldset :disabled="busy">
-            <legend>后台证据删除待办</legend>
-            <label for="delete-job-id">删除待办标识</label>
-            <input
-              id="delete-job-id"
-              v-model="jobId"
-              type="password"
-              autocomplete="off"
-              spellcheck="false"
-              @input="scheduleLookup('first', $event)"
-              @compositionstart="autoSearch.start"
-              @compositionend="autoSearch.end"
-            />
-            <button type="submit" :disabled="!validDeletionId(jobId.trim())">
-              查询证据删除待办
-            </button>
-          </fieldset>
-        </form>
+      <section
+        class="experience-panel experience-table-panel"
+        aria-label="证据删除任务列表"
+        :aria-busy="listBusy"
+      >
+        <div class="experience-toolbar">
+          <h2 class="experience-list-title">证据删除任务</h2>
+          <button :disabled="listBusy" @click="runRead(() => loadTasks(), '任务列表已刷新')">
+            刷新任务列表
+          </button>
+        </div>
+        <p v-if="listBusy" role="status">正在读取删除任务…</p>
+        <FloatingNotice v-if="listError" :message="listError" tone="error">{{
+          listError
+        }}</FloatingNotice>
+        <p v-else-if="!listBusy && !tasks.length" class="experience-empty">暂无删除任务</p>
+        <div v-if="tasks.length" class="business-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">证据来源</th>
+                <th scope="col">受理时间</th>
+                <th scope="col">清理状态</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in tasks" :key="item.id">
+                <td>{{ deletionTaskLabel(item) }}</td>
+                <td>{{ displayBeijingTime(item.created_at) }}</td>
+                <td>{{ item.status === 'completed' ? '已完成' : '清理中' }}</td>
+                <td>
+                  <button :disabled="busy || listBusy" @click="runRead(() => queryTask(item))">
+                    查看进度
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <NumberedPagination
+          v-if="tasks.length"
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          :disabled="listBusy"
+          @turn="loadTasks"
+          @resize="resizeTasks"
+        />
       </section>
       <section class="experience-panel" aria-label="匿名删除回执查询">
         <h2>查询匿名回执</h2>
@@ -105,7 +129,7 @@ function submitReceiptSearch() {
               type="password"
               autocomplete="off"
               spellcheck="false"
-              @input="scheduleLookup('second', $event)"
+              @input="autoSearch.input"
               @compositionstart="autoSearch.start"
               @compositionend="autoSearch.end"
             />
@@ -116,34 +140,24 @@ function submitReceiptSearch() {
             <button type="submit" :disabled="!validDeletionReceipt(handle.trim())">
               查询匿名删除回执
             </button>
+            <button type="button" @click="clearSearch">清空查询</button>
           </fieldset>
         </form>
-        <section v-if="progress" aria-label="清理结果" role="status">
-          <h3>清理结果</h3>
-          <div class="business-table">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">查询来源</th>
-                  <th scope="col">清理状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{{ progressKind }}</td>
-                  <td>
-                    {{
-                      progress.status === 'completed'
-                        ? '清理已完成（后端确认）。'
-                        : '正在清理，尚未全部完成；请稍后手动刷新查询。'
-                    }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="retryHint">{{ retryHint }}</p>
-        </section>
+      </section>
+      <FloatingNotice v-if="error" :message="error" tone="error">{{ error }}</FloatingNotice>
+      <p v-if="busy" role="status">正在查询清理进度…</p>
+      <section v-if="progress" class="experience-panel" aria-label="清理结果" role="status">
+        <h2>清理结果</h2>
+        <p>{{ progressKind }}</p>
+        <p>
+          {{
+            progress.status === 'completed'
+              ? '清理已完成（后端确认）。'
+              : '正在清理，尚未全部完成；请稍后手动刷新查询。'
+          }}
+        </p>
+        <p v-if="retryHint">{{ retryHint }}</p>
+        <button v-if="task" @click="runRead(() => task && queryTask(task))">刷新任务进度</button>
       </section>
     </template>
   </main>

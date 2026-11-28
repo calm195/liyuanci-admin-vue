@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, useTemplateRef, watch } from 'vue'
+import { onBeforeRouteUpdate, useRoute } from 'vue-router'
 import NumberedPagination from '@/components/NumberedPagination.vue'
 import { useOperationFeedback } from '@/composables/useOperationFeedback'
 import FloatingNotice from '@/components/FloatingNotice.vue'
@@ -7,10 +9,17 @@ import WorkspaceHeading from '@/components/WorkspaceHeading.vue'
 import WorkspaceDrawer from '@/components/WorkspaceDrawer.vue'
 import IdentityCaseDetail from '@/components/IdentityCaseDetail.vue'
 import { useIdentityReview } from '@/composables/useIdentityReview'
+import type { IdentityListView } from '@/types/identity'
 import { displayBeijingTime } from '@/utils/admin-time'
 
-const props = defineProps<{ history?: boolean }>()
-const pageTitle = props.history ? '身份审核历史' : '身份审核'
+const route = useRoute()
+const history = computed(() => route.query['tab'] === 'processed')
+const view = computed<IdentityListView>(() => (history.value ? 'history' : 'pending'))
+const editor = useTemplateRef<{ close: () => Promise<void> }>('editor')
+const tabs = [
+  { title: '待审核', view: 'pending', to: '/identity' },
+  { title: '已处理', view: 'history', to: '/identity?tab=processed' },
+] as const
 const {
   uncertain,
   pageSize,
@@ -53,10 +62,18 @@ const {
   submit,
   startProcessing,
   cancelProcessing,
-} = useIdentityReview(props.history ? 'history' : 'pending')
-const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
-  Boolean(listError.value),
-)
+} = useIdentityReview(view)
+onBeforeRouteUpdate(async (to) => {
+  if ((to.query['tab'] === 'processed') === history.value || !editorOpen.value) return true
+  await editor.value?.close()
+  return !editorOpen.value
+})
+const {
+  feedback: readFeedback,
+  run: runRead,
+  reset: resetReadFeedback,
+} = useOperationFeedback(() => Boolean(listError.value))
+watch(view, resetReadFeedback, { flush: 'sync' })
 function resizePage(size: number) {
   pageSize.value = size
   return refreshList()
@@ -70,9 +87,9 @@ function resizePage(size: number) {
     :tone="readFeedback.tone"
     :revision="readFeedback.revision"
   />
-  <main class="experience-page workflow" :aria-label="pageTitle">
+  <main class="experience-page workflow" aria-label="身份审核">
     <WorkspaceHeading
-      :title="pageTitle"
+      title="身份审核"
       :description="
         history
           ? '查看已处理身份审核的姓名、学号、结论和时间。'
@@ -80,6 +97,19 @@ function resizePage(size: number) {
       "
     />
     <template v-if="allowed()">
+      <nav class="identity-tabs" aria-label="身份审核列表">
+        <RouterLink
+          v-for="tab in tabs"
+          :key="tab.view"
+          v-slot="{ href, navigate }"
+          :to="tab.to"
+          custom
+        >
+          <a :href="href" :aria-current="view === tab.view ? 'page' : undefined" @click="navigate">
+            {{ tab.title }}
+          </a>
+        </RouterLink>
+      </nav>
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice
         v-if="caseError && !selected && !editorOpen"
@@ -246,6 +276,7 @@ function resizePage(size: number) {
       </WorkspaceDrawer>
       <WorkspaceDrawer
         v-if="editorOpen"
+        ref="editor"
         presentation="dialog"
         :open="editorOpen"
         :busy="submitting || uncertain"
@@ -322,6 +353,23 @@ function resizePage(size: number) {
 </template>
 
 <style scoped>
+.identity-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.identity-tabs a {
+  padding: 0.625rem 0.125rem;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.identity-tabs [aria-current='page'] {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
 .muted {
   color: var(--text-secondary);
   font-size: 0.9rem;

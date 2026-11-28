@@ -1,7 +1,7 @@
 import type { CursorPage } from './moderation'
 
 export const safetyRoles = ['review_operator', 'crisis_operator', 'super_admin'] as const
-export const contentKinds = ['wish', 'application', 'message', 'story'] as const
+export const contentKinds = ['wish', 'wish_comment', 'application', 'message', 'story'] as const
 export const appealContentKinds = [
   ...contentKinds,
   'whisper_post',
@@ -33,6 +33,16 @@ export interface ReportDetail extends SafetySummary {
   description: string
   reason: string | null
 }
+export interface ReportContentControl {
+  report_id: string
+  report_version: number
+  report_status: string
+  target_kind: ContentKind
+  target_id: string
+  content_ref: string
+  content_version: number
+  version: number
+}
 export interface AppealSummary extends Omit<SafetySummary, 'kind'> {
   kind?: AppealContentKind
 }
@@ -59,6 +69,10 @@ export interface PenaltyInput extends ReasonInput {
   level: PenaltyLevel
 }
 export type RestrictionAction = 'offline' | 'release-restriction'
+export interface RestrictionInput extends ReasonInput {
+  report_id?: string
+  report_version?: number
+}
 export interface SafetyClient {
   reports(
     cursor: string | null,
@@ -67,6 +81,7 @@ export interface SafetyClient {
     resolved?: boolean,
   ): Promise<CursorPage<SafetySummary>>
   report(id: string, signal: AbortSignal): Promise<ReportDetail>
+  reportContentControl(id: string, signal: AbortSignal): Promise<ReportContentControl>
   decideReport(
     id: string,
     input: ReportDecisionInput,
@@ -95,7 +110,7 @@ export interface SafetyClient {
     kind: ContentKind,
     id: string,
     action: RestrictionAction,
-    input: ReasonInput,
+    input: RestrictionInput,
     key: string,
     signal: AbortSignal,
   ): Promise<SafetySummary>

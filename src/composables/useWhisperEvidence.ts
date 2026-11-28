@@ -1,13 +1,13 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { ApiError } from '@/services/admin'
 import { createWhispersClient } from '@/services/whispers'
 import { uuid } from '@/services/whispers/boundary'
 import { parseEvidenceDelete } from '@/services/whispers/parsers'
 import { useAdminStore } from '@/stores/admin'
 import { reviewErrorMessage, useAdminWorkspace } from './useAdminWorkspace'
-import type { DeletionJob, EvidenceDelete, EvidenceScope } from '@/types/whispers'
+import type { EvidenceDelete, EvidenceScope } from '@/types/whispers'
 
-export function validWhisperId(value: string): boolean {
+function validWhisperId(value: string): boolean {
   try {
     uuid(value)
     return true
@@ -20,9 +20,7 @@ export function useWhisperEvidence() {
   const admin = useAdminStore()
   const evidenceId = ref('')
   const target = ref<EvidenceScope | null>(null)
-  const jobId = ref('')
   const acceptedId = ref('')
-  const progress = ref<DeletionJob | null>(null)
   const busy = ref(false)
   const error = ref('')
   const notice = ref('')
@@ -67,45 +65,24 @@ export function useWhisperEvidence() {
   function clearAll() {
     target.value = null
     evidenceId.value = ''
-    jobId.value = ''
     acceptedId.value = ''
-    progress.value = null
     busy.value = false
     error.value = ''
     notice.value = ''
     resetForm()
   }
-  function reset() {
-    if (busy.value || editorOpen.value) return
-    workspace.cancel()
-    clearAll()
-  }
-  watch(
-    evidenceId,
-    () => {
-      target.value = null
-    },
-    { flush: 'sync' },
-  )
-  watch(
-    jobId,
-    () => {
-      progress.value = null
-    },
-    { flush: 'sync' },
-  )
-  async function loadTarget() {
-    if (busy.value || editorOpen.value || !validWhisperId(evidenceId.value)) return
+  async function loadTarget(id = evidenceId.value) {
+    if (busy.value || editorOpen.value || !validWhisperId(id)) return
+    evidenceId.value = id
     workspace.cancel()
     target.value = null
     error.value = ''
     notice.value = ''
     busy.value = true
-    const id = evidenceId.value
     await workspace.run(
       (signal) => client.whisperAdminEvidenceGet(id, signal),
       (value) => {
-        if (evidenceId.value === id) target.value = value
+        target.value = value
       },
       (cause) => {
         error.value = reviewErrorMessage(cause)
@@ -126,11 +103,6 @@ export function useWhisperEvidence() {
     if (busy.value || uncertain.value) return
     resetForm()
     error.value = ''
-  }
-  function closeProcessing(done: () => void) {
-    if (busy.value || uncertain.value) return
-    cancelProcessing()
-    done()
   }
   function check() {
     if (editorOpen.value && valid.value && !busy.value && !uncertain.value) confirming.value = true
@@ -159,9 +131,8 @@ export function useWhisperEvidence() {
       (value) => {
         target.value = null
         resetForm()
+        evidenceId.value = ''
         acceptedId.value = value.id
-        jobId.value = value.id
-        progress.value = null
         notice.value =
           '删除请求已受理，尚未确认清理完成，请按删除任务查询进度。删除不会恢复普通内容。'
       },
@@ -185,37 +156,10 @@ export function useWhisperEvidence() {
       },
     )
   }
-  async function queryAccepted() {
-    if (busy.value || editorOpen.value || !acceptedId.value) return
-    jobId.value = acceptedId.value
-    await query()
-  }
-  async function query() {
-    if (busy.value || editorOpen.value || !validWhisperId(jobId.value)) return
-    workspace.cancel()
-    progress.value = null
-    error.value = ''
-    busy.value = true
-    const id = jobId.value
-    await workspace.run(
-      (signal) => client.whisperAdminDeletionGet(id, signal),
-      (value) => {
-        if (jobId.value === id) progress.value = value
-      },
-      (cause) => {
-        error.value = reviewErrorMessage(cause)
-      },
-      () => {
-        busy.value = false
-      },
-    )
-  }
   return {
-    evidenceId,
+    canReload: computed(() => !!evidenceId.value),
     target,
-    jobId,
     acceptedId,
-    progress,
     busy,
     error,
     notice,
@@ -227,15 +171,11 @@ export function useWhisperEvidence() {
     workspace,
     canDelete,
     valid,
-    reset,
     loadTarget,
     startProcessing,
     cancelProcessing,
-    closeProcessing,
     check,
     back,
     submit,
-    query,
-    queryAccepted,
   }
 }

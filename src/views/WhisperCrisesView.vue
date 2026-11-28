@@ -240,7 +240,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(
             <section v-if="admin.can('super_admin')" aria-label="限定证据范围">
               <button
                 :disabled="privacyPending"
-                @click="openPrivacy('/whispers/evidence', detail.evidence_scope_id)"
+                @click="openPrivacy({ path: '/whispers/evidence', id: detail.evidence_scope_id })"
               >
                 前往树洞证据删除与进度查询
               </button>

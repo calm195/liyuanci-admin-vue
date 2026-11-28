@@ -5,7 +5,8 @@ import FloatingNotice from '@/components/FloatingNotice.vue'
 import PageSizeSelect from './PageSizeSelect.vue'
 import WorkspaceHeading from './WorkspaceHeading.vue'
 import WorkspaceDrawer from './WorkspaceDrawer.vue'
-import { useRoute } from 'vue-router'
+import { onBeforeRouteUpdate, useRoute } from 'vue-router'
+import { useTemplateRef } from 'vue'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
 import { useSafety } from '@/composables/useSafety'
 import type { SafetyMode } from '@/composables/useSafety'
@@ -14,10 +15,9 @@ import { penaltyLevels } from '@/types/safety'
 const props = defineProps<{ mode: SafetyMode }>()
 const mode = props.mode
 const route = useRoute()
-const initialReport = typeof route.query['report'] === 'string' ? route.query['report'] : undefined
-const initialAppeal = typeof route.query['appeal'] === 'string' ? route.query['appeal'] : undefined
-const title = { reports: '举报管理', penalties: '处罚管理', appeals: '申诉管理' }[mode]
-const processingTitle = { reports: '举报处理', penalties: '账号处罚', appeals: '申诉处理' }[mode]
+const initialCase = route.query[mode === 'reports' ? 'report' : 'appeal']
+const title = mode === 'reports' ? '举报管理' : '申诉管理'
+const processingTitle = mode === 'reports' ? '举报处理' : '申诉处理'
 const admin = useAdminStore()
 const {
   uncertain,
@@ -43,11 +43,11 @@ const {
   appeal,
   detail,
   receipt,
+  canPenalize,
   operation,
   reason,
   level,
   accountVersion,
-  resourceVersion,
   confirmation,
   workspace,
   options,
@@ -57,9 +57,12 @@ const {
   kindLabels,
   status,
   refresh,
+  resolvedOnly,
+  filterReports,
   loadList,
   page,
   open,
+  openPenaltyFromReceipt,
   close,
   reloadSelected,
   startProcessing,
@@ -67,10 +70,20 @@ const {
   prepare,
   submit,
   crisisEscalated,
-} = useSafety(mode, initialReport, initialAppeal)
+} = useSafety(
+  mode,
+  typeof initialCase === 'string' ? initialCase : undefined,
+  mode === 'reports' && route.query['status'] === 'resolved',
+)
 const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
   Boolean(error.value || listError.value),
 )
+const editor = useTemplateRef<{ close: () => Promise<void> }>('editor')
+onBeforeRouteUpdate(async () => {
+  if (!editorOpen.value) return true
+  await editor.value?.close()
+  return !editorOpen.value
+})
 </script>
 <template>
   <FloatingNotice
@@ -80,15 +93,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
     :revision="readFeedback.revision"
   />
   <main class="experience-page workflow" :aria-label="title">
-    <WorkspaceHeading
-      :title="title"
-      description="按授权案件核对正文与举报依据；处理、处罚和危机升级分别确认。"
-    />
-    <p v-if="mode === 'penalties'" class="banner">
-      本页从已确认举报查询处罚依据；处罚历史可在“用户管理 →
-      平台用户”查询。仅显示当前分页中的已确认举报，可继续翻页查询。
-    </p>
-    <p>仅处理服务端授权的普通案件；账号角色管理请进入“后台账号管理”。</p>
+    <WorkspaceHeading :title="title" />
     <template v-if="workspace.allowed()">
       <FloatingNotice v-if="notice" :message="notice" tone="info">{{ notice }}</FloatingNotice>
       <FloatingNotice v-if="error && !selected && !editorOpen" :message="error" tone="error">{{
@@ -97,11 +102,13 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
       <section v-if="receipt" class="workflow-box" aria-label="处理回执">
         <h2>处理回执</h2>
         <p>{{ status(receipt.status) }} · 版本 {{ receipt.version }}</p>
-        <RouterLink
+        <button
           v-if="mode === 'reports' && receipt.status === 'resolved'"
-          :to="{ path: '/safety/penalties', query: { report: receipt.id } }"
-          >进入该举报的处罚管理</RouterLink
+          :disabled="busy || loading || editorOpen || writing"
+          @click="openPenaltyFromReceipt"
         >
+          给予账号处罚
+        </button>
       </section>
 
       <section
@@ -111,11 +118,29 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
       >
         <div class="experience-toolbar">
           <h2 class="experience-list-title">
-            {{
-              mode === 'appeals' ? '申诉案件' : mode === 'penalties' ? '本页已确认举报' : '举报案件'
-            }}
+            {{ mode === 'appeals' ? '申诉案件' : '举报案件' }}
           </h2>
-
+          <div
+            v-if="mode === 'reports'"
+            class="workflow-actions"
+            role="group"
+            aria-label="举报状态"
+          >
+            <button
+              :aria-pressed="!resolvedOnly"
+              :disabled="!resolvedOnly || busy || editorOpen || writing"
+              @click="runRead(() => filterReports(false), '查询已完成')"
+            >
+              全部举报
+            </button>
+            <button
+              :aria-pressed="resolvedOnly"
+              :disabled="resolvedOnly || busy || editorOpen || writing"
+              @click="runRead(() => filterReports(true), '查询已完成')"
+            >
+              已确认
+            </button>
+          </div>
           <button
             :disabled="busy || editorOpen || writing"
             @click="runRead(() => refresh(), '查询已完成')"
@@ -134,7 +159,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
           </button>
         </FloatingNotice>
         <p v-else-if="!items.length" class="experience-empty">
-          {{ mode === 'penalties' ? '本页暂无已确认举报，可继续翻页查询' : '暂无案件' }}
+          {{ resolvedOnly ? '本页暂无已确认举报' : '暂无案件' }}
         </p>
         <div v-else class="business-table">
           <table>
@@ -232,13 +257,7 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
                 :disabled="busy || editorOpen"
                 @click="startProcessing()"
               >
-                {{
-                  mode === 'appeals'
-                    ? '处理申诉'
-                    : mode === 'penalties'
-                      ? '给予账号处罚'
-                      : '处理举报'
-                }}
+                {{ mode === 'appeals' ? '处理申诉' : '处理举报' }}
               </button>
               <button
                 v-if="mode === 'reports' && report && admin.can('crisis_operator')"
@@ -247,17 +266,15 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
               >
                 升级危机
               </button>
-              <RouterLink
-                v-if="mode === 'reports' && report?.status === 'resolved'"
-                :to="{ path: '/safety/penalties', query: { report: report.id } }"
-                >进入处罚管理</RouterLink
+              <button
+                v-if="canPenalize"
+                :disabled="busy || editorOpen"
+                @click="startProcessing('penalty')"
               >
+                给予账号处罚
+              </button>
             </div>
-            <p v-if="!options.length">
-              {{
-                mode === 'penalties' ? '仅已确认举报可作为处罚依据。' : '当前案件已处理，仅供查看。'
-              }}
-            </p>
+            <p v-if="!options.length">当前案件已处理，仅供查看。</p>
           </template>
           <p v-else-if="!loading && !selected">选择案件，按需读取详情。</p>
         </section>
@@ -269,10 +286,17 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
       </WorkspaceDrawer>
       <WorkspaceDrawer
         v-if="editorOpen"
+        ref="editor"
         presentation="dialog"
         :open="editorOpen"
         :busy="writing || escalating || uncertain"
-        :title="editorTask === 'crisis' ? '升级危机' : processingTitle"
+        :title="
+          editorTask === 'crisis'
+            ? '升级危机'
+            : editorTask === 'penalty'
+              ? '账号处罚'
+              : processingTitle
+        "
         class="business-dialog workflow"
         @close="cancelProcessing"
       >
@@ -322,21 +346,9 @@ const { feedback: readFeedback, run: runRead } = useOperationFeedback(() =>
                   }}
                 </p>
               </template>
-              <template v-if="operation === 'offline' || operation === 'release-restriction'">
-                <label for="resource-version">内容对象当前版本</label>
-                <input
-                  id="resource-version"
-                  v-model="resourceVersion"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[1-9][0-9]*"
-                  required
-                  aria-describedby="resource-version-note"
-                />
-                <p id="resource-version-note">
-                  请从授权交接取得本内容对象的当前版本；心愿与故事使用所属心愿版本，留言与消息使用各自对象版本，均不是正文版本。
-                </p>
-              </template>
+              <p v-if="operation === 'offline' || operation === 'release-restriction'">
+                核对处理时会读取本案内容对象的当前版本。
+              </p>
               <p
                 v-if="operation === 'revoke' || operation === 'release-restriction'"
                 class="banner"

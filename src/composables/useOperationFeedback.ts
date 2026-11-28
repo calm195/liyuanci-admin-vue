@@ -12,18 +12,15 @@ export function useOperationFeedback(hasFailure: () => boolean) {
   })
   let generation = 0
   let active = true
+  function reset() {
+    generation++
+    feedback.message = ''
+  }
   onBeforeUnmount(() => {
     active = false
     generation++
   })
-  watch(
-    () => [admin.session, admin.forbidden],
-    () => {
-      generation++
-      feedback.message = ''
-    },
-    { flush: 'sync' },
-  )
+  watch(() => [admin.session, admin.forbidden], reset, { flush: 'sync' })
   async function run(task: () => unknown, success = '查询已完成') {
     const current = ++generation
     const owner = admin.session
@@ -41,5 +38,5 @@ export function useOperationFeedback(hasFailure: () => boolean) {
       feedback.tone = 'error'
     }
   }
-  return { feedback, run }
+  return { feedback, run, reset }
 }

@@ -23,6 +23,7 @@ const cases = [
   { id: 'rejected-a', status: 'rejected', kind: 'story', version: 2, content_version: 1 },
 ]
 const queries = [],
+  decisions = [],
   errors = [],
   unexpected = []
 try {
@@ -51,6 +52,33 @@ try {
       return
     }
     if (await handleSessionAndDashboard(route)) return
+    const casePath = '/api/v1/admin/moderation-tasks/pending-01'
+    if (url.pathname === casePath) {
+      await route.fulfill({
+        json: {
+          code: 0,
+          message: '合成响应',
+          request_id: 'synthetic',
+          data: { ...cases[0], body: '合成点选案件正文' },
+        },
+      })
+      return
+    }
+    if (url.pathname === `${casePath}/decision`) {
+      const request = route.request()
+      assert.equal(request.method(), 'POST')
+      assert.ok(request.headers()['idempotency-key'])
+      decisions.push(request.postDataJSON())
+      await route.fulfill({
+        json: {
+          code: 0,
+          message: '合成审核决定',
+          request_id: 'synthetic',
+          data: { content_decision: 'approved', business_outcome: 'cancelled', version: 2 },
+        },
+      })
+      return
+    }
     if (url.pathname !== '/api/v1/admin/moderation-tasks') {
       unexpected.push(url.pathname)
       await route.fulfill({ status: 404, json: {} })
@@ -59,11 +87,11 @@ try {
     const q = url.searchParams
     queries.push(Object.fromEntries(q))
     const status = q.get('status') ?? 'human_required'
+    assert.equal(q.has('q'), false)
     const items = cases.filter(
       (item) =>
         (status === 'all' || item.status === status) &&
-        (!q.get('kind') || q.get('kind') === item.kind) &&
-        (!q.get('q') || item.id.includes(q.get('q'))),
+        (!q.has('kind') || q.get('kind') === item.kind),
     )
     const start = Number(q.get('cursor') ?? 0),
       limit = Number(q.get('limit') ?? 10)
@@ -83,8 +111,13 @@ try {
   await page.getByText('pending-01', { exact: true }).waitFor()
   assert.equal(queries[0].status, 'human_required')
   assert.equal(await page.locator('tbody tr').count(), 10)
-  await page.getByLabel('审核状态').selectOption('all')
-  await page.getByRole('button', { name: '查询', exact: true }).click()
+  assert.equal(await page.getByRole('form', { name: '审核案件筛选' }).locator('input').count(), 0)
+  await Promise.all([
+    page.waitForResponse(
+      (response) => new URL(response.url()).searchParams.get('status') === 'all',
+    ),
+    page.getByLabel('审核状态').selectOption('all'),
+  ])
   await page.getByText('pending-01', { exact: true }).waitFor()
   await page.getByRole('button', { name: '下一页', exact: true }).click()
   await page.getByText('approved-a', { exact: true }).waitFor()
@@ -92,12 +125,14 @@ try {
   assert.ok(rows[0].includes('pending-11'))
   assert.ok(rows[1].includes('pending-12'))
   assert.ok(rows[2].includes('approved-a'))
-  await page.getByLabel('搜索案件或内容编号').fill('approved')
-  await page.getByLabel('内容类型').selectOption('wish')
-  await page.getByRole('button', { name: '查询', exact: true }).click()
+  await page.getByLabel('审核状态').selectOption('approved')
+  await Promise.all([
+    page.waitForResponse((response) => new URL(response.url()).searchParams.get('kind') === 'wish'),
+    page.getByLabel('内容类型').selectOption('wish'),
+  ])
   await page.waitForFunction(() => globalThis.document.querySelectorAll('tbody tr').length === 1)
   assert.equal(queries.at(-1).cursor, undefined)
-  assert.equal(queries.at(-1).q, 'approved')
+  assert.equal(queries.at(-1).status, 'approved')
   assert.equal(queries.at(-1).kind, 'wish')
   for (const close of await page.getByRole('button', { name: '关闭提示', exact: true }).all())
     await close.click()
@@ -127,9 +162,16 @@ try {
   assert.equal(queries.at(-1).status, 'human_required')
   assert.equal(queries.at(-1).q, undefined)
   assert.equal(queries.at(-1).kind, undefined)
+  await page.getByRole('button', { name: '查看第 1 条案件', exact: true }).click()
+  await page.getByText('合成点选案件正文', { exact: true }).waitFor()
+  await page.getByRole('button', { name: '处理内容审核', exact: true }).click()
+  await page.getByRole('button', { name: '核对操作', exact: true }).click()
+  await page.getByRole('button', { name: '确认提交', exact: true }).click()
+  await page.getByRole('heading', { name: '审核回执', exact: true }).waitFor()
+  assert.deepEqual(decisions, [{ expected_version: 1, decision: 'approved' }])
   assert.deepEqual(errors, [])
   assert.deepEqual(unexpected, [])
-  process.stdout.write(`内容审核默认待审、全部排序、筛选重置游标、窄屏回归通过：${output}\n`)
+  process.stdout.write(`内容审核类型与状态筛选、列表点选处理、窄屏回归通过：${output}\n`)
 } finally {
   await browser.close()
 }

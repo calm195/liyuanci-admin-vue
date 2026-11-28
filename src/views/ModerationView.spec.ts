@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, getActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import ModerationView from './ModerationView.vue'
 import { ElDialog } from 'element-plus'
 import CrisisEscalation from '@/components/CrisisEscalation.vue'
@@ -20,20 +21,24 @@ vi.mock('@/components/CrisisEscalation.vue', () => ({
 }))
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: mocks.beforeUpdate,
   useRouter: () => ({ push: mocks.push }),
   useRoute: () => ({ query: mocks.query }),
 }))
 vi.mock('@/components/confirmDiscardChanges', () => ({ confirmDiscardChanges: vi.fn() }))
+type CaseRoute = { query: { case?: string } }
 const mocks = vi.hoisted(() => {
   const query: { case?: string } = {}
   return {
     query,
     push: vi.fn(),
+    beforeUpdate: vi.fn<(guard: (to: CaseRoute, from: CaseRoute) => Promise<boolean>) => void>(),
     list: vi.fn(),
     detail: vi.fn(),
     decide: vi.fn(),
   }
 })
+mocks.query = reactive(mocks.query)
 vi.mock('@/services/content-transport', async (original) => ({
   ...(await original<typeof contentService>()),
   createModerationTransport: () => mocks,
@@ -140,7 +145,7 @@ describe('T017 真实内容审核页面交互', () => {
     expect(wrapper?.text()).toContain('合成涉校命中正文')
     expect(wrapper?.text()).toContain('正文版本 2')
     expect(wrapper?.text()).toContain('未经证实')
-    expect(wrapper?.find('input[type="search"]').exists()).toBe(true)
+    expect(wrapper?.get('form[aria-label="审核案件筛选"]').find('input').exists()).toBe(false)
     await open('case-b')
     expect(wrapper?.text()).not.toContain('本正文版本涉及学校官方内容')
   })
@@ -383,14 +388,12 @@ describe('T017 真实内容审核页面交互', () => {
     await button('下一页').trigger('click')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith('next', expect.any(AbortSignal), {
-      q: '',
       status: 'human_required',
       kind: '',
     })
     await button('上一页').trigger('click')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: '',
       status: 'human_required',
       kind: '',
     })
@@ -506,17 +509,51 @@ it('通过关联入口直接读取授权审核案件，无需从列表手动匹�
   expect(wrapper.text()).toContain(second.body)
 })
 
+it('同页切换关联审核案件时只展示当前授权响应，移除链接时关闭详情', async () => {
+  await flushPromises()
+  const oldDetail = deferred<ModerationCase>()
+  mocks.detail.mockReturnValueOnce(oldDetail.promise)
+  mocks.query.case = first.id
+  await flushPromises()
+  const oldSignal: unknown = mocks.detail.mock.calls[0]?.[1]
+  expect(oldSignal).toBeInstanceOf(AbortSignal)
+  mocks.query.case = second.id
+  await flushPromises()
+  expect(mocks.detail).toHaveBeenLastCalledWith(second.id, expect.any(AbortSignal))
+  expect(oldSignal).toHaveProperty('aborted', true)
+  oldDetail.resolve(first)
+  await flushPromises()
+  expect(wrapper?.text()).toContain(second.body)
+  expect(wrapper?.text()).not.toContain(first.body)
+  delete mocks.query.case
+  await flushPromises()
+  expect(wrapper?.text()).not.toContain(second.body)
+})
+
+it('同页关联跳转先确认放弃未保存意见', async () => {
+  await flushPromises()
+  await open()
+  await processing()
+  await wrapper?.get('input[value="rejected"]').setValue()
+  await wrapper?.get('#moderation-reason').setValue('尚未保存的理由')
+  const guard = mocks.beforeUpdate.mock.calls[0]?.[0]
+  if (!guard) throw new Error('缺少关联案件导航拦截')
+  const target = { query: { case: second.id } }
+  const from = { query: {} }
+  vi.mocked(confirmDiscardChanges).mockResolvedValueOnce(false)
+  await expect(guard(target, from)).resolves.toBe(false)
+  expect(wrapper?.get('#moderation-reason').element).toHaveProperty('value', '尚未保存的理由')
+  await expect(guard(target, from)).resolves.toBe(true)
+  expect(wrapper?.find('#moderation-reason').exists()).toBe(false)
+})
+
 describe('内容审核筛选与游标', () => {
-  it('默认请求需要审核，查询改变筛选重置页码且翻页保留已应用筛选', async () => {
+  it('默认请求需要审核，类型和状态改变立即筛选，翻页保留筛选且换条件回首页', async () => {
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: '',
       status: 'human_required',
       kind: '',
     })
-    await wrapper?.get('input[type="search"]').setValue(' case- ')
-    await wrapper?.get('form[aria-label="审核案件筛选"] select').setValue('all')
-    await wrapper?.findAll('form[aria-label="审核案件筛选"] select')[1]?.setValue('wish')
     mocks.list.mockResolvedValue({
       items: [
         { id: 'pending-z', status: 'human_required', version: 1 },
@@ -524,34 +561,37 @@ describe('内容审核筛选与游标', () => {
       ],
       next_cursor: 'next-filtered',
     })
-    await wrapper?.get('form[aria-label="审核案件筛选"]').trigger('submit')
+    const selects = wrapper?.get('form[aria-label="审核案件筛选"]').findAll('select') ?? []
+    expect(selects).toHaveLength(2)
+    await selects[0]?.setValue('all')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: 'case-',
+      status: 'all',
+      kind: '',
+    })
+    await selects[1]?.setValue('wish')
+    await flushPromises()
+    expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
       status: 'all',
       kind: 'wish',
     })
     expect(wrapper?.findAll('tbody tr')[0]?.text()).toContain('待人工审核')
-    await wrapper?.get('input[type="search"]').setValue('未提交输入')
     await button('下一页').trigger('click')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith('next-filtered', expect.any(AbortSignal), {
-      q: 'case-',
       status: 'all',
       kind: 'wish',
     })
-    await wrapper?.get('form[aria-label="审核案件筛选"]').trigger('submit')
+    await selects[1]?.setValue('message')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: '未提交输入',
       status: 'all',
-      kind: 'wish',
+      kind: 'message',
     })
     expect(button('上一页').attributes('disabled')).toBeDefined()
     await button('重置筛选').trigger('click')
     await flushPromises()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: '',
       status: 'human_required',
       kind: '',
     })
@@ -565,7 +605,6 @@ describe('内容审核筛选与游标', () => {
     ).toBeDefined()
     await confirm()
     expect(mocks.list).toHaveBeenLastCalledWith(null, expect.any(AbortSignal), {
-      q: '',
       status: 'human_required',
       kind: '',
     })
